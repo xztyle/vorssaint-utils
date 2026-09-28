@@ -31,6 +31,9 @@ hardware/permission-dependent behavior remains unverified.
 
 - Fast history search at realistic large history sizes.
 - Paste-informed visual cards, clear previews and an efficient keyboard workflow.
+- The primary history opens as a drawer from the very bottom of the active display,
+  across the screen and over the Dock. It is not a floating window above the Dock.
+  Opening and closing use vertical motion, with Reduce Motion respected.
 - Named pinned collections, editing and reordering.
 - Preserve rich text, images and file references as appropriate for their types.
 - Durable history, explicit retention, backups and migration without silent loss.
@@ -51,8 +54,26 @@ hardware/permission-dependent behavior remains unverified.
 
 - Capture, corner preview, edit, and drag to an image-capable text input.
 - Edited images must remain available in the corner and drag with all edits applied.
+- The resting bottom-left preview is only the screenshot image: no persistent
+  border, frame, backing, padding, caption, toolbar or shadow. Its size follows
+  the image rather than a fixed card size.
+- Reveal capture actions on hover, without changing the screenshot pixels.
+- A leftward drag that finishes at the source display's left edge dismisses the
+  preview. A successful drop into another app takes precedence and must transfer
+  the edited image as native image data or a file, including into image-capable
+  text fields. Cancelled drags must not dismiss it.
 - Predictable preview lifetime, multiple captures, keyboard actions and cancellation.
 - Keep existing capture, annotation, recording and local-sharing functions working.
+
+## App-wide appearance
+
+- Use macOS 26 Liquid Glass for top-level floating controls and navigation,
+  following the system's light/dark appearance and user-selected accent.
+- Keep content itself legible and visually clean. Glass must not cover or alter
+  screenshots, image previews, data cards or text merely to increase its use.
+- Respect Reduce Transparency, Increase Contrast and Reduce Motion. Keep the
+  same functions available through keyboard and accessibility controls.
+- Verify the principal surfaces of all five replacement features on this Mac.
 
 ## Cleanup
 
@@ -68,8 +89,9 @@ hardware/permission-dependent behavior remains unverified.
 
 - Five branches: `feature/battery-care`, `feature/clipboard`, `feature/menu-bar`,
   `feature/screen-capture`, `feature/mac-cleanup`, each with a distinct worktree.
-- Two agents per feature: GPT 6 Sol at xhigh for research, GPT 6 Astra at xhigh
-  for implementation. Ten agents total, scheduled within available concurrency.
+- The original research and implementation workers used the requested separate
+  feature scopes. From the owner's later instruction onward, use GPT 6 Sol at
+  xhigh for all further work; do not resume GPT 6 Astra workers.
 - The primary agent owns shared identity/signing work, review, integration and final
   real-Mac verification. No external Fable/Claude review.
 - Finish each branch, verify it, then merge it into main. Commit and push are authorized.
