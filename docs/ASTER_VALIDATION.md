@@ -666,3 +666,24 @@ checks: battery protected-state and charge behavior, menu-bar restoration,
 screenshot swipe and cross-app drop, and clipboard quick paste. The installed
 app remains an older signed build until those safety and interaction checks
 permit replacement.
+
+## Installed clipboard interaction — 2026-09-28
+
+The installed older Aster build has clipboard capture and the history shortcut
+enabled, with no shortcut-registration warning visible in Settings. Its History
+shortcut button opens the bottom drawer, and the Utilities panel opens the same
+drawer. A copied ordinary test phrase appeared as the sixth recent item. The
+earlier token-shaped test marker did not appear because the enabled sensitive-
+text filter excluded it. Double-clicking the saved phrase closed the drawer
+and copied that phrase again.
+
+Sending ⌃⌥⌘V through computer control while a disposable TextEdit document was
+focused did not open the drawer. The copied test phrase appeared in history
+with **Aster** as its source app, even though the command was sent to TextEdit.
+This indicates the computer-control input reached TextEdit without making it
+macOS's frontmost app. Opening the drawer through Aster's own panel and
+selecting an item therefore did not paste into TextEdit: Aster had no prior
+regular app to activate. These observations do not prove the global shortcut
+or cross-app paste fails for physical keyboard input, so both live acceptance
+checks remain open. A manual keyboard check was requested from the owner. The
+disposable document and prior generated clipboard content were restored.
