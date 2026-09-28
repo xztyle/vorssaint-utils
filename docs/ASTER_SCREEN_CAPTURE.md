@@ -162,8 +162,16 @@ adapts when the gesture starts close to that edge. Reduce Motion skips the
 animation. Other drag directions keep the native image transfer, and a display
 to the left remains a valid drag destination.
 
-The `feature/screen-capture` branch through `e7b81d1` passes 832 screenshot
-checks after the adaptive swipe change. A distinct signed generated-image
+The branch also tracks a two-finger left swipe through AppKit's fluid swipe
+progress. It moves the same card across the display, follows the system's
+scroll-direction preference and returns on cancellation. Mouse drags still
+start native image transfers in the other directions. [CleanShot's feature
+list](https://cleanshot.com/features) calls out swipe control for its Quick
+Access Overlay. This adds the trackpad interaction to the
+existing pointer gesture; real trackpad feel remains a live acceptance check.
+
+The `feature/screen-capture` branch passes 834 screenshot checks after the
+trackpad and adaptive pointer swipe changes. A distinct signed generated-image
 fixture showed a 320 × 178 point image-only card. The computer-control tool
 could not route a reliable drag to this transient panel. Hands-on confirmation
 of the card's swipe motion, hover controls and image-capable text input is still
