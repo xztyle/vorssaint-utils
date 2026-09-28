@@ -25,8 +25,10 @@ private struct StorageDuplicateGroupView: View {
     @ObservedObject private var service = StorageInspectionService.shared
     private var text: StorageInspectionStrings { .current }
     var body: some View {
-        GroupBox("\(group.files.count) · \(ByteCountFormatter.string(fromByteCount: group.files[0].logicalBytes, countStyle: .file))") {
+        GroupBox {
             VStack(alignment: .leading) {
+                Text("\(group.files.count) · \(ByteCountFormatter.string(fromByteCount: group.files[0].logicalBytes, countStyle: .file))")
+                    .font(.headline)
                 ForEach(group.files.prefix(shown)) { file in
                     HStack(alignment: .top) {
                         StorageFileRow(file: file, allowsSelection: group.keeperID != nil && group.keeperID != file.id)
@@ -75,14 +77,17 @@ struct StorageRecoveryView: View {
     private var text: StorageInspectionStrings { .current }
     var body: some View {
         if !service.receipts.isEmpty {
-            GroupBox(text[.recovery]) {
-                ForEach(service.receipts) { receipt in
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(receipt.original.path).font(.caption).textSelection(.enabled)
-                        if let url = receipt.trash {
-                            Button("\(text[.reveal]): \(url.path)") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
-                        } else { Text("\(text[.failed]): \(failure(receipt.failure))").foregroundStyle(.orange) }
-                    }.frame(maxWidth: .infinity, alignment: .leading)
+            GroupBox {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(text[.recovery]).font(.headline)
+                    ForEach(service.receipts) { receipt in
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(receipt.original.path).font(.caption).textSelection(.enabled)
+                            if let url = receipt.trash {
+                                Button("\(text[.reveal]): \(url.path)") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                            } else { Text("\(text[.failed]): \(failure(receipt.failure))").foregroundStyle(.orange) }
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
             }.accessibilityElement(children: .contain)
         }
