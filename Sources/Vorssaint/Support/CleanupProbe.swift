@@ -13,6 +13,7 @@ enum CleanupProbe {
         return (try? StorageLocalAccess.canonicalRoot(supplied)) ?? supplied
     }
     private static var window: NSWindow?
+    private static var resizeObserver: NSObjectProtocol?
 
     static func runIfRequested() {
         guard let root else { return }
@@ -21,17 +22,42 @@ enum CleanupProbe {
         let app = NSApplication.shared
         app.setActivationPolicy(.regular)
         StorageInspectionService.shared.roots = [root.appendingPathComponent("Files", isDirectory: true)]
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1060, height: 780),
+        let window = makeWindow()
+        self.window = window
+        resizeObserver = NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification,
+            object: window, queue: .main) { _ in writeGeometry() }
+        window.center(); window.makeKeyAndOrderFront(nil)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { writeGeometry() }
+        app.activate(ignoringOtherApps: true)
+        app.run()
+        exit(0)
+    }
+
+    private static func makeWindow() -> NSWindow {
+        let size = NSSize(width: 1060, height: 780)
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
                               styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.title = "Aster — " + StorageInspectionStrings.current[.title]
         let host = NSHostingController(rootView: StorageInspectionView())
         host.sizingOptions = []
+        host.view.frame = NSRect(origin: .zero, size: size)
+        host.view.autoresizingMask = [.width, .height]
         window.contentViewController = host
-        window.center(); window.makeKeyAndOrderFront(nil)
-        self.window = window
-        app.activate(ignoringOtherApps: true)
-        app.run()
-        exit(0)
+        window.setContentSize(size)
+        window.contentMinSize = NSSize(width: 860, height: 600)
+        return window
+    }
+
+    private static func writeGeometry() {
+        guard let root, let window else { return }
+        let frame = window.frame
+        let content = window.contentView?.bounds ?? .zero
+        let state: [String: Any] = ["pid": ProcessInfo.processInfo.processIdentifier,
+            "frame": [frame.minX, frame.minY, frame.width, frame.height],
+            "content": [content.width, content.height], "visible": window.isVisible,
+            "minimumContent": [window.contentMinSize.width, window.contentMinSize.height]]
+        guard let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) else { return }
+        PrivateFileStore.write(data, to: root.appendingPathComponent("ui-state.json"))
     }
 
     private static func prepare(_ root: URL) throws {
