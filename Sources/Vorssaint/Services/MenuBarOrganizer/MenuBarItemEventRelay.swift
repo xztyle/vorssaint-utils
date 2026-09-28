@@ -20,21 +20,28 @@ final class MenuBarItemEventRelay {
     init(pid: pid_t) { self.pid = pid }
 
     func start() throws {
+        guard taps.isEmpty else { throw MenuBarItemMoveError.busy }
+        var started = false
+        defer { if !started { close() } }
         let mask = [CGEventType.null, .leftMouseDown, .leftMouseDragged, .leftMouseUp]
             .reduce(CGEventMask(0)) { $0 | (CGEventMask(1) << $1.rawValue) }
         let context = Unmanaged.passUnretained(self).toOpaque()
         guard let target = CGEvent.tapCreateForPid(pid: pid, place: .headInsertEventTap,
             options: .defaultTap, eventsOfInterest: mask, callback: Self.targetCallback, userInfo: context)
         else { throw MenuBarItemMoveError.eventCreationFailed }
-        install(target)
+        try install(target)
         guard let session = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap,
             options: .defaultTap, eventsOfInterest: mask, callback: Self.sessionCallback, userInfo: context)
-        else { close(); throw MenuBarItemMoveError.eventCreationFailed }
-        install(session)
+        else { throw MenuBarItemMoveError.eventCreationFailed }
+        try install(session)
+        started = true
     }
 
-    private func install(_ tap: CFMachPort) {
-        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)!
+    private func install(_ tap: CFMachPort) throws {
+        guard let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0) else {
+            CFMachPortInvalidate(tap)
+            throw MenuBarItemMoveError.eventCreationFailed
+        }
         taps.append((tap, source))
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)

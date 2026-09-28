@@ -8,6 +8,7 @@ enum MenuBarOrganizerTests {
         MenuBarItemEventTests.run(suite)
         MenuBarRestorationTests.run(suite)
         MenuBarPointerRecoveryTests.run(suite)
+        MenuBarTapLifecycleTests.run(suite)
         accessibilityFrames(suite)
         diagnosticPrivacy(suite)
         redactedHostTitles(suite)
