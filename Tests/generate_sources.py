@@ -41,6 +41,11 @@ def availability_declaration(path, prefix):
 
 
 def main():
+    write("BatteryHelperUpgradeContract.swift", "import Foundation\nextension BatteryHelperUpgradeTests.Service {\n"
+          + declaration("Sources/Vorssaint/Services/BatteryCare/BatteryCareService.swift",
+                        "    private func upgradeIfNeeded(").replace("private func", "func", 1)
+              .replace("UserDefaults.standard", "defaults")
+          + "}\n")
     write("NotchActivityPicker.swift", "import SwiftUI\n"
           + declaration("Sources/Vorssaint/UI/Notch/NotchView.swift", "struct NotchShape: Shape {")
           + declaration("Sources/Vorssaint/UI/Notch/NotchView.swift", "struct NotchActivityPicker: View {"))

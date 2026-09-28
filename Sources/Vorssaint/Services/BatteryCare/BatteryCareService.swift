@@ -142,10 +142,13 @@ final class BatteryCareService: ObservableObject {
 
     private func upgradeIfNeeded() -> Bool {
         let old = UserDefaults.standard.string(forKey: DefaultsKey.batteryCareHelperVersion)
-        guard old != nil, old != buildVersion else { return false }
+        guard !buildVersion.isEmpty, old != buildVersion else { return false }
         removing = true
         send(.init(kind: .returnToSystem)) { success in
-            guard success, !self.snapshot.state.recoveryPending else { self.removing = false; return }
+            guard success, !self.snapshot.state.ownsHardware, !self.snapshot.state.recoveryPending else {
+                self.removing = false
+                return
+            }
             do {
                 try self.daemon.unregister()
                 self.connection?.invalidate()

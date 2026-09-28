@@ -18,9 +18,11 @@ enum BatteryCareTests {
         replyCompletion(suite)
         hardware(suite)
         sensors(suite)
+        adapterPresence(suite)
         BatteryControllerTests.run(suite)
         #if !BATTERY_STANDALONE
         localizationAndBackup(suite)
+        BatteryHelperUpgradeTests.run(suite)
         #endif
     }
 
@@ -230,6 +232,29 @@ enum BatteryCareTests {
         var missingCurrent = sample
         missingCurrent.watts = nil
         suite.expect(!missingCurrent.isFresh(at: now), "missing current stops discharge immediately")
+    }
+
+    static func adapterPresence(_ suite: TestSuite) {
+        var properties: [String: Any] = ["CurrentCapacity": 80, "MaxCapacity": 100,
+            "Temperature": 3078, "ExternalConnected": false, "IsCharging": false,
+            "Voltage": 12000, "Amperage": -1000, "AppleRawExternalConnected": true]
+        let cut = BatterySensor.decode(properties, at: now)
+        suite.expect(cut.connected == true && cut.externalPowerConnected == false && cut.isFresh(at: now),
+                     "physical attachment remains distinct from intentionally cut effective AC")
+        properties["AppleRawExternalConnected"] = false
+        properties["ExternalConnected"] = true
+        let unplugged = BatterySensor.decode(properties, at: now)
+        suite.expect(unplugged.connected == false && unplugged.externalPowerConnected == true,
+                     "physical unplug wins over a lagging effective-power flag")
+        properties["AppleRawExternalConnected"] = "invalid"
+        suite.expect(!BatterySensor.decode(properties, at: now).isFresh(at: now),
+                     "malformed physical presence fails closed instead of assuming attachment")
+        properties.removeValue(forKey: "AppleRawExternalConnected")
+        suite.expect(BatterySensor.decode(properties, at: now).connected == true,
+                     "legacy registry without a raw signal retains effective AC detection")
+        properties["ExternalConnected"] = false
+        suite.expect(BatterySensor.decode(properties, at: now).connected == false,
+                     "legacy effective AC loss remains conservative when physical presence is unavailable")
     }
 
     #if !BATTERY_STANDALONE
