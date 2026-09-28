@@ -5,6 +5,7 @@ import AppKit
 enum MenuBarOrganizerTests {
     static func run(_ suite: TestSuite) {
         windowNumbers(suite)
+        MenuBarItemEventTests.run(suite)
         accessibilityFrames(suite)
         diagnosticPrivacy(suite)
         redactedHostTitles(suite)

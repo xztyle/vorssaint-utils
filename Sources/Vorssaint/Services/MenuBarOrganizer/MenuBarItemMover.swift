@@ -31,8 +31,7 @@ final class MenuBarItemMover {
         }
         let end = CGPoint(x: placeAfter ? destinationFrame.maxX + 2 : destinationFrame.minX - 2,
                           y: destinationFrame.midY)
-        try await postCommandDrag(from: CGPoint(x: item.frame.midX, y: item.frame.midY),
-                                  to: end, targetPID: targetPID(item))
+        try await postCommandDrag(item: item, to: end)
     }
 
     func click(item: ManagedMenuBarItem) async throws {
@@ -43,8 +42,8 @@ final class MenuBarItemMover {
         try checkFrame(item)
         let point = CGPoint(x: item.frame.midX, y: item.frame.midY)
         let source = try source()
-        let down = try event(.leftMouseDown, source: source, point: point)
-        let up = try event(.leftMouseUp, source: source, point: point)
+        let down = try event(.leftMouseDown, source: source, point: point, item: item)
+        let up = try event(.leftMouseUp, source: source, point: point, item: item)
         down.postToPid(targetPID(item))
         defer { up.postToPid(targetPID(item)) }
         try await Task.sleep(for: .milliseconds(35))
@@ -89,24 +88,24 @@ final class MenuBarItemMover {
     }
 
     private func source() throws -> CGEventSource {
-        guard let source = CGEventSource(stateID: .hidSystemState) else { throw MenuBarItemMoveError.eventCreationFailed }
-        source.localEventsSuppressionInterval = 0
+        guard let source = MenuBarItemEventFactory.source() else { throw MenuBarItemMoveError.eventCreationFailed }
         return source
     }
 
     private func event(_ type: CGEventType, source: CGEventSource, point: CGPoint,
-                       command: Bool = false) throws -> CGEvent {
-        guard let event = CGEvent(mouseEventSource: source, mouseType: type,
-                                  mouseCursorPosition: point, mouseButton: .left)
+                       item: ManagedMenuBarItem, moving: Bool = false) throws -> CGEvent {
+        guard let event = MenuBarItemEventFactory.make(type, source: source, point: point,
+            windowID: item.windowID, targetPID: targetPID(item), moving: moving)
         else { throw MenuBarItemMoveError.eventCreationFailed }
-        event.flags = command ? .maskCommand : []
         return event
     }
 
-    private func postCommandDrag(from start: CGPoint, to end: CGPoint, targetPID: pid_t) async throws {
+    private func postCommandDrag(item: ManagedMenuBarItem, to end: CGPoint) async throws {
+        let start = CGPoint(x: item.frame.midX, y: item.frame.midY)
+        let targetPID = targetPID(item)
         let source = try source()
-        let down = try event(.leftMouseDown, source: source, point: start, command: true)
-        let up = try event(.leftMouseUp, source: source, point: end, command: true)
+        let down = try event(.leftMouseDown, source: source, point: start, item: item, moving: true)
+        let up = try event(.leftMouseUp, source: source, point: end, item: item, moving: true)
         CGWarpMouseCursorPosition(start)
         down.postToPid(targetPID)
         defer { up.postToPid(targetPID) }
@@ -115,7 +114,7 @@ final class MenuBarItemMover {
             let fraction = CGFloat(step) / 10
             let point = CGPoint(x: start.x + (end.x - start.x) * fraction,
                                 y: start.y + (end.y - start.y) * fraction)
-            try event(.leftMouseDragged, source: source, point: point, command: true).postToPid(targetPID)
+            try event(.leftMouseDragged, source: source, point: point, item: item, moving: true).postToPid(targetPID)
             try await Task.sleep(for: .milliseconds(8))
         }
     }
