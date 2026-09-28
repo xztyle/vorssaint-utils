@@ -47,6 +47,8 @@ enum CleanupFixtureReceipt {
     }
 
     private static func within(_ url: URL, _ root: URL) -> Bool {
-        StorageInspectionPolicy.isWithin(url.standardizedFileURL, root: root.standardizedFileURL)
+        // File URL standardization resolves /private/tmp only while a path
+        // exists. A trashed original is missing, so normalize lexically.
+        StorageInspectionPolicy.isWithin(url.standardized, root: root.standardized)
     }
 }

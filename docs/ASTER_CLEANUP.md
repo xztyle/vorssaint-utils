@@ -130,32 +130,31 @@ acceptance is recorded separately in `ASTER_VALIDATION.md`; CLI checks do not
 claim that UI interactions, Finder Put Back, cloud providers or external-volume
 Trash behavior were exercised on the owner's data.
 
-### Duplicate-results UI limitation
+### Live Mac verification
 
-On Mac16,5 / macOS 26.6.2, the generated fixture scanned four files and reached
-the duplicate-results state through the Duplicates tab and action. Both an
-accessibility-tree read and a screenshot request then crashed
-`SkyComputerUseService`, while Aster remained running. An earlier reproduction,
-`SkyComputerUseService-2026-09-28-090040.ips`, records `Array.remove(at:)` followed
-by repeated `compactMap` frames in the tool process. TextEdit remained accessible
-through the same control tool immediately afterward.
+On Mac16,5 / macOS 26.6.2, duplicate and recovery result groups with separate
+SwiftUI GroupBox labels crashed the computer-control tool's accessibility reader;
+Aster remained running. Moving the titles inside explicitly contained groups
+made both results readable in the actual app.
 
-Commit `3dfa0c8` narrows the disabled state to the removal checkbox and adds
-file-specific keeper labels. It passed 88 storage-inspection checks, 246
-repository checks, the optimized build, strict signature verification and
-runtime selftest. An exact live retry still crashed the control tool when the
-duplicate results appeared. The change improves the review controls, but it is
-not claimed to fix the tool crash. No duplicate-results UI acceptance pass is
-claimed, including choosing a keeper or removing a reviewed duplicate through
-that screen. The automated keeper/removal-policy checks passed independently.
+The generated-file UI test selected Original.txt as keeper, selected only
+Duplicate.txt for removal, reviewed both exact paths, and moved the extra copy to
+Trash. The recovery panel revealed the real returned Trash path. Finder's Put
+Back restored Duplicate.txt to its original folder; its SHA-256 still matched
+Original.txt. The earlier 8 MiB Large fixture.bin was also restored through Finder.
+No personal file was scanned or removed.
 
-The same tool-only crash also occurred after a reviewed Trash action from the
-working Storage list: the selected generated `Large fixture.bin` disappeared from
-its original location, then the tool crashed while reading the recovery result;
-Aster stayed running. Recovery via Finder was not yet verified at that point.
-Duplicate and recovery result groups now use explicit accessibility containment,
-a bounded semantic grouping change whose live result still needs verification.
-The fixture observer records future service outcomes and cannot reconstruct an
-earlier process's in-memory Trash receipt. Five new receipt checks verify scope
-filtering, keeper identity, returned Trash locations, and omission of private
-content; the combined storage-inspection and repository run passes 339 checks.
+The age filter at 180 days showed the 400-day-old Keep.txt. The large-file filter
+showed no fixture at 100 MB and only Large fixture.bin at 1 MB. The actual malware
+UI detected the harmless EICAR fixture with verified ClamAV definitions and
+reported partial coverage because excluded entries remained outside the scan.
+
+Startup inspection repeated the tool-reader crash with labeled result groups.
+Its titles now use the same readable arrangement; a live retry is still pending.
+The fixture receipt writer also now normalizes paths lexically: Foundation's file
+URL normalization resolved the existing /private/tmp scope to /tmp but left a
+trashed, absent original unchanged, incorrectly omitting its receipt. The new
+missing-original regression fails before the fix and passes with it. All 94
+storage-inspection checks pass. Combined optimized packaging and the new startup
+result UI remain the next gate. External-volume and cloud-provider behavior has
+not been exercised on the owner's data.

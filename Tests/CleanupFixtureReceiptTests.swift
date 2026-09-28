@@ -5,6 +5,7 @@ import Foundation
 
 enum CleanupFixtureReceiptTests {
     static func run(_ suite: TestSuite) {
+        missingOriginal(suite)
         let root = URL(fileURLWithPath: "/private/tmp/AsterGeneratedReceipt/Files")
         let first = file(root.appendingPathComponent("First.txt"), root: root)
         let second = file(root.appendingPathComponent("Second.txt"), root: root)
@@ -46,5 +47,24 @@ enum CleanupFixtureReceiptTests {
     private static func file(_ url: URL, root: URL) -> StorageFileSnapshot {
         .init(url: url, root: root, identity: .init(device: 1, inode: 2), logicalBytes: 1,
               allocatedBytes: 1, modifiedSeconds: 1, modifiedNanoseconds: 0, ancestors: [])
+    }
+
+    private static func missingOriginal(_ suite: TestSuite) {
+        let root = URL(fileURLWithPath: "/private/tmp/aster-receipt-\(UUID().uuidString)")
+        do {
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let original = root.appendingPathComponent("Moved.txt")
+            let trash = URL(fileURLWithPath: "/fixture-trash/Moved.txt")
+            let receipts: [StorageTrashReceipt] = [
+                .init(original: original, trash: trash, failure: nil),
+                .init(original: root.appendingPathComponent("../Outside.txt"), trash: trash, failure: nil)]
+            let data = try CleanupFixtureReceipt.data(root: root, scan: .init(), duplicates: .init(),
+                receipts: receipts, selection: [], malware: nil, busy: false)
+            let state = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+            let result = state["receipts"] as? [[String: Any]]
+            suite.expect(result?.count == 1 && result?.first?["original"] as? String == original.path,
+                         "fixture keeps missing original under existing private tmp scope and excludes lexical escape")
+        } catch { suite.expect(false, "missing original fixture receipt: \(error)") }
     }
 }
