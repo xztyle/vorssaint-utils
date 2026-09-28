@@ -110,7 +110,7 @@ final class MenuBarItemEventRelay {
             fail("press released"); return nil
         }
         guard continuation != nil else { return unchanged }
-        let matches = matchesWindow(event, expected: mouse)
+        let matches = MenuBarItemEventFactory.routingMatches(event, expected: mouse)
         switch delivery?.receive(token: token, isSession: session, matchesWindow: matches) {
         case .sendToSession: postWhilePressed { mouse.post(tap: .cgSessionEventTap) }; return nil
         case .sendToTarget: return postWhilePressed { mouse.postToPid(pid) } ? unchanged : nil
@@ -127,18 +127,13 @@ final class MenuBarItemEventRelay {
         let wanted = fields.map { String(expected.getIntegerValueField($0)) }.joined(separator: ",")
         let received = fields.map { String(event.getIntegerValueField($0)) }.joined(separator: ",")
         logger.error("Menu event rebound: session \(session), type \(event.type.rawValue), expected \(wanted, privacy: .public), received \(received, privacy: .public), x \(event.location.x), y \(event.location.y)")
+        logger.error("Menu event process: expected \(expected.getIntegerValueField(.eventTargetUnixProcessID)), received \(event.getIntegerValueField(.eventTargetUnixProcessID))")
     }
 
     @discardableResult
     private func postWhilePressed(_ post: () -> Void) -> Bool {
         guard press?.performIfArmed(post) == true else { fail("press released"); return false }
         return true
-    }
-
-    private func matchesWindow(_ event: CGEvent, expected: CGEvent) -> Bool {
-        var fields: [CGEventField] = [.mouseEventWindowUnderMousePointer, .mouseEventWindowUnderMousePointerThatCanHandleThisEvent]
-        if expected.getIntegerValueField(MenuBarItemEventFactory.windowField) > 0 { fields.append(MenuBarItemEventFactory.windowField) }
-        return event.type == expected.type && fields.allSatisfy { event.getIntegerValueField($0) == expected.getIntegerValueField($0) }
     }
 
     private static let targetCallback: CGEventTapCallBack = { _, type, event, context in

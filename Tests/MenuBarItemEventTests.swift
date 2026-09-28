@@ -17,6 +17,7 @@ enum MenuBarItemEventTests {
         deliveryRejection(suite)
         releaseRecovery(suite)
         releaseOrdering(suite)
+        hoverRouting(source, suite)
     }
 
     static func routing(_ type: CGEventType, source: CGEventSource, suite: TestSuite) {
@@ -126,5 +127,29 @@ enum MenuBarItemEventTests {
         suite.expect(finished.wait(timeout: .now() + 1) == .success && order == ["mouse", "release"],
                      "an in-flight post completes before watchdog release; later posts are rejected")
         suite.expect(!guardItem.performIfArmed { order.append("late drag") }, "a later drag cannot revive the released gesture")
+    }
+
+    static func hoverRouting(_ source: CGEventSource, _ suite: TestSuite) {
+        for type: CGEventType in [.leftMouseDown, .leftMouseDragged, .leftMouseUp] {
+            guard let expected = MenuBarItemEventFactory.make(type, source: source, point: .zero,
+                windowID: 14651, targetPID: 625, moving: true), let received = expected.copy() else {
+                suite.expect(false, "create routed event fixtures"); return
+            }
+            received.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: 14661)
+            received.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: 14661)
+            suite.expect(MenuBarItemEventFactory.routingMatches(received, expected: expected) == (type != .leftMouseDown),
+                         "actual Tahoe hover-field changes are accepted only after a verified press")
+            received.setIntegerValueField(MenuBarItemEventFactory.windowField, value: 494)
+            suite.expect(!MenuBarItemEventFactory.routingMatches(received, expected: expected),
+                         "a rewritten explicit target never becomes an accepted drag or release")
+            received.setIntegerValueField(MenuBarItemEventFactory.windowField, value: 14651)
+            received.setIntegerValueField(.eventTargetUnixProcessID, value: 626)
+            suite.expect(!MenuBarItemEventFactory.routingMatches(received, expected: expected), "wrong host delivery always fails closed")
+        }
+        guard let click = MenuBarItemEventFactory.make(.leftMouseUp, source: source, point: .zero,
+            windowID: 14651, targetPID: 625, moving: false), let changed = click.copy() else { return }
+        changed.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: 494)
+        suite.expect(!MenuBarItemEventFactory.routingMatches(changed, expected: click),
+                     "ordinary activation does not inherit the held-drag hover exception")
     }
 }
