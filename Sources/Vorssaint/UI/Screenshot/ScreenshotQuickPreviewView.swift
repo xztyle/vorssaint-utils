@@ -261,6 +261,7 @@ struct ScreenshotQuickPreviewView: View {
     @ViewBuilder private var shareMenu: some View {
         if embedded {
             shareMenuContent.menuStyle(.borderlessButton).menuIndicator(.hidden)
+                .fixedSize()
                 .frame(width: 28, height: 28)
         } else {
             shareMenuContent.menuStyle(.button).buttonStyle(.bordered).controlSize(.small)
