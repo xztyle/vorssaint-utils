@@ -13,7 +13,7 @@ extension ScreenshotQuickPreviewView {
     }
     private var showsFloatingActions: Bool {
         ScreenshotPreviewPolicy.showsActions(hovered: floatingHovered,
-            menuTracking: trackingMenu != nil, dragging: floatingDragging)
+            menuTracking: trackingMenu != nil, dragging: floatingDragging || floatingSwiping)
     }
 
     var floatingPreview: some View {
@@ -35,7 +35,8 @@ extension ScreenshotQuickPreviewView {
             .frame(width: imageSize.width, height: imageSize.height)
             .overlay {
                 ScreenshotPreviewDragSurface(image: image, transfer: dragItem,
-                    edit: { perform(.edit) }, dragging: floatingDragChanged, dismiss: dismiss)
+                    edit: { perform(.edit) }, dragging: floatingDragChanged,
+                    swipe: floatingSwipeChanged, dismiss: dismiss)
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(strings.pageTitle)
@@ -121,6 +122,11 @@ extension ScreenshotQuickPreviewView {
     private func floatingDragChanged(_ value: Bool) {
         floatingDragging = value
         draggingChanged(value)
+    }
+
+    private func floatingSwipeChanged(_ value: Bool) {
+        floatingSwiping = value
+        swipingChanged(value)
     }
 
     private func menuBegan(_ notification: Notification) {

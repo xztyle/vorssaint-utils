@@ -55,9 +55,10 @@ final class ScreenshotQuickPreviewController {
     var fixtureWindowTitle: String?
     var interactionEnded: (() -> Void)?
     private var dragging = false
+    private var swiping = false
     private var editing = false
 
-    var isInteracting: Bool { dragging || editing || pointerInside || systemSharing || model.sharing }
+    var isInteracting: Bool { dragging || swiping || editing || pointerInside || systemSharing || model.sharing }
     private var closed = false
     private let presentationID = UUID()
     private var shownInNotch = false
@@ -107,6 +108,7 @@ final class ScreenshotQuickPreviewController {
                                               prefix: self.strings.fileNamePrefix, directory: self.dragDirectory)
             },
             draggingChanged: { [weak self] in self?.draggingChanged($0) },
+            swipingChanged: { [weak self] in self?.swipingChanged($0) },
             dismiss: { [weak self] in self?.close() },
             share: { [weak self] duration in self?.performShare(duration) },
             systemShare: { [weak self] in self?.performSystemShare() },
@@ -295,6 +297,13 @@ final class ScreenshotQuickPreviewController {
     private func draggingChanged(_ value: Bool) {
         dragging = value
         panel?.alphaValue = value ? 0 : 1
+        dismissWork?.cancel()
+        dismissWork = nil
+        if !value { scheduleAutoDismiss(); interactionEnded?() }
+    }
+
+    private func swipingChanged(_ value: Bool) {
+        swiping = value
         dismissWork?.cancel()
         dismissWork = nil
         if !value { scheduleAutoDismiss(); interactionEnded?() }

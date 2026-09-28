@@ -150,3 +150,25 @@ are now observed. Manual external drag acceptance, actual drag cancellation,
 multi-display and Spaces behavior remain unverified. The earlier generated-image
 fixture drag receipts remain separate evidence and do not stand in for this
 pending production cross-app drop.
+
+## Bare corner card and left swipe — 2026-09-28
+
+The floating preview now shows only the captured image at rest. Its panel is
+transparent, borderless and shadowless. Close, Edit, Copy, Save and More appear
+over the image while hovered. A leftward gesture moves the actual card with the
+pointer. Releasing a sufficient horizontal swipe animates it completely past
+the left display edge; a short or cancelled swipe returns it. The distance
+adapts when the gesture starts close to that edge. Reduce Motion skips the
+animation. Other drag directions keep the native image transfer, and a display
+to the left remains a valid drag destination.
+
+The `feature/screen-capture` branch through `e7b81d1` passes 832 screenshot
+checks after the adaptive swipe change. A distinct signed generated-image
+fixture showed a 320 × 178 point image-only card. The computer-control tool
+could not route a reliable drag to this transient panel. Hands-on confirmation
+of the card's swipe motion, hover controls and image-capable text input is still
+pending; no visual swipe success is claimed from the automated check.
+The full branch gate currently has 14 failures in notch-rail and switcher-scroll
+visibility checks. The same 13 switcher failures also occur on current main
+while the screenshot fixture is open. These are not counted as a passing full
+gate; they need a clean rerun after fixture interaction ends.

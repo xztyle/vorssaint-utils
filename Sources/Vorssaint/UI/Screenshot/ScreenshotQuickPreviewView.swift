@@ -11,6 +11,7 @@ struct ScreenshotQuickPreviewView: View {
     let perform: (ScreenshotQuickPreviewController.Action) -> Void
     let dragItem: () -> ScreenshotDragTransfer?
     let draggingChanged: (Bool) -> Void
+    let swipingChanged: (Bool) -> Void
     let dismiss: () -> Void
     let share: (ScreenshotShareDuration) -> Void
     let systemShare: () -> Void
@@ -30,6 +31,7 @@ struct ScreenshotQuickPreviewView: View {
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @State var floatingHovered = false
     @State var floatingDragging = false
+    @State var floatingSwiping = false
     @State var trackingMenu: NSMenu?
 
 
