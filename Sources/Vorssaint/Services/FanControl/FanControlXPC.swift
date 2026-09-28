@@ -4,21 +4,17 @@
 import Foundation
 
 enum FanControlIdentifiers {
-    static let teamID = "3D485NHW29"
-
     #if VORSSAINT_DEVELOPMENT
-    static let appBundleID = "com.vorssaint.utils.dev"
+    static let appBundleID = "io.github.xztyle.Aster.dev"
     #else
-    static let appBundleID = "com.vorssaint.utils"
+    static let appBundleID = "io.github.xztyle.Aster"
     #endif
 
     static let helperID = "\(appBundleID).fan-control"
     static let plistName = "\(helperID).plist"
 
-    static let appCodeRequirement =
-        "anchor apple generic and certificate leaf[subject.OU] = \"\(teamID)\" and identifier \"\(appBundleID)\""
-    static let helperCodeRequirement =
-        "anchor apple generic and certificate leaf[subject.OU] = \"\(teamID)\" and identifier \"\(helperID)\""
+    static let appCodeRequirement = AppCodeIdentity.requirement(identifier: appBundleID)
+    static let helperCodeRequirement = AppCodeIdentity.requirement(identifier: helperID)
 }
 
 @objc protocol FanControlXPCProtocol {

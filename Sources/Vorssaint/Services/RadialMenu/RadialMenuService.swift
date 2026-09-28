@@ -908,7 +908,7 @@ final class RadialMenuService: ObservableObject {
                                       styleMask: [.borderless, .nonactivatingPanel],
                                       backing: .buffered,
                                       defer: false)
-        panel.title = "Vorssaint"
+        panel.title = "Aster"
         panel.isReleasedWhenClosed = false
         panel.isMovableByWindowBackground = false
         panel.hidesOnDeactivate = false

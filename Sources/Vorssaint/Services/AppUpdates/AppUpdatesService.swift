@@ -812,11 +812,10 @@ final class AppUpdatesService: ObservableObject {
                                               updateFeed: updateFeed)
     }
 
-    /// This app never lists itself: it has its own updater, and letting the
-    /// package manager replace a running bundle is exactly what that updater
-    /// exists to do safely.
+    /// Keep Aster builds and upstream apps out of third-party update actions.
     private static func isOwnBundle(_ bundleID: String) -> Bool {
         bundleID == Bundle.main.bundleIdentifier || bundleID.hasPrefix("com.vorssaint")
+            || bundleID.hasPrefix("io.github.xztyle.Aster")
     }
 
     private static let ownPackageTokens: Set<String> = ["vorssaint", "vorssaint@beta", "vorssaint-beta"]

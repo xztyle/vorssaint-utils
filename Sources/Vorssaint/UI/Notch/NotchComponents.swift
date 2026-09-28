@@ -199,27 +199,39 @@ struct NotchRail<Item: Identifiable, Content: View>: View {
                 ForEach(rowStarts, id: \.self) { start in row(start, cell: cell) }
             }
         } else {
-            ScrollViewReader { proxy in
-                // Legacy scroll bars would take a row's worth of height; the
-                // column cut at the edge is the cue that more follows.
-                ScrollView(.horizontal) {
-                    LazyHStack(alignment: .top, spacing: spacing) {
-                        ForEach(starts, id: \.self) { start in column(start).frame(width: itemWidth).id(start) }
-                    }
-                    .contentShape(Rectangle())
+            scrollingRail
+        }
+    }
+
+    private var scrollingRail: some View {
+        ScrollViewReader { proxy in
+            // Legacy scroll bars would take a row's worth of height; the
+            // column cut at the edge is the cue that more follows.
+            ScrollView(.horizontal) {
+                LazyHStack(alignment: .top, spacing: spacing) {
+                    ForEach(starts, id: \.self) { start in column(start).frame(width: itemWidth).id(start) }
                 }
-                .scrollIndicators(.never)
-                .onAppear {
-                    if let targetColumn { proxy.scrollTo(targetColumn, anchor: .center) }
-                }
-                .onChange(of: targetColumn) { _, target in
-                    guard let target else { return }
-                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
-                        proxy.scrollTo(target, anchor: .center)
-                    }
-                }
+                .contentShape(Rectangle())
+            }
+            .scrollIndicators(.never)
+            .onAppear {
+                if let targetColumn { proxy.scrollTo(targetColumn, anchor: .center) }
+            }
+            .onChange(of: targetColumn) { previous, target in
+                guard let target else { return }
+                reveal(target, previous: previous, proxy: proxy)
             }
         }
+    }
+
+    private func reveal(_ target: Int, previous: Int?, proxy: ScrollViewProxy) {
+        let visibleColumns = max(1, Int(width / max(1, itemWidth + spacing)))
+        let nearby = previous.map { abs(target - $0) <= visibleColumns * max(1, rows) } ?? false
+        let animated = nearby && !reduceMotion
+        var transaction = Transaction(animation: animated ? .easeOut(duration: 0.16) : nil)
+        // Animating distant jumps causes the lazy grid to create intervening items.
+        transaction.disablesAnimations = !animated
+        withTransaction(transaction) { proxy.scrollTo(target, anchor: .center) }
     }
 
     private func row(_ start: Int, cell: CGFloat) -> some View {

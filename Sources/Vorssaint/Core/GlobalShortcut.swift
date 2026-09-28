@@ -564,7 +564,7 @@ struct GlobalShortcut: Equatable, Hashable {
     private static let layoutLabelLock = NSLock()
     private static var layoutLabels: [LayoutLabelKey: String] = [:]
     private static var keyboardLayoutObserver: AnyObject?
-    static let keyboardLayoutDidChange = Notification.Name("VorssaintShortcutKeyboardLayoutDidChange")
+    static let keyboardLayoutDidChange = Notification.Name("AsterShortcutKeyboardLayoutDidChange")
 
     /// Starts observing system keyboard layout changes so the keycap cache stays
     /// current across layout switches. Safe to call multiple times.

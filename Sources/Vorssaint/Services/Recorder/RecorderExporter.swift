@@ -482,7 +482,7 @@ final class RecorderExporter {
             return nil
         }
         let directory = cache
-            .appendingPathComponent(Bundle.main.bundleIdentifier ?? "com.vorssaint.utils",
+            .appendingPathComponent(Bundle.main.bundleIdentifier ?? "io.github.xztyle.Aster",
                                     isDirectory: true)
             .appendingPathComponent("Temporary Recording Uploads", isDirectory: true)
         do {

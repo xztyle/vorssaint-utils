@@ -2118,9 +2118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     }
 
     private func showSupportUpdateIntroIfNeeded() -> Bool {
-        // Stable patches share one invitation, even if the first installed
-        // version in this release series is a hotfix.
-        guard SupportUpdateIntroInfo.shouldShow(
+        guard AppInfo.showsPublisherIntroductions, SupportUpdateIntroInfo.shouldShow(
             appVersion: AppInfo.version,
             lastSeenVersion: UserDefaults.standard.string(forKey: DefaultsKey.supportUpdateIntroVersion)
         ) else { return false }
@@ -2129,7 +2127,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     }
 
     private func showSupportUpdateIntro(isReview: Bool = false) {
-        guard !isTerminating, isReview || !AppInfo.isBeta else { return }
+        guard AppInfo.showsPublisherIntroductions, !isTerminating, isReview || !AppInfo.isBeta else { return }
         closePopover()
         if let window = supportIntroWindow {
             NSApp.activate(ignoringOtherApps: true)

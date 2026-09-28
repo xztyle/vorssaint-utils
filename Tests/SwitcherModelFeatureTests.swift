@@ -2039,13 +2039,13 @@ enum SwitcherModelFeatureTests {
                "an app the person switched to while the panel was open keeps activation")
         suite.expect(!StatusItemAnchorSupport.shouldReturnActivation(to: 501, ownPID: 900, frontmostPID: 900,
                                                                      ownWindowIsKey: true, closeReason: .escape),
-               "a Vorssaint window that took focus from the panel keeps Vorssaint active")
+               "a Aster window that took focus from the panel keeps Aster active")
         suite.expect(!StatusItemAnchorSupport.shouldReturnActivation(to: nil, ownPID: 900, frontmostPID: 900,
                                                                      ownWindowIsKey: false, closeReason: .escape),
-               "a panel opened while Vorssaint was already in front has nothing to hand back")
+               "a panel opened while Aster was already in front has nothing to hand back")
         suite.expect(!StatusItemAnchorSupport.shouldReturnActivation(to: 900, ownPID: 900, frontmostPID: 900,
                                                                      ownWindowIsKey: false, closeReason: .escape),
-               "Vorssaint never hands activation back to itself")
+               "Aster never hands activation back to itself")
         suite.expect(!StatusItemAnchorSupport.shouldReturnActivation(to: 501, ownPID: 900, frontmostPID: nil,
                                                                      ownWindowIsKey: false, closeReason: .escape),
                "no known frontmost app means nothing is taken from anyone")
@@ -2059,7 +2059,7 @@ enum SwitcherModelFeatureTests {
         }
         suite.expect(!StatusItemAnchorSupport.shouldReturnActivation(to: 501, ownPID: 900, frontmostPID: 900,
                                                                      ownWindowIsKey: false, closeReason: nil),
-               "a close Vorssaint did not ask for leaves activation alone")
+               "a close Aster did not ask for leaves activation alone")
 
         let showing: Set<UInt64> = [3, 7]
         suite.expect(StatusItemAnchorSupport.handbackWouldSwitchDesktop(windowSpaces: [[1], [2]],
@@ -2087,7 +2087,7 @@ enum SwitcherModelFeatureTests {
                "another app becoming active while the panel is open replaces the remembered app")
         suite.expect(StatusItemAnchorSupport.panelActivationSource(after: .appActivated(900), current: 501,
                                                                    isOwnApp: ownApp) == 501,
-               "Vorssaint taking activation back from the panel keeps the remembered app")
+               "Aster taking activation back from the panel keeps the remembered app")
         suite.expect(StatusItemAnchorSupport.panelActivationSource(after: .appActivated(777), current: nil,
                                                                    isOwnApp: ownApp) == 777,
                "an app activated after the remembered one was dropped becomes the one to return to")
@@ -2351,14 +2351,14 @@ enum SwitcherModelFeatureTests {
             statusDefaults.removePersistentDomain(forName: statusPlacementSuite)
             suite.expect(StatusItemPlacementSupport.placementGeneration(in: statusDefaults) == 0,
                    "initial placement generation is 0")
-            suite.expect(StatusItemPlacementSupport.mainAutosaveName(in: statusDefaults) == "VorssaintMenuBarItem",
+            suite.expect(StatusItemPlacementSupport.mainAutosaveName(in: statusDefaults) == "AsterMenuBarItem",
                    "generation 0 uses base autosave name")
 
             // The coordinate macOS saves for the icon is what puts it back in
             // the same spot on the next launch. 3.3.3 deleted the one written
             // by the older recovery on every launch, which moved the icon to
             // where a first-time item goes and, on a full bar, out of sight.
-            let legacyKey = "NSStatusItem Preferred Position VorssaintMenuBarItem"
+            let legacyKey = "NSStatusItem Preferred Position AsterMenuBarItem"
             statusDefaults.set(64.0, forKey: legacyKey)
             StatusItemPlacementSupport.clearRememberedVisibility(in: statusDefaults)
             suite.expect(statusDefaults.double(forKey: legacyKey) == 64.0,
@@ -2371,29 +2371,29 @@ enum SwitcherModelFeatureTests {
 
             StatusItemPlacementSupport.bumpPlacementGeneration(in: statusDefaults)
             let gen1Name = StatusItemPlacementSupport.mainAutosaveName(in: statusDefaults)
-            suite.expect(gen1Name == "VorssaintMenuBarItem.1",
+            suite.expect(gen1Name == "AsterMenuBarItem.1",
                    "bumped generation produces numbered autosave name")
-            suite.expect(statusDefaults.object(forKey: "NSStatusItem Preferred Position VorssaintMenuBarItem.1") == nil,
+            suite.expect(statusDefaults.object(forKey: "NSStatusItem Preferred Position AsterMenuBarItem.1") == nil,
                    "a reset lets macOS place the full item without a machine-specific position")
-            suite.expect(statusDefaults.object(forKey: "NSStatusItem Preferred Position VorssaintMenuBarItem") == nil,
+            suite.expect(statusDefaults.object(forKey: "NSStatusItem Preferred Position AsterMenuBarItem") == nil,
                    "bumping drops the previous identity's preferred position")
 
             // Recovery keeps the spot the person arranged and only drops the
             // hidden state macOS remembered: an item that starts over with no
             // saved position is born against the notch, the first place a
             // crowded bar hides.
-            let gen1Position = "NSStatusItem Preferred Position VorssaintMenuBarItem.1"
+            let gen1Position = "NSStatusItem Preferred Position AsterMenuBarItem.1"
             statusDefaults.set(280.0, forKey: gen1Position)
-            statusDefaults.set(false, forKey: "NSStatusItem Visible VorssaintMenuBarItem.1")
-            statusDefaults.set(false, forKey: "NSStatusItem VisibleCC VorssaintMenuBarItem.1")
+            statusDefaults.set(false, forKey: "NSStatusItem Visible AsterMenuBarItem.1")
+            statusDefaults.set(false, forKey: "NSStatusItem VisibleCC AsterMenuBarItem.1")
             StatusItemPlacementSupport.clearRememberedVisibility(in: statusDefaults)
             suite.expect(statusDefaults.double(forKey: gen1Position) == 280.0,
                    "clearing the remembered visibility keeps the arranged position")
             suite.expect(StatusItemPlacementSupport.placementGeneration(in: statusDefaults) == 1
                     && StatusItemPlacementSupport.mainAutosaveName(in: statusDefaults) == gen1Name,
                    "recovery leaves the item's identity alone, so reopening cannot churn it")
-            suite.expect(statusDefaults.object(forKey: "NSStatusItem Visible VorssaintMenuBarItem.1") == nil
-                    && statusDefaults.object(forKey: "NSStatusItem VisibleCC VorssaintMenuBarItem.1") == nil,
+            suite.expect(statusDefaults.object(forKey: "NSStatusItem Visible AsterMenuBarItem.1") == nil
+                    && statusDefaults.object(forKey: "NSStatusItem VisibleCC AsterMenuBarItem.1") == nil,
                    "clearing the remembered visibility drops both spellings macOS has used")
 
             // Giving the spot up is what an explicit recovery escalates to,
@@ -2403,28 +2403,28 @@ enum SwitcherModelFeatureTests {
                    "only the identity reset gives up a saved position")
             // Leave orphan keys for older generations the way a long-running
             // install accumulates them, then confirm a bump sweeps them.
-            statusDefaults.set(11.0, forKey: "NSStatusItem Preferred Position VorssaintMenuBarItem")
-            statusDefaults.set(false, forKey: "NSStatusItem Visible VorssaintMenuBarItem")
-            statusDefaults.set(false, forKey: "NSStatusItem VisibleCC VorssaintMenuBarItem.1")
-            let metricPosition = "NSStatusItem Preferred Position VorssaintMetric.cpu"
+            statusDefaults.set(11.0, forKey: "NSStatusItem Preferred Position AsterMenuBarItem")
+            statusDefaults.set(false, forKey: "NSStatusItem Visible AsterMenuBarItem")
+            statusDefaults.set(false, forKey: "NSStatusItem VisibleCC AsterMenuBarItem.1")
+            let metricPosition = "NSStatusItem Preferred Position AsterMetric.cpu"
             statusDefaults.set(42.0, forKey: metricPosition)
             StatusItemPlacementSupport.bumpPlacementGeneration(in: statusDefaults)
             suite.expect(statusDefaults.object(forKey: gen1Position) == nil
-                    && statusDefaults.object(forKey: "NSStatusItem Preferred Position VorssaintMenuBarItem") == nil
-                    && statusDefaults.object(forKey: "NSStatusItem Visible VorssaintMenuBarItem") == nil
-                    && statusDefaults.object(forKey: "NSStatusItem VisibleCC VorssaintMenuBarItem.1") == nil
+                    && statusDefaults.object(forKey: "NSStatusItem Preferred Position AsterMenuBarItem") == nil
+                    && statusDefaults.object(forKey: "NSStatusItem Visible AsterMenuBarItem") == nil
+                    && statusDefaults.object(forKey: "NSStatusItem VisibleCC AsterMenuBarItem.1") == nil
                     && StatusItemPlacementSupport.mainAutosaveName(in: statusDefaults)
-                        == "VorssaintMenuBarItem.2"
-                    && statusDefaults.object(forKey: "NSStatusItem Preferred Position VorssaintMenuBarItem.2") == nil,
+                        == "AsterMenuBarItem.2"
+                    && statusDefaults.object(forKey: "NSStatusItem Preferred Position AsterMenuBarItem.2") == nil,
                    "the identity reset gives the saved position up and sweeps orphaned identities")
             suite.expect(statusDefaults.double(forKey: metricPosition) == 42.0,
                    "recovering the main item leaves metric-item positions alone")
             statusDefaults.set(StatusItemPlacementSupport.maxPlacementGeneration,
                                forKey: DefaultsKey.statusItemPlacementGeneration)
-            statusDefaults.set(false, forKey: "NSStatusItem Visible VorssaintMenuBarItem.9999")
+            statusDefaults.set(false, forKey: "NSStatusItem Visible AsterMenuBarItem.9999")
             StatusItemPlacementSupport.bumpPlacementGeneration(in: statusDefaults)
-            suite.expect(StatusItemPlacementSupport.mainAutosaveName(in: statusDefaults) == "VorssaintMenuBarItem.1"
-                    && statusDefaults.object(forKey: "NSStatusItem Visible VorssaintMenuBarItem.9999") == nil
+            suite.expect(StatusItemPlacementSupport.mainAutosaveName(in: statusDefaults) == "AsterMenuBarItem.1"
+                    && statusDefaults.object(forKey: "NSStatusItem Visible AsterMenuBarItem.9999") == nil
                     && statusDefaults.double(forKey: metricPosition) == 42.0,
                    "generation wrap clears old main-item state without touching metric placements")
             suite.expect(StatusItemAnchorSupport.isSettlingStatusFrame(CGRect(x: 0, y: 0, width: 36, height: 0)),
@@ -2504,13 +2504,13 @@ enum SwitcherModelFeatureTests {
             return [["bundle": ["_0": bundleID]], entry]
         }
         let trackedApplications: [Any] = tracked("com.lowtechguys.Clop", allowed: true)
-            + tracked("com.vorssaint.utils", allowed: false)
-            + tracked("com.vorssaint.utils.dev", allowed: true)
+            + tracked("io.github.xztyle.Aster", allowed: false)
+            + tracked("io.github.xztyle.Aster.dev", allowed: true)
             + tracked("com.example.legacy", allowed: nil)
-        suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "com.vorssaint.utils",
+        suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "io.github.xztyle.Aster",
                                                        trackedApplications: trackedApplications) == .disallowed,
                "an app switched off under Allow in the Menu Bar reads as disallowed")
-        suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "com.vorssaint.utils.dev",
+        suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "io.github.xztyle.Aster.dev",
                                                        trackedApplications: trackedApplications) == .allowed,
                "a sibling bundle id with its own entry does not bleed over")
         suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "com.example.legacy",
@@ -2519,7 +2519,7 @@ enum SwitcherModelFeatureTests {
         suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "com.example.absent",
                                                        trackedApplications: trackedApplications) == .unknown,
                "an app Control Center has never tracked is unknown")
-        suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "com.vorssaint.utils",
+        suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "io.github.xztyle.Aster",
                                                        trackedApplications: ["garbage", 3]) == .unknown,
                "a malformed store is unknown rather than a crash or a verdict")
         // The on-disk shape: an outer plist whose trackedApplications value is
@@ -2532,10 +2532,10 @@ enum SwitcherModelFeatureTests {
                                                 format: .binary, options: 0)
         }
         suite.expect(outerData.map {
-                MenuBarAllowanceSupport.allowance(forBundleID: "com.vorssaint.utils", groupContainerPlist: $0)
+                MenuBarAllowanceSupport.allowance(forBundleID: "io.github.xztyle.Aster", groupContainerPlist: $0)
             } == .disallowed,
                "the nested Control Center store decodes down to the per-app verdict")
-        suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "com.vorssaint.utils",
+        suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "io.github.xztyle.Aster",
                                                        groupContainerPlist: Data([0x00, 0x01])) == .unknown,
                "an unreadable store is unknown")
         let verifyIconCode = stripCommentLines((statusAnchorAppDelegateSource
@@ -3687,8 +3687,8 @@ enum SwitcherModelFeatureTests {
                "a click after hiding lets the Dock bring the app back")
         suite.expect(DockClickSupport.repeatDecision(lastAction: .hide, elapsed: 0.1) == .swallow,
                "an accidental double-click never hides and immediately reopens the app")
-        suite.expect(DockClickSupport.isOwnBundleIdentifier("com.vorssaint.utils")
-                && DockClickSupport.isOwnBundleIdentifier("com.vorssaint.utils.dev")
+        suite.expect(DockClickSupport.isOwnBundleIdentifier("io.github.xztyle.Aster")
+                && DockClickSupport.isOwnBundleIdentifier("io.github.xztyle.Aster.dev")
                 && !DockClickSupport.isOwnBundleIdentifier("com.example.editor")
                 && !DockClickSupport.isOwnBundleIdentifier(nil),
                "Dock clicks never target either build of this app")
@@ -5792,7 +5792,7 @@ enum SwitcherModelFeatureTests {
                "App Switcher leaves unrelated middle-mouse-up events alone")
         let searchRecords = [
             SwitcherSearchRecord(id: "alpha", title: "Inbox", appName: "Alpha"),
-            SwitcherSearchRecord(id: "beta", title: "Vorssaint Roadmap", appName: "Beta"),
+            SwitcherSearchRecord(id: "beta", title: "Aster Roadmap", appName: "Beta"),
             SwitcherSearchRecord(id: "gamma", title: "Café notes", appName: "Gamma"),
         ]
         suite.expect(SwitcherSupport.filteredSearchIDs(records: searchRecords, query: "") == ["alpha", "beta", "gamma"],

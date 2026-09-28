@@ -356,7 +356,7 @@ enum LocalizationFeatureContractTests {
         suite.expect(bundleLocalizations.contains("tr"), "Info.plist declares Turkish as a bundle localization")
         suite.expect(bundleLocalizations.contains("ko"), "Info.plist declares Korean as a bundle localization")
         let baseAudioPrompt = infoPlist?["NSAudioCaptureUsageDescription"] as? String ?? ""
-        suite.expect(baseAudioPrompt.contains("Vorssaint uses each app's audio"),
+        suite.expect(baseAudioPrompt.contains("Aster uses each app's audio"),
                "base audio permission prompt is an English fallback")
         let organizerFolderPromptKeys = [
             "NSDesktopFolderUsageDescription", "NSDocumentsFolderUsageDescription",
@@ -396,7 +396,7 @@ enum LocalizationFeatureContractTests {
             contentsOfFile: "Resources/com.vorssaint.utils.fan-control.plist",
             encoding: .utf8)) ?? ""
         suite.expect(!helperTemplate.isEmpty, "the helper template reads back")
-        let releaseHelperID = "com.vorssaint.utils.fan-control"
+        let releaseHelperID = "io.github.xztyle.Aster.fan-control"
         let mentions = helperTemplate.components(separatedBy: releaseHelperID).count - 1
         suite.expect(mentions == 3,
                "the helper template names the release service exactly where the build rewrites it (\(mentions))")

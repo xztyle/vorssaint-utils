@@ -49,7 +49,7 @@ final class AudioInputDeviceManager: ObservableObject {
     /// is delivered here. A device being reconfigured can hold a property read
     /// for as long as the audio daemon holds the device, and that is exactly
     /// the moment the listeners fire.
-    private let halQueue = DispatchQueue(label: "com.vorssaint.utils.audioinput.hal", qos: .userInitiated)
+    private let halQueue = DispatchQueue(label: "io.github.xztyle.Aster.audioinput.hal", qos: .userInitiated)
     /// The system input before the singular preferred-microphone behavior
     /// changed it, and the device that behavior applied. Priority selections
     /// clear this pair and become the new system choice instead of a temporary

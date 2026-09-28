@@ -30,6 +30,7 @@ trap 'exit 1' INT TERM HUP
 # bundle id, so it coexists with the official app); --install puts it in /Applications.
 DEV=0
 INSTALL=0
+BUILD_JOBS="${ASTER_BUILD_JOBS:-6}"
 TEST=0
 TEST_ARGS=()
 for arg in "$@"; do
@@ -43,16 +44,16 @@ for arg in "$@"; do
 done
 
 if (( DEV )); then
-    APP_NAME="Vorssaint (Developer)"
-    EXECUTABLE="VorssaintDeveloper"
-    APP_BUNDLE_ID="com.vorssaint.utils.dev"
+    APP_NAME="Aster (Developer)"
+    EXECUTABLE="AsterDeveloper"
+    APP_BUNDLE_ID="io.github.xztyle.Aster.dev"
     BUILD_VARIANT_FLAGS=(-D VORSSAINT_DEVELOPMENT)
     APP_OPTIMIZATION_FLAGS=(-Onone)
     BUILD_CONFIGURATION="debug"
 else
-    APP_NAME="Vorssaint"
-    EXECUTABLE="Vorssaint"
-    APP_BUNDLE_ID="com.vorssaint.utils"
+    APP_NAME="Aster"
+    EXECUTABLE="Aster"
+    APP_BUNDLE_ID="io.github.xztyle.Aster"
     BUILD_VARIANT_FLAGS=()
     APP_OPTIMIZATION_FLAGS=(-O)
     BUILD_CONFIGURATION="release"
@@ -64,7 +65,7 @@ NOW_PLAYING_ADAPTER_ID="$APP_BUNDLE_ID.now-playing"
 NOW_PLAYING_ADAPTER="libVorssaintNowPlaying.dylib"
 TARGET="arm64-apple-macosx14.0"
 ENTITLEMENTS="Resources/Vorssaint.entitlements"
-LEGACY_IDENTITY="Vorssaint Utils Signing"
+LEGACY_IDENTITY="Aster Local Signing"
 
 developer_id_identity() {
     security find-identity -v -p codesigning 2>/dev/null \
@@ -80,8 +81,8 @@ legacy_identity_installed() {
     local probe signed=1
     # A locked keychain still lists its identities but cannot sign with them,
     # and this one is locked after every reboot; unlock it before asking.
-    security unlock-keychain -p vorssaint-signing \
-        "$HOME/Library/Keychains/vorssaint-signing.keychain-db" 2>/dev/null || true
+    security unlock-keychain -p aster-signing \
+        "$HOME/Library/Keychains/aster-signing.keychain-db" 2>/dev/null || true
     probe="$(mktemp)"
     cp /bin/echo "$probe"
     /usr/bin/codesign --force --strip-disallowed-xattrs --sign "$LEGACY_IDENTITY" "$probe" \
@@ -523,7 +524,7 @@ if (( TEST )); then
     TEST_OUTPUT_FILE_MAP="$TEST_OBJECT_DIR/output-file-map.json"
     write_swift_output_file_map "$TEST_OUTPUT_FILE_MAP" "$TEST_OBJECT_DIR" "${TEST_SOURCES[@]}"
     echo "▸ Building & running tests against $(basename "$SDK")…"
-    swiftc -Onone -incremental -enable-batch-mode -j "$(sysctl -n hw.logicalcpu)" \
+    swiftc -Onone -incremental -enable-batch-mode -j "$BUILD_JOBS" \
         -module-name VorssaintTests -output-file-map "$TEST_OUTPUT_FILE_MAP" \
         -target "$TARGET" -sdk "$SDK" "${SDK_COMPAT_FLAGS[@]}" \
         "${VM_STATISTICS_COMPAT_FLAGS[@]}" "${TEST_SOURCES[@]}" -o build/metrics-tests
@@ -553,7 +554,7 @@ write_swift_output_file_map "$APP_OUTPUT_FILE_MAP" "$APP_OBJECT_DIR" "${APP_SOUR
 # each file's compiler parses the whole module again: a clean release took a
 # quarter of an hour. Batches share that work and run on every core, and the
 # optimization stays per file, as before.
-swiftc "${APP_OPTIMIZATION_FLAGS[@]}" -incremental -enable-batch-mode -j "$(sysctl -n hw.logicalcpu)" \
+swiftc "${APP_OPTIMIZATION_FLAGS[@]}" -incremental -enable-batch-mode -j "$BUILD_JOBS" \
     -output-file-map "$APP_OUTPUT_FILE_MAP" \
     -target "$TARGET" -sdk "$SDK" "${SDK_COMPAT_FLAGS[@]}" "${VM_STATISTICS_COMPAT_FLAGS[@]}" "${HID_EVENT_SYSTEM_FLAGS[@]}" \
     "${BUILD_VARIANT_FLAGS[@]}" \
@@ -561,6 +562,7 @@ swiftc "${APP_OPTIMIZATION_FLAGS[@]}" -incremental -enable-batch-mode -j "$(sysc
 
 echo "▸ Compiling protected fan helper…"
 swiftc -O -target "$TARGET" -sdk "$SDK" "${SDK_COMPAT_FLAGS[@]}" "${BUILD_VARIANT_FLAGS[@]}" \
+    Sources/Vorssaint/Core/AppCodeIdentity.swift \
     Sources/Vorssaint/Services/FanControl/FanControlSupport.swift \
     Sources/Vorssaint/Services/FanControl/FanControlXPC.swift \
     Sources/Vorssaint/Services/SystemMonitor/SMCClient.swift \
@@ -640,7 +642,7 @@ if (( DEV )); then
     FAN_PLIST="$STAGE/Contents/Library/LaunchDaemons/$FAN_HELPER_ID.plist"
     /usr/libexec/PlistBuddy -c "Set :Label $FAN_HELPER_ID" "$FAN_PLIST"
     /usr/libexec/PlistBuddy -c "Set :BundleProgram Contents/Library/LaunchServices/$FAN_HELPER_ID" "$FAN_PLIST"
-    /usr/libexec/PlistBuddy -c "Delete :MachServices:com.vorssaint.utils.fan-control" "$FAN_PLIST"
+    /usr/libexec/PlistBuddy -c "Delete :MachServices:io.github.xztyle.Aster.fan-control" "$FAN_PLIST"
     /usr/libexec/PlistBuddy -c "Add :MachServices:$FAN_HELPER_ID bool true" "$FAN_PLIST"
     # Stamp the source commit + build time so the running dev app shows (in About)
     # exactly which code it was compiled from. Lets you verify it matches HEAD before
@@ -686,7 +688,7 @@ xattr -c -r "$STAGE" 2>/dev/null || true
 #      notarization), the app's entitlements and a secure timestamp. Gives a
 #      stable, team-based designated requirement, so permissions persist across
 #      updates AND Gatekeeper shows no "unverified developer" warning.
-#   2. "Vorssaint Utils Signing" — the legacy stable self-signed identity, kept
+#   2. "Aster Local Signing" — the legacy stable self-signed identity, kept
 #      as a fallback so contributors without a Developer ID still get a constant
 #      designated requirement across their local builds.
 #   3. Ad-hoc — fresh clone with no identity at all.

@@ -1356,7 +1356,7 @@ enum CommandBarFeatureTests {
         suite.expect(CommandBarLinks.trailingArgument(query: "gh vorssaint utils", name: "gh")
                 == "vorssaint utils",
                "what comes after the name is what the saved search opens with")
-        suite.expect(CommandBarLinks.trailingArgument(query: "GH Vorssaint", name: "gh") == "Vorssaint",
+        suite.expect(CommandBarLinks.trailingArgument(query: "GH Aster", name: "gh") == "Aster",
                "the name is matched without case; the argument keeps its own")
         suite.expect(CommandBarLinks.trailingArgument(query: "ghost writer", name: "gh") == nil
                 && CommandBarLinks.trailingArgument(query: "gh", name: "gh") == nil,
