@@ -125,6 +125,24 @@ enum MenuBarOrganizerSupport {
         return CGWindowID(exactly: number)
     }
 
+    static func accessibilityFrame(frame: AXValue?, position: AXValue?, size: AXValue?) -> CGRect? {
+        var rect = CGRect.zero
+        if let frame, AXValueGetType(frame) == .cgRect, AXValueGetValue(frame, .cgRect, &rect),
+           validAccessibilityFrame(rect) { return rect }
+        guard let position, let size, AXValueGetType(position) == .cgPoint,
+              AXValueGetType(size) == .cgSize else { return nil }
+        var origin = CGPoint.zero
+        var extent = CGSize.zero
+        guard AXValueGetValue(position, .cgPoint, &origin), AXValueGetValue(size, .cgSize, &extent) else { return nil }
+        rect = CGRect(origin: origin, size: extent)
+        return validAccessibilityFrame(rect) ? rect : nil
+    }
+
+    private static func validAccessibilityFrame(_ rect: CGRect) -> Bool {
+        [rect.origin.x, rect.origin.y, rect.width, rect.height].allSatisfy(\.isFinite)
+            && rect.width > 0 && rect.height > 0
+    }
+
     static func collapsedLength(screenWidths: [CGFloat]) -> CGFloat {
         let widest = screenWidths.max() ?? 2_048
         return min(max(widest * 2, 4_096), 16_384)

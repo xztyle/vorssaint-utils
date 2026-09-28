@@ -29,7 +29,7 @@ actor MenuBarItemSourceResolver {
         let liveWindowIDs = Set(records.map(\.windowID))
         cache = cache.filter { liveWindowIDs.contains($0.key) && sourceStillRunning($0.value) }
         cacheDirectItems(records)
-        let unresolved = records.filter { cache[$0.windowID] == nil }
+        let unresolved = records.filter { cache[$0.windowID]?.stableTitle == nil }
         guard !unresolved.isEmpty, AXIsProcessTrusted() else { return cache }
         let applications = await Self.runningApplications()
         if scanTask == nil {
@@ -51,7 +51,9 @@ actor MenuBarItemSourceResolver {
     }
 
     private func cacheDirectItems(_ records: [MenuBarOrganizerWindowRecord]) {
-        for record in records where record.ownerBundleIdentifier != MenuBarOrganizerSupport.controlCenterBundleIdentifier {
+        for record in records where record.ownerBundleIdentifier != MenuBarOrganizerSupport.controlCenterBundleIdentifier
+            && cache[record.windowID] == nil {
+            guard !record.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
             cache[record.windowID] = MenuBarItemSourceIdentity(pid: record.ownerPID,
                 bundleIdentifier: record.ownerBundleIdentifier, name: record.ownerName,
                 axIdentifier: nil, axTitle: record.title)
@@ -139,14 +141,9 @@ actor MenuBarItemSourceResolver {
     }
 
     private static func frame(of element: AXUIElement) -> CGRect? {
-        guard let value: AXValue = attribute("AXFrame", from: element),
-              AXValueGetType(value) == .cgRect
-        else { return nil }
-        var frame = CGRect.zero
-        guard AXValueGetValue(value, .cgRect, &frame),
-              frame.width > 0,
-              frame.height > 0
-        else { return nil }
-        return frame
+        MenuBarOrganizerSupport.accessibilityFrame(
+            frame: attribute("AXFrame", from: element),
+            position: attribute(kAXPositionAttribute, from: element),
+            size: attribute(kAXSizeAttribute, from: element))
     }
 }

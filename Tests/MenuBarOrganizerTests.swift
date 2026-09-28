@@ -5,6 +5,7 @@ import AppKit
 enum MenuBarOrganizerTests {
     static func run(_ suite: TestSuite) {
         windowNumbers(suite)
+        accessibilityFrames(suite)
         identities(suite)
         layouts(suite)
         newItems(suite)
@@ -21,6 +22,26 @@ enum MenuBarOrganizerTests {
             suite.expect(MenuBarOrganizerSupport.windowID(fromWindowNumber: number) == nil,
                          "unassigned and macOS 26 remote window identifiers cannot trap or alias a real window")
         }
+    }
+
+    static func accessibilityFrames(_ suite: TestSuite) {
+        var expected = CGRect(x: 1400, y: 0, width: 24, height: 39)
+        var origin = expected.origin
+        var size = expected.size
+        let frame = AXValueCreate(.cgRect, &expected)
+        let point = AXValueCreate(.cgPoint, &origin)
+        let extent = AXValueCreate(.cgSize, &size)
+        suite.expect(MenuBarOrganizerSupport.accessibilityFrame(frame: frame, position: nil, size: nil) == expected,
+                     "AXFrame remains supported")
+        suite.expect(MenuBarOrganizerSupport.accessibilityFrame(frame: nil, position: point, size: extent) == expected,
+                     "standard AXPosition and AXSize resolve menu items without AXFrame")
+        suite.expect(MenuBarOrganizerSupport.accessibilityFrame(frame: point, position: point, size: extent) == expected,
+                     "an unsupported frame type falls back to valid standard geometry")
+        suite.expect(MenuBarOrganizerSupport.accessibilityFrame(frame: nil, position: extent, size: point) == nil,
+                     "wrong accessibility value types are rejected")
+        size.width = -.infinity
+        suite.expect(MenuBarOrganizerSupport.accessibilityFrame(frame: nil, position: point,
+                     size: AXValueCreate(.cgSize, &size)) == nil, "invalid geometry cannot match a real item")
     }
 
     static func item(_ name: String, x: CGFloat, section: MenuBarOrganizerSection = .visible,
