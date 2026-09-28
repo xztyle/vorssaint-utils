@@ -304,9 +304,9 @@ suite completed 79,560 checks with the same 14 notch and switcher visibility
 failures already reproduced before this update; all other suites passed. New
 menu-bar icon labels were rebranded to Aster in every provided localization.
 
-Current detached integration `cbbccbe` combines upstream main and all five
+Current detached integration `71640b7` combines upstream main and all five
 feature branches. Its optimized release build and packaged selftest pass. A
-metadata-free copy at `/private/tmp/aster-integrated-eased-23_9ahme/Aster.app`
+metadata-free copy at `/private/tmp/aster-integrated-notch-a2238u5j/Aster.app`
 passes deep strict signature verification. It is not installed; the protected
 battery journal must be read before replacing the production app or helper.
 The combined screenshot suite passes 834 checks. The last full combined run,
@@ -331,6 +331,15 @@ Screenshot, battery, clipboard, menu, cleanup and localization suites passed.
 A newly signed generated-image fixture for the eased swipe is staged at
 `/private/tmp/aster-swipe-eased-vfd4gn3d/Aster Swipe Eased.app`; it has not
 been launched while the Mac remains locked.
+
+The next upstream update through `9254b18` adds notch camera-fit controls and
+pointer-following display placement. It is merged into Aster main and the
+integration candidate. The combined run completed **80,686 checks** with the
+same 14 notch and switcher visibility failures and no new failures. The 834
+screenshot checks, 162 battery checks, 691 clipboard checks, 405 menu-bar
+checks, and cleanup suites passed. The current signed candidate above includes
+this update, but the Mac remains locked, so actual multi-display behavior and
+the eased screenshot swipe still need live checks.
 
 Replacement acceptance has not passed. Main retains the baseline and evidence
 docs; feature merges await their actual-Mac gates. Each feature needs its reviewed
