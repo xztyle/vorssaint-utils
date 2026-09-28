@@ -23,7 +23,7 @@ enum WindowVisibilityTests {
         let view = WindowVisibilityView(frame: container.bounds)
         var changes: [Bool] = []
         view.onChange = { changes.append($0) }
-        func flush() { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+        func flush() { drainVisibilityCallbacks() }
         view.reportVisibility()
         flush()
         expect(changes == [false], "unattached previews are suspended")
@@ -75,5 +75,14 @@ enum WindowVisibilityTests {
             transient.removeFromSuperview()
         }
         expect(released == nil, "visibility observers and queued work do not retain removed previews")
+    }
+
+    private static func drainVisibilityCallbacks() {
+        var drained = false
+        DispatchQueue.main.async { drained = true }
+        let deadline = Date().addingTimeInterval(1)
+        while !drained, Date() < deadline {
+            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.01))
+        }
     }
 }
