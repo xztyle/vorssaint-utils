@@ -150,11 +150,19 @@ UI detected the harmless EICAR fixture with verified ClamAV definitions and
 reported partial coverage because excluded entries remained outside the scan.
 
 Startup inspection repeated the tool-reader crash with labeled result groups.
-Its titles now use the same readable arrangement; a live retry is still pending.
+Its titles now use the same readable arrangement. The signed generated-only UI
+fixture displayed both startup entries without a reader crash: the missing
+executable reported Unknown, and `/usr/bin/true` reported Signature valid.
 The fixture receipt writer also now normalizes paths lexically: Foundation's file
 URL normalization resolved the existing /private/tmp scope to /tmp but left a
 trashed, absent original unchanged, incorrectly omitting its receipt. The new
-missing-original regression fails before the fix and passes with it. All 94
-storage-inspection checks pass. Combined optimized packaging and the new startup
-result UI remain the next gate. External-volume and cloud-provider behavior has
+missing-original regression fails before the fix and passes with it. The signed
+fixture entry also uses canonical filesystem paths, so `/tmp` and `/private/tmp`
+name the same prepared folder. The actual UI recorded a generated duplicate's
+original and returned Trash paths; Finder Put Back restored the file with the
+same SHA-256 as its keeper. All 97 storage-inspection checks pass. Combined
+integration `b0da423` passed its optimized build, packaged selftest, full
+70,815-check suite, and preference cleanup. Its copied bundle passed deep strict
+signature verification but remains uninstalled while the battery helper's
+protected journal is checked. External-volume and cloud-provider behavior has
 not been exercised on the owner's data.
