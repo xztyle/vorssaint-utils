@@ -166,3 +166,12 @@ integration `b0da423` passed its optimized build, packaged selftest, full
 signature verification but remains uninstalled while the battery helper's
 protected journal is checked. External-volume and cloud-provider behavior has
 not been exercised on the owner's data.
+
+The installed Aster uninstaller also selected a generated-only 12 KB app under
+Applications. Its review listed only that app, then Move to Trash reported Done
+and the original path was absent. Finder Trash showed the exact item. Finder's
+Put Back command was disabled for this dot-prefixed test bundle; Finder Move Here
+restored it to Applications instead. The restored generated marker matched its
+original SHA-256. The temporary app was then removed from Applications. This
+proves the reversible Trash path for a generated app, but Put Back for a normal
+visible app and the remaining user-app cleanup cases still need a live check.
