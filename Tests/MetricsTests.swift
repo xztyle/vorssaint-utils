@@ -94,6 +94,7 @@ struct MetricsTests {
                 AssistiveKeyboardTests.run(suite)
                 ScreenshotToolShortcutTests.run(suite)
             }),
+            ("storage-inspection", { StorageInspectionTests.run(suite) }),
             ("storage", {
                 RecentCaptureStoreTests.run(suite)
                 RecorderPresetImageStoreTests.run(suite)

@@ -512,6 +512,18 @@ if (( TEST )); then
         Sources/Vorssaint/Services/Display/ExtraBrightnessSupport.swift
         Sources/Vorssaint/Services/Display/BrightnessSupport.swift
         Sources/Vorssaint/Services/Display/LidDimmingSupport.swift
+        Sources/Vorssaint/Support/CleanupFixturePolicy.swift
+        Sources/Vorssaint/Core/StorageInspectionStrings.swift
+        Sources/Vorssaint/Core/StorageInspectionPreferences.swift
+        Sources/Vorssaint/Services/StorageInspection/StorageInspectionModels.swift
+        Sources/Vorssaint/Services/StorageInspection/StorageLocalAccess.swift
+        Sources/Vorssaint/Services/StorageInspection/StorageFolderScanner.swift
+        Sources/Vorssaint/Services/StorageInspection/StorageDuplicateFinder.swift
+        Sources/Vorssaint/Services/StorageInspection/StorageTrashService.swift
+        Sources/Vorssaint/Services/StorageInspection/ClamAVSupport.swift
+        Sources/Vorssaint/Services/StorageInspection/ClamAVBackend.swift
+        Sources/Vorssaint/Services/StorageInspection/ClamAVSnapshots.swift
+        Sources/Vorssaint/Services/StorageInspection/SecurityInspector.swift
         Sources/Vorssaint/Services/Cleaner/CleanerSupport.swift
         Sources/Vorssaint/Services/Cleaner/CleanerPolicy.swift
         Sources/Vorssaint/Services/Cleaner/CleanerSchedule.swift

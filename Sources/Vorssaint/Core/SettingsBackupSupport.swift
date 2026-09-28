@@ -46,6 +46,7 @@ enum SettingsBackupSupport {
     /// Preferences stored without a registered default (absence means "use
     /// the built-in behavior"), still part of how the user set the app up.
     static let unregisteredPreferenceKeys: Set<String> = [
+        DefaultsKey.storageLargeMegabytes, DefaultsKey.storageOldDays,
         DefaultsKey.autoQuitEnabled,
         DefaultsKey.shelfEnabled,
         DefaultsKey.finderCutPasteEnabled,
@@ -395,6 +396,8 @@ enum SettingsBackupSupport {
     /// code that trusts its own settings.
     static func valueLooksRight(_ key: String, _ value: Any) -> Bool {
         switch key {
+        case DefaultsKey.storageLargeMegabytes: return isInteger(value) && (1...100_000).contains((value as? NSNumber)?.intValue ?? 0)
+        case DefaultsKey.storageOldDays: return isInteger(value) && (1...3650).contains((value as? NSNumber)?.intValue ?? 0)
         case DefaultsKey.notchQuickAccessSide, DefaultsKey.notchQuickAccessSecond, DefaultsKey.notchQuickAccessThird:
             return value is String
         default: break

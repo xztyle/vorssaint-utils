@@ -3,6 +3,7 @@
 
 import AppKit
 
+CleanupProbe.runIfRequested()
 SuperKeyMappingGuard.runIfRequestedAndExit()
 Defaults.register()
 MouseAccelerationGuard.runIfRequestedAndExit()
