@@ -209,3 +209,19 @@ notes that exit 78 commonly reflects a broken launchd plist or executable
 path, while [its upgrade discussion](https://developer.apple.com/forums/thread/795022)
 describes saved signing constraints as another cause after helper replacement.
 The protected journal gate remains in force before any unregister or install.
+
+## Service configuration versioning
+
+The app previously recorded a battery-helper version from the unsigned helper
+executable alone. Changing only the embedded launch daemon plist would therefore
+leave the saved version unchanged and skip the authenticated replacement path.
+The build now hashes the helper and its embedded plist in a stable order, using
+the same version function as fan control. This detects a changed service path or
+launch setting before the app decides whether a replacement is needed.
+
+The focused battery suite passed 162 checks. The optimized app and packaged
+selftest passed. In the packaged Info.plist, both helper version values match
+independent hashes of their executable and launch plist. Changing a temporary
+copy of either plist changes its computed version. This is build-time evidence;
+it does not repair the currently broken saved registration. The protected
+journal must still be checked before any unregister or production install.

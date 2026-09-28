@@ -727,17 +727,21 @@ if (( DEV )); then
     /usr/libexec/PlistBuddy -c "Add :VorssaintBuildCommit string '$SHA · $(date '+%Y-%m-%d %H:%M')'" "$STAGE/Contents/Info.plist"
     echo "  stamped dev build: $SHA"
 fi
-FAN_HELPER_VERSION="$(
+helper_version() {
     export LC_ALL=C
     /usr/bin/shasum -a 256 \
-        "$STAGE/Contents/Library/LaunchServices/$FAN_HELPER_ID" \
-        "$STAGE/Contents/Library/LaunchDaemons/$FAN_HELPER_ID.plist" \
+        "$1" "$2" \
         | /usr/bin/awk '{print $1}' | /usr/bin/shasum -a 256 \
         | /usr/bin/awk '{print $1}'
-)"
+}
+FAN_HELPER_VERSION="$(helper_version \
+    "$STAGE/Contents/Library/LaunchServices/$FAN_HELPER_ID" \
+    "$STAGE/Contents/Library/LaunchDaemons/$FAN_HELPER_ID.plist")"
 /usr/libexec/PlistBuddy -c "Add :VorssaintFanControlHelperVersion string '$FAN_HELPER_VERSION'" \
     "$STAGE/Contents/Info.plist"
-BATTERY_HELPER_VERSION="$(/usr/bin/shasum -a 256 "build/$BATTERY_HELPER_ID" | /usr/bin/awk '{print $1}')"
+BATTERY_HELPER_VERSION="$(helper_version \
+    "$STAGE/Contents/Library/LaunchServices/$BATTERY_HELPER_ID" \
+    "$STAGE/Contents/Library/LaunchDaemons/$BATTERY_HELPER_ID.plist")"
 /usr/libexec/PlistBuddy -c "Add :AsterBatteryCareHelperVersion string '$BATTERY_HELPER_VERSION'" "$STAGE/Contents/Info.plist"
 printf 'APPL????'  > "$STAGE/Contents/PkgInfo"
 cp build/AppIcon.icns "$STAGE/Contents/Resources/AppIcon.icns"
