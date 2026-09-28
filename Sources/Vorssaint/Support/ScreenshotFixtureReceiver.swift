@@ -11,6 +11,8 @@ final class ScreenshotFixtureReceiver: NSObject {
     private let workspace: ScreenshotCaptureWorkspace
     private let directory: URL
     private var window: NSWindow?
+    private weak var receiverView: NSView?
+    private var geometryObservers: [NSObjectProtocol] = []
     private let status = NSTextField(labelWithString: "Drop an edited corner image into the text input below.")
 
     init(workspace: ScreenshotCaptureWorkspace, directory: URL) {
@@ -18,11 +20,14 @@ final class ScreenshotFixtureReceiver: NSObject {
         self.directory = directory
     }
 
+    deinit { geometryObservers.forEach(NotificationCenter.default.removeObserver) }
+
     func show() {
         guard window == nil else { window?.makeKeyAndOrderFront(nil); return }
         let panel = NSWindow(contentRect: .init(x: 0, y: 0, width: 640, height: 650),
                              styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         panel.title = "Aster Capture Fixture — Controls and Drop Receiver"
+        panel.level = .statusBar
         panel.isReleasedWhenClosed = false
         panel.contentView = content()
         panel.collectionBehavior = [.fullScreenAuxiliary, .moveToActiveSpace]
@@ -31,6 +36,8 @@ final class ScreenshotFixtureReceiver: NSObject {
         window = panel
         panel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        observeGeometry()
+        recordGeometry()
     }
 
     private func content() -> NSView {
@@ -46,10 +53,11 @@ final class ScreenshotFixtureReceiver: NSObject {
         let scroll = NSScrollView()
         scroll.hasVerticalScroller = true
         scroll.borderType = .bezelBorder
-        let receiver = DropTextView(frame: .init(x: 0, y: 0, width: 590, height: 430))
+        let receiver = DropTextView(frame: .init(x: 0, y: 0, width: 590, height: 430), textContainer: nil)
         receiver.directory = directory
         receiver.completed = { [weak self] in self?.status.stringValue = $0 }
         scroll.documentView = receiver
+        receiverView = scroll.contentView
         stack.addArrangedSubview(scroll)
         scroll.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -32).isActive = true
         scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 430).isActive = true
@@ -71,19 +79,71 @@ final class ScreenshotFixtureReceiver: NSObject {
         guard let raw = sender.identifier?.rawValue, let id = UUID(uuidString: raw),
               let item = workspace.items.first(where: { $0.id == id }) else { return }
         item.preview?.bringForward(takingFocus: true)
+        recordGeometry()
     }
 
     @objc private func editCapture(_ sender: NSButton) {
         guard let raw = sender.identifier?.rawValue, let id = UUID(uuidString: raw) else { return }
         workspace.openEditor(id: id)
+        recordGeometry()
+    }
+
+    private func observeGeometry() {
+        guard geometryObservers.isEmpty else { return }
+        let names: [Notification.Name] = [NSWindow.didMoveNotification, NSWindow.didResizeNotification,
+                                          NSWindow.didBecomeKeyNotification, NSWindow.didChangeOcclusionStateNotification]
+        geometryObservers = names.map { name in
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                self?.recordGeometry()
+            }
+        }
+    }
+
+    private func recordGeometry() {
+        var receipt: [String: Any] = ["coordinateSystem": "AppKit screen points, origin bottom left",
+                                    "windows": NSApp.windows.filter(\.isVisible).map(Self.geometry)]
+        if let window, let receiverView {
+            let rect = receiverView.convert(receiverView.bounds, to: nil)
+            receipt["receiverInput"] = Self.rectangle(window.convertToScreen(rect))
+        }
+        do {
+            let data = try JSONSerialization.data(withJSONObject: receipt, options: [.prettyPrinted, .sortedKeys])
+            try RecentCaptureStore.write(data, to: directory.appendingPathComponent("ui-geometry.json"))
+        } catch { fputs("Capture fixture geometry failed: \(error)\n", stderr) }
+    }
+
+    private static func geometry(_ window: NSWindow) -> [String: Any] {
+        ["title": window.title, "windowNumber": window.windowNumber, "key": window.isKeyWindow,
+         "frame": rectangle(window.frame), "content": rectangle(window.contentRect(forFrameRect: window.frame))]
+    }
+
+    private static func rectangle(_ rect: CGRect) -> [String: CGFloat] {
+        ["x": rect.minX, "y": rect.minY, "width": rect.width, "height": rect.height]
     }
 
     private final class DropTextView: NSTextView {
         var directory: URL?
         var completed: ((String) -> Void)?
+        private(set) var importedType: NSPasteboard.PasteboardType?
+        private let ownedTextStorage: NSTextStorage?
 
-        override init(frame frameRect: NSRect) {
-            super.init(frame: frameRect)
+        override init(frame frameRect: NSRect, textContainer container: NSTextContainer?) {
+            let owned = container == nil ? Self.textSystem(width: frameRect.width) : nil
+            ownedTextStorage = owned?.storage
+            super.init(frame: frameRect, textContainer: container ?? owned?.container)
+            configure()
+        }
+
+        private static func textSystem(width: CGFloat) -> (storage: NSTextStorage, container: NSTextContainer) {
+            let storage = NSTextStorage()
+            let layout = NSLayoutManager()
+            let container = NSTextContainer(size: .init(width: width, height: CGFloat.greatestFiniteMagnitude))
+            storage.addLayoutManager(layout)
+            layout.addTextContainer(container)
+            return (storage, container)
+        }
+
+        private func configure() {
             isRichText = true
             importsGraphics = true
             isEditable = true
@@ -117,10 +177,21 @@ final class ScreenshotFixtureReceiver: NSObject {
                   let source = CGImageSourceCreateWithData(png as CFData, nil),
                   let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return false }
             setSelectedRange(NSRange(location: textStorage?.length ?? 0, length: 0))
-            let before = attachmentCount
-            let imported = readSelection(from: board, type: .png)
-            let accepted = imported && attachmentCount > before
+            let accepted = importImage(from: board)
             return record(png, image: image, directory: directory, board: board, accepted: accepted)
+        }
+
+        func importImage(from board: NSPasteboard) -> Bool {
+            let before = attachmentCount
+            importedType = nil
+            for type in [NSPasteboard.PasteboardType.png, .tiff] {
+                guard board.types?.contains(type) == true else { continue }
+                if readSelection(from: board, type: type), attachmentCount > before {
+                    importedType = type
+                    return true
+                }
+            }
+            return false
         }
 
         private var attachmentCount: Int {
@@ -136,6 +207,7 @@ final class ScreenshotFixtureReceiver: NSObject {
             let stem = "received-\(UUID().uuidString)"
             let receipt: [String: Any] = [
                 "acceptedByRichTextInput": accepted, "attachmentCount": attachmentCount,
+                "importedType": importedType?.rawValue ?? "",
                 "file": stem + ".png", "width": image.width, "height": image.height,
                 "sha256": SHA256.hash(data: png).map { String(format: "%02x", $0) }.joined(),
                 "dragTypes": board.types?.map(\.rawValue) ?? []]

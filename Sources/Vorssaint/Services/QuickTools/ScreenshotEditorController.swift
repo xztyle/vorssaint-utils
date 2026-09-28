@@ -54,6 +54,7 @@ final class ScreenshotEditorController: NSObject, NSWindowDelegate {
         // One continuous surface: the canvas fills the window and the
         // controls float over it, so the editor reads as a single object.
         window.title = strings.editorTitle
+        if fixtureDirectory != nil { window.level = .statusBar }
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden

@@ -785,6 +785,16 @@ def main():
           + declaration(view, "    private func isActive(_ item: QuickLauncherItem)")
           + "func display(_ item: QuickLauncherItem) -> (String, Bool) { (icon(for: item), isActive(item)) }\n}\n}\n")
 
+    write("CaptureReceiverConstruction.swift", "import AppKit\nimport CryptoKit\nimport ImageIO\n"
+          + "extension ScreenshotFixtureReceiverTests {\n"
+          + declaration("Sources/Vorssaint/Support/ScreenshotCaptureFixture.swift",
+                        "    private static func fixtureDirectory(").replace("private static func", "static func", 1)
+          + "\n" + declaration("Sources/Vorssaint/Support/ScreenshotCaptureFixture.swift",
+                        "    private static func canonicalDirectory(").replace("private static func", "static func", 1)
+          + declaration("Sources/Vorssaint/Support/ScreenshotFixtureReceiver.swift",
+                        "    private final class DropTextView:").replace(
+                            "    private final class DropTextView", "    final class DropTextView")
+          + "}\n")
     write("ScreenshotWorkspaceContract.swift", "import AppKit\n"
           + "extension ScreenshotCaptureWorkspaceTests {\n"
           + declaration("Sources/Vorssaint/Services/QuickTools/ScreenshotCaptureWorkspace.swift",

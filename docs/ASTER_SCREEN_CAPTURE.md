@@ -49,7 +49,10 @@ The same control window contains a rich text input. It imports a dragged PNG thr
 AppKit, verifies a new image attachment, and writes a received PNG and JSON receipt
 with acceptance, dimensions, hash and advertised types. It reads only the drag
 pasteboard; the receiver's general copy, cut and paste commands are disabled.
-Root owns all actual GUI launches and interactions.
+Fixture windows share a level so named controls can select each preview or editor.
+`ui-geometry.json` records visible window and receiver-input bounds in AppKit screen
+points whenever a window moves, resizes or changes focus/visibility. Root owns GUI
+interaction; a worker may launch this generated-only mode with explicit approval.
 
 1. Inspect the early entry in `main.swift` and `ScreenshotCaptureFixture.swift`.
 2. Launch a new app instance with a new private temporary root.
@@ -79,5 +82,11 @@ Implementation branch: `feature/screen-capture`.
   The corner returned and the same capture UUID gained revision 1. Selection of
   unnamed corner windows made the drag check ambiguous; the controls and receiver
   were added for that acceptance check.
+- The first receiver launch exposed an AppKit designated-initializer crash. The
+  receiver now owns a complete text system and uses the designated initializer.
+  A regression constructs the actual class and imports an image attachment using
+  a private pasteboard. The screenshot suite passes 822 checks, including new/existing
+  temporary-root checks and rejection of the shared temporary root. A generated-only fixture launch stayed alive and wrote all
+  three initial manifest entries after this repair.
 - Actual capture permissions, multi-display/Spaces, drag receivers and hardware
   behavior on Mac16,5 macOS 26.6.2 remain the root's acceptance gate.

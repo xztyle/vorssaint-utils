@@ -24,8 +24,9 @@ enum ScreenshotCaptureFixture {
 
     private static func fixtureDirectory(_ path: String) throws -> URL {
         let url = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
-        let resolved = url.resolvingSymlinksInPath()
-        let roots = [FileManager.default.temporaryDirectory.resolvingSymlinksInPath().path, "/private/tmp"]
+        let resolved = canonicalDirectory(url)
+        let roots = [canonicalDirectory(FileManager.default.temporaryDirectory).path,
+                     canonicalDirectory(URL(fileURLWithPath: "/private/tmp")).path]
         guard roots.contains(where: { resolved.path.hasPrefix($0 + "/") }),
               (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true else {
             throw CocoaError(.fileWriteInvalidFileName)
@@ -34,6 +35,18 @@ enum ScreenshotCaptureFixture {
                                                attributes: [.posixPermissions: 0o700])
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
         return url
+    }
+
+    private static func canonicalDirectory(_ url: URL) -> URL {
+        var ancestor = url.standardizedFileURL
+        var suffix: [String] = []
+        while !FileManager.default.fileExists(atPath: ancestor.path), ancestor.path != "/" {
+            suffix.append(ancestor.lastPathComponent)
+            ancestor.deleteLastPathComponent()
+        }
+        return suffix.reversed().reduce(ancestor.resolvingSymlinksInPath()) {
+            $0.appendingPathComponent($1, isDirectory: true)
+        }
     }
 
     private final class FixtureDelegate: NSObject, NSApplicationDelegate {
