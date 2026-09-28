@@ -454,3 +454,22 @@ strict signature verification. Its executable SHA-256 is
 It has not replaced the installed app. A separate signed generated-image swipe
 fixture is staged but not launched: the Mac was locked during this gate. The
 card's feel, hover controls and cross-app image drop still need live acceptance.
+
+## Clipboard restart-order gate — 2026-09-28
+
+The clipboard branch `775fb01` now saves card-order changes even when a clip's
+content is unchanged. Its SQLite position cache reads the stored position, so
+two clips with the same recorded time retain their intended order after a
+restart, including when older entries later acquire that same time. Two
+disposable reopened-database checks cover these cases. The focused clipboard
+suite passed **695 checks**, and its optimized bundle and packaged selftest
+passed. A real drawer restart with personal history remains unverified.
+
+Detached integration `18a2638` passed **80,693 checks** plus preference cleanup
+with zero failures. Its optimized bundle and packaged selftest passed. The
+metadata-free signed candidate at
+`/private/tmp/aster-integrated-clipboard-order-dmp4VZ/Aster.app` passed deep,
+strict signature verification. Its executable SHA-256 is
+`7c8d5b4f1db6636f6907047990e0ef92c8d94a286d9f64aeb1db76678a5087ea`.
+It has not replaced the installed app. Upstream Vorssaint still ends at
+`0a28f0d`, which Aster main already contains.
