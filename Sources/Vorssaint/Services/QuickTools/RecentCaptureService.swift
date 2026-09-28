@@ -211,45 +211,47 @@ final class RecentCaptureService: ObservableObject {
         }
     }
 
-    func recordScreenshot(_ capture: ScreenshotSelectionController.Capture) {
-        let id = UUID()
-        let screenshotName = "\(id.uuidString).png"
-        let thumbnailName = "\(id.uuidString)-thumbnail.png"
-        let entry = RecentCaptureEntry(
-            id: id,
-            kind: .screenshot,
-            createdAt: Date(),
-            screenshotName: screenshotName,
-            recordingPath: nil,
-            thumbnailName: thumbnailName,
-            scale: Double(capture.scale),
-            anchorX: Double(capture.anchorRect.origin.x),
-            anchorY: Double(capture.anchorRect.origin.y),
-            anchorWidth: Double(capture.anchorRect.width),
-            anchorHeight: Double(capture.anchorRect.height))
-        let image = capture.image
-        let scale = capture.scale
-
+    func recordScreenshot(_ capture: ScreenshotSelectionController.Capture,
+                          id: UUID = UUID(), edited: Bool = false) {
+        let generation = currentClearGeneration()
         queue.async { [weak self] in
-            guard let self, let root = self.root else { return }
-            guard self.store.loadIfNeeded() else { return }
-            do {
-                guard let full = ScreenshotRenderer.pngData(from: image, scale: scale),
-                      let smallImage = Self.thumbnail(from: image),
-                      let small = ScreenshotRenderer.pngData(from: smallImage, scale: 1)
-                else { return }
-                try RecentCaptureStore.write(full, to: root.appendingPathComponent(screenshotName))
-                do {
-                    try RecentCaptureStore.write(small, to: root.appendingPathComponent(thumbnailName))
-                } catch {
-                    try? self.manager.removeItem(at: root.appendingPathComponent(screenshotName))
-                    try? self.manager.removeItem(at: root.appendingPathComponent(thumbnailName))
-                    throw error
-                }
-                self.prepend(entry)
-            } catch {
-                return
-            }
+            guard let self, self.currentClearGeneration() == generation,
+                  let root = self.root, self.store.loadIfNeeded() else { return }
+            let revision = UUID().uuidString
+            let entry = self.screenshotEntry(capture, id: id, revision: revision, edited: edited)
+            guard self.writeScreenshot(capture, entry: entry, root: root),
+                  self.currentClearGeneration() == generation else { return }
+            self.prepend(entry)
+        }
+    }
+
+    private func screenshotEntry(_ capture: ScreenshotSelectionController.Capture,
+                                 id: UUID, revision: String, edited: Bool) -> RecentCaptureEntry {
+        var entry = RecentCaptureEntry(
+            id: id, kind: .screenshot,
+            createdAt: store.entries.first(where: { $0.id == id })?.createdAt ?? Date(),
+            screenshotName: "\(revision).png", recordingPath: nil,
+            thumbnailName: "\(revision)-thumbnail.png", scale: Double(capture.scale),
+            anchorX: Double(capture.anchorRect.origin.x), anchorY: Double(capture.anchorRect.origin.y),
+            anchorWidth: Double(capture.anchorRect.width), anchorHeight: Double(capture.anchorRect.height))
+        entry.edited = edited
+        return entry
+    }
+
+    private func writeScreenshot(_ capture: ScreenshotSelectionController.Capture,
+                                 entry: RecentCaptureEntry, root: URL) -> Bool {
+        guard let name = entry.screenshotName, let thumbnail = entry.thumbnailName,
+              let full = ScreenshotRenderer.pngData(from: capture.image, scale: capture.scale),
+              let smallImage = Self.thumbnail(from: capture.image),
+              let small = ScreenshotRenderer.pngData(from: smallImage, scale: 1) else { return false }
+        do {
+            try RecentCaptureStore.write(full, to: root.appendingPathComponent(name))
+            try RecentCaptureStore.write(small, to: root.appendingPathComponent(thumbnail))
+            return true
+        } catch {
+            try? manager.removeItem(at: root.appendingPathComponent(name))
+            try? manager.removeItem(at: root.appendingPathComponent(thumbnail))
+            return false
         }
     }
 
@@ -359,6 +361,20 @@ final class RecentCaptureService: ObservableObject {
         }
     }
 
+    func editLatestScreenshot(missing: @escaping () -> Void) {
+        queue.async { [weak self] in
+            guard let self, self.store.loadIfNeeded(),
+                  let entry = self.store.entries.first(where: { $0.kind == .screenshot }),
+                  let capture = self.loadScreenshot(entry) else {
+                DispatchQueue.main.async(execute: missing)
+                return
+            }
+            DispatchQueue.main.async {
+                ScreenshotService.shared.restoreEditor(capture, id: entry.id, edited: entry.edited == true)
+            }
+        }
+    }
+
     private func restoreScreenshot(_ entry: RecentCaptureEntry) {
         queue.async { [weak self] in
             guard let self, let capture = self.loadScreenshot(entry) else {
@@ -371,7 +387,7 @@ final class RecentCaptureService: ObservableObject {
             DispatchQueue.main.async {
                 appDelegate()?.closePopover()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                    ScreenshotService.shared.restorePreview(capture)
+                    ScreenshotService.shared.restorePreview(capture, id: entry.id, edited: entry.edited == true)
                 }
             }
         }
@@ -411,6 +427,8 @@ final class RecentCaptureService: ObservableObject {
     }
 
     private func prepend(_ entry: RecentCaptureEntry) {
+        let previousEntries = store.entries
+        store.entries.removeAll { $0.id == entry.id }
         if let path = entry.recordingPath,
            let previous = store.entries.first(where: { $0.recordingPath == path }) {
             store.entries.removeAll { $0.id == previous.id }
@@ -419,7 +437,8 @@ final class RecentCaptureService: ObservableObject {
         store.entries.sort { $0.createdAt > $1.createdAt }
         let keepIDs = cappedIDs(for: store.entries)
         store.entries.removeAll { !keepIDs.contains($0.id) }
-        store.persist()
+        guard store.persist() else { store.entries = previousEntries; return }
+        thumbnailCache.removeAllObjects()
         publish()
     }
 

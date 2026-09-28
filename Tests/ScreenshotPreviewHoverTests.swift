@@ -8,7 +8,7 @@ import Foundation
 enum ScreenshotPreviewHoverTests {
     typealias DispatchQueue = NotchScreenRefreshContract.DispatchQueue
 
-    enum Action: Hashable { case edit, copy, save }
+    enum Action: Hashable { case edit, copy, save, discard }
 
     final class Model {
         var disabledActions: Set<Action> = []
@@ -16,7 +16,13 @@ enum ScreenshotPreviewHoverTests {
         var deletingShare = false
     }
 
+    final class Panel { func orderOut(_ sender: Any?) {} }
+
     class State {
+        var panel: Panel?
+        var interactionEnded: (() -> Void)?
+        var editing = false
+        var dragging = false
         var pointerInside = false
         var systemSharing = false
         var dismissWork: DispatchWorkItem?
@@ -33,13 +39,13 @@ enum ScreenshotPreviewHoverTests {
         let editorPreview = Controller()
         var editorOpened = false
         editorPreview.action = { action in
-            suite.expect(editorPreview.closed, "Edit releases preview focus before opening the editor")
+            suite.expect(editorPreview.editing, "Edit protects the item before opening the editor")
             editorOpened = true
             return [action]
         }
         editorPreview.perform(.edit)
-        suite.expect(editorPreview.closed && !editorOpened,
-                     "Edit dismisses immediately and defers window creation beyond the button update")
+        suite.expect(editorPreview.editing && !editorPreview.closed && !editorOpened,
+                     "Edit retains the item and defers window creation beyond the button update")
         editorPreview.perform(.edit)
         DispatchQueue.main.advance(0)
         suite.expect(editorOpened && DispatchQueue.main.pending == 0,
@@ -50,7 +56,17 @@ enum ScreenshotPreviewHoverTests {
         suite.expect(!failedCopy.closed, "failed Copy still leaves the preview available for retry")
         DispatchQueue.main = NotchScreenRefreshContract.Scheduler()
 
-        for duration in [3.0, 12.0] {
+        for pause in ["dragging", "editing", "keepOpen"] {
+            DispatchQueue.main = NotchScreenRefreshContract.Scheduler()
+            let paused = Controller()
+            paused.dragging = pause == "dragging"
+            paused.editing = pause == "editing"
+            if pause == "keepOpen" { paused.autoDismissDuration = 0 }
+            paused.scheduleAutoDismiss()
+            DispatchQueue.main.advance(120)
+            suite.expect(!paused.closed, "\(pause) protects the capture from expiry")
+        }
+        for duration in [15.0, 30.0, 60.0] {
             DispatchQueue.main = NotchScreenRefreshContract.Scheduler()
             let controller = Controller()
             controller.autoDismissDuration = duration

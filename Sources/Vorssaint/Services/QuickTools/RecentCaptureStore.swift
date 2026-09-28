@@ -20,6 +20,7 @@ struct RecentCaptureEntry: Codable, Equatable, Identifiable {
     let anchorY: Double?
     let anchorWidth: Double?
     let anchorHeight: Double?
+    var edited: Bool? = nil
 
     var recordingURL: URL? {
         guard let recordingPath else { return nil }

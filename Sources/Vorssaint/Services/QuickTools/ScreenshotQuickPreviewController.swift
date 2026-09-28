@@ -47,7 +47,17 @@ final class ScreenshotQuickPreviewController {
     private var panel: ScreenshotQuickPreviewPanel?
     private var keyMonitor: Any?
     private var dismissWork: DispatchWorkItem?
-    private var autoDismissDuration: TimeInterval = 12
+    private var autoDismissDuration: TimeInterval = 30
+    private let preferences: UserDefaults
+    private let dragDirectory: URL?
+    private var stackIndex = 0
+    private var stacking = false
+    var fixtureWindowTitle: String?
+    var interactionEnded: (() -> Void)?
+    private var dragging = false
+    private var editing = false
+
+    var isInteracting: Bool { dragging || editing || pointerInside || systemSharing || model.sharing }
     private var closed = false
     private let presentationID = UUID()
     private var shownInNotch = false
@@ -62,11 +72,17 @@ final class ScreenshotQuickPreviewController {
     init(capture: ScreenshotSelectionController.Capture,
          strings: ScreenshotFeatureStrings,
          defaultAction: ScreenshotDefaultAction,
+         preferences: UserDefaults = .standard,
+         dragDirectory: URL? = nil,
          action: @escaping (Action) -> Set<Action>,
          share: @escaping (ScreenshotShareDuration,
                            @escaping (ScreenshotShareRecord?) -> Void) -> Void,
          shareFile: @escaping () -> URL?,
          onClose: @escaping () -> Void) {
+        self.dragDirectory = dragDirectory
+        self.preferences = preferences
+        self.autoDismissDuration = ScreenshotPreviewLifetime.duration(
+            preferences.object(forKey: "screenshotPreviewLifetime") as? Int ?? 30)
         self.capture = capture
         self.strings = strings
         self.defaultAction = defaultAction
@@ -86,12 +102,11 @@ final class ScreenshotQuickPreviewController {
             model: model,
             perform: { [weak self] action in self?.perform(action) },
             dragItem: { [weak self] in
-                guard let self else { return NSItemProvider() }
-                return ScreenshotService.dragItemProvider(image: self.capture.image,
-                                                          scale: self.capture.scale,
-                                                          strings: self.strings)
-                    ?? NSItemProvider()
+                guard let self else { return nil }
+                return ScreenshotDragTransfer(image: self.capture.image, scale: self.capture.scale,
+                                              prefix: self.strings.fileNamePrefix, directory: self.dragDirectory)
             },
+            draggingChanged: { [weak self] in self?.draggingChanged($0) },
             share: { [weak self] duration in self?.performShare(duration) },
             systemShare: { [weak self] in self?.performSystemShare() },
             shareAnchor: shareAnchor,
@@ -100,6 +115,7 @@ final class ScreenshotQuickPreviewController {
             showQR: { [weak self] in self?.showQRResult() },
             hoverChanged: { [weak self] inside in self?.hoverChanged(inside) },
             embedded: wantsNotch)
+        let presentedContent = content.defaultAppStorage(preferences)
         if wantsNotch, NotchService.shared.presentCapture(
             id: presentationID, content: AnyView(content), actions: AnyView(content.toolbar), height: Self.size(showingLink: model.sharedRecord != nil).height,
             fallback: { [weak self] in
@@ -117,13 +133,14 @@ final class ScreenshotQuickPreviewController {
             finishShowing()
             return
         }
-        let host = NSHostingController(rootView: content)
+        let host = NSHostingController(rootView: presentedContent)
         let size = Self.size(showingLink: model.sharedRecord != nil)
         let panel = ScreenshotQuickPreviewPanel(
             contentRect: CGRect(origin: .zero, size: size),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false)
+        if let fixtureWindowTitle { panel.title = fixtureWindowTitle }
         panel.contentViewController = host
         panel.isReleasedWhenClosed = false
         panel.isOpaque = false
@@ -143,7 +160,7 @@ final class ScreenshotQuickPreviewController {
         // #1463 reported, since Command-C and Command-S did nothing until a
         // click. Taking it costs the caret in the app being typed into
         // (#1089), so More options can hand that trade back to a click.
-        if UserDefaults.standard.bool(forKey: DefaultsKey.screenshotPreviewTakesFocus) {
+        if preferences.bool(forKey: DefaultsKey.screenshotPreviewTakesFocus) {
             panel.makeKey()
         }
         // A performed action turns the preview into a short confirmation; a
@@ -154,7 +171,7 @@ final class ScreenshotQuickPreviewController {
     private func finishShowing() {
         if !didRunDefaultAction {
             didRunDefaultAction = true
-            autoDismissDuration = runDefaultAction(defaultAction) ? 3 : 12
+            _ = runDefaultAction(defaultAction)
             scanForQR()
         }
         scheduleAutoDismiss()
@@ -164,7 +181,7 @@ final class ScreenshotQuickPreviewController {
         pointerInside = inside
         dismissWork?.cancel()
         dismissWork = nil
-        if !inside { scheduleAutoDismiss() }
+        if !inside { scheduleAutoDismiss(); interactionEnded?() }
     }
 
     /// Runs the Settings-configured action once, right after the preview
@@ -258,11 +275,10 @@ final class ScreenshotQuickPreviewController {
         dismissWork?.cancel()
         dismissWork = nil
         if requested == .edit {
-            // Release the island's non-activating key panel before promoting
-            // the app and constructing another SwiftUI window. Defer past the
-            // button's current update rather than nesting editor layout in it.
+            guard !editing else { return }
+            editing = true
+            panel?.orderOut(nil)
             let action = action
-            close()
             DispatchQueue.main.async { _ = action(requested) }
             return
         }
@@ -270,7 +286,15 @@ final class ScreenshotQuickPreviewController {
             scheduleAutoDismiss()
             return
         }
-        close()
+        if requested == .discard { close() }
+        else { scheduleAutoDismiss() }
+    }
+
+    private func draggingChanged(_ value: Bool) {
+        dragging = value
+        dismissWork?.cancel()
+        dismissWork = nil
+        if !value { scheduleAutoDismiss(); interactionEnded?() }
     }
 
     /// The system share sheet: AirDrop, messages and every other target the
@@ -289,7 +313,7 @@ final class ScreenshotQuickPreviewController {
         let shown = shareAnchor.present([url]) { [weak self] chosen in
             guard let self else { return }
             self.systemSharing = false
-            if chosen { self.close() } else { self.scheduleAutoDismiss() }
+            self.scheduleAutoDismiss()
         }
         if !shown {
             systemSharing = false
@@ -319,7 +343,6 @@ final class ScreenshotQuickPreviewController {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.86)) {
                 self.model.sharedRecord = record
             }
-            self.autoDismissDuration = 30
             self.resizePanel(showingLink: true)
             self.scheduleAutoDismiss()
         }
@@ -355,7 +378,6 @@ final class ScreenshotQuickPreviewController {
                     self.model.deletingShare = false
                 }
                 QuickToolHUD.show(icon: "link", message: self.strings.linkDeletedHUD)
-                self.autoDismissDuration = 12
                 self.resizePanel(showingLink: false)
             } catch {
                 guard !self.closed else { return }
@@ -373,29 +395,48 @@ final class ScreenshotQuickPreviewController {
 
     private func previewFrame(for size: CGSize) -> CGRect {
         let pointer = NSEvent.mouseLocation
-        let screens = NSScreen.screens.map { (frame: $0.frame, visibleFrame: $0.visibleFrame) }
-        let visibleFrame = ScreenshotSupport.quickPreviewVisibleFrame(
-            anchor: capture.anchorRect,
-            pointer: pointer,
-            screens: screens,
-            fallback: NSScreen.pointerVisibleFrame)
-        let storedPosition = UserDefaults.standard.string(
+        let visibleFrame = self.visibleFrame
+        let storedPosition = preferences.string(
             forKey: DefaultsKey.screenshotPreviewPosition) ?? ""
-        let position = ScreenshotSupport.QuickPreviewPosition(rawValue: storedPosition)
-            ?? .automatic
-        // With an after-capture action the preview is just a confirmation,
-        // so it sits quietly in the corner and leaves sooner, instead of
-        // popping up next to the selection and waiting.
-        let effectivePosition: ScreenshotSupport.QuickPreviewPosition =
-            position == .automatic && defaultAction != .none
-                ? .bottomRight
-                : position
-        return ScreenshotSupport.quickPreviewFrame(
-            size: size,
-            anchor: capture.anchorRect,
-            pointer: pointer,
-            visibleFrame: visibleFrame,
-            position: effectivePosition)
+        let configured = ScreenshotSupport.QuickPreviewPosition(rawValue: storedPosition) ?? .bottomLeft
+        let position: ScreenshotSupport.QuickPreviewPosition =
+            stacking && configured == .automatic ? .bottomLeft : configured
+        let base = ScreenshotSupport.quickPreviewFrame(
+            size: size, anchor: capture.anchorRect, pointer: pointer,
+            visibleFrame: visibleFrame, position: position)
+        return ScreenshotPreviewPolicy.stackFrame(
+            base: base, visible: visibleFrame, index: stackIndex,
+            top: position == .topLeft || position == .topRight,
+            right: position == .topRight || position == .bottomRight)
+    }
+
+    private var visibleFrame: CGRect {
+        ScreenshotSupport.quickPreviewVisibleFrame(
+            anchor: capture.anchorRect, pointer: NSEvent.mouseLocation,
+            screens: NSScreen.screens.map { (frame: $0.frame, visibleFrame: $0.visibleFrame) },
+            fallback: NSScreen.pointerVisibleFrame)
+    }
+
+    var displayID: CGDirectDisplayID {
+        NSScreen.screens.first { $0.visibleFrame == visibleFrame }?.displayID ?? 0
+    }
+
+    var visibleCapacity: Int {
+        let size = Self.size(showingLink: model.sharedRecord != nil)
+        let columns = max(1, Int((visibleFrame.width - 12) / (size.width + 12)))
+        let rows = max(1, Int((visibleFrame.height - 12) / (size.height + 12)))
+        return columns * rows
+    }
+
+    func setStackIndex(_ index: Int, count: Int) {
+        stackIndex = index
+        stacking = count > 1
+        resizePanel(showingLink: model.sharedRecord != nil)
+    }
+
+    func bringForward(takingFocus: Bool = false) {
+        panel?.orderFrontRegardless()
+        if takingFocus, fixtureWindowTitle != nil { panel?.makeKey() }
     }
 
     private func resizePanel(showingLink: Bool) {
@@ -409,7 +450,8 @@ final class ScreenshotQuickPreviewController {
     }
 
     private func scheduleAutoDismiss() {
-        guard !closed, !pointerInside, !systemSharing, !model.sharing, !model.deletingShare else { return }
+        guard !closed, !pointerInside, !systemSharing, !model.sharing, !model.deletingShare,
+              !dragging, !editing, autoDismissDuration > 0 else { return }
         dismissWork?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.close() }
         dismissWork = work
@@ -436,6 +478,9 @@ final class ScreenshotQuickPreviewController {
             }
             if flags.contains(.command) {
                 switch key {
+                case kVK_ANSI_E:
+                    self.perform(.edit)
+                    return nil
                 case kVK_ANSI_C:
                     self.perform(.copy)
                     return nil
@@ -494,7 +539,8 @@ private struct ScreenshotQuickPreviewView: View {
     let strings: ScreenshotFeatureStrings
     @ObservedObject var model: ScreenshotQuickPreviewModel
     let perform: (ScreenshotQuickPreviewController.Action) -> Void
-    let dragItem: () -> NSItemProvider
+    let dragItem: () -> ScreenshotDragTransfer?
+    let draggingChanged: (Bool) -> Void
     let share: (ScreenshotShareDuration) -> Void
     let systemShare: () -> Void
     let shareAnchor: ShelfSharePickerAnchor.Anchor
@@ -625,7 +671,10 @@ private struct ScreenshotQuickPreviewView: View {
                     )
             }
             .buttonStyle(.plain)
-            .onDrag(dragItem)
+            .overlay {
+                ScreenshotPreviewDragSurface(image: image, transfer: dragItem,
+                                             edit: { perform(.edit) }, dragging: draggingChanged)
+            }
             .screenshotSafeHelp(strings.editButton)
             .accessibilityLabel(strings.editButton)
             .overlay(alignment: .topTrailing) {
