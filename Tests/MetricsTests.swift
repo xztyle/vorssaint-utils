@@ -14,6 +14,7 @@ struct MetricsTests {
                 TestHarnessTests.run(suite)
                 PreferenceNamespaceTests.run(suite)
             }),
+            ("battery-care", { BatteryCareTests.run(suite) }),
             ("metrics", {
                 MetricsFeatureTests.run(suite)
                 ProcessNameContract.run(suite)

@@ -100,7 +100,7 @@ enum SelfUninstall {
                     // The helper must be safely removed before permissions go;
                     // a failure here keeps the app's existing grants intact.
                     let fanHelperWasRegistered = FanControlService.hasRegisteredHelperForRemoval
-                    guard detachFanControl() else {
+                    guard BatteryCareService.detachForRemoval(), detachFanControl() else {
                         stop(L10n.shared.s.advancedUninstallFailedBody, sleepRestored: true)
                         return
                     }
@@ -187,7 +187,7 @@ enum SelfUninstall {
 
     @discardableResult
     private static func detachFromSystem() -> Bool {
-        guard detachFanControl() else { return false }
+        guard BatteryCareService.detachForRemoval(), detachFanControl() else { return false }
         detachLoginItem()
         return true
     }

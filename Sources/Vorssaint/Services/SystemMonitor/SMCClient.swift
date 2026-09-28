@@ -126,6 +126,34 @@ final class SMCClient {
                    dataType: Self.fourCCString(out.keyInfo.dataType))
     }
 
+    /// Result-bearing access for control paths: denied reads must not look absent.
+    func inspectKey(named name: String) throws -> Key {
+        guard name.utf8.count == 4 else { throw WriteError.invalidPayload }
+        var input = SMCParamStruct()
+        input.key = Self.fourCC(name)
+        input.data8 = Self.cmdKeyInfo
+        let output = try checkedCall(&input)
+        return Key(code: input.key, name: name, dataSize: output.keyInfo.dataSize,
+                   dataType: Self.fourCCString(output.keyInfo.dataType))
+    }
+
+    func checkedRead(_ key: Key) throws -> [UInt8] {
+        guard key.dataSize > 0, key.dataSize <= 32 else { throw WriteError.invalidPayload }
+        var input = SMCParamStruct()
+        input.key = key.code
+        input.keyInfo.dataSize = key.dataSize
+        input.data8 = Self.cmdReadKey
+        let output = try checkedCall(&input)
+        return withUnsafeBytes(of: output.bytes) { Array($0.prefix(Int(key.dataSize))) }
+    }
+
+    private func checkedCall(_ input: inout SMCParamStruct) throws -> SMCParamStruct {
+        let (result, output) = invoke(&input)
+        guard result == kIOReturnSuccess else { throw WriteError.transport(result) }
+        guard output.result == 0 else { throw WriteError.controller(output.result) }
+        return output
+    }
+
     // MARK: - Plumbing
 
     private func keyCount() -> Int {

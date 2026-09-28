@@ -58,6 +58,8 @@ else
     BUILD_CONFIGURATION="release"
 fi
 FAN_HELPER_ID="$APP_BUNDLE_ID.fan-control"
+BATTERY_HELPER_ID="io.github.xztyle.Aster.battery-care"
+(( DEV )) && BATTERY_HELPER_ID="io.github.xztyle.Aster.dev.battery-care"
 # Now Playing is read through /usr/bin/perl loading this library; see
 # Sources/NowPlayingAdapter. Staged under Contents/Frameworks, signed on its own.
 NOW_PLAYING_ADAPTER_ID="$APP_BUNDLE_ID.now-playing"
@@ -153,6 +155,7 @@ finalize_installed_bundle_after_child() {
     local bundle="$1"
     local helper="$bundle/Contents/Library/LaunchServices/$FAN_HELPER_ID"
     local adapter="$bundle/Contents/Frameworks/$NOW_PLAYING_ADAPTER"
+    local battery="$bundle/Contents/Library/LaunchServices/$BATTERY_HELPER_ID"
     local devid
     devid="$(developer_id_identity)"
 
@@ -331,6 +334,15 @@ if (( TEST )); then
         Sources/Vorssaint/Core/KeepAwakeStrings.swift
         Sources/Vorssaint/Core/BluetoothSleepStrings.swift
         Sources/Vorssaint/Core/PermissionGuideStrings.swift
+        Sources/Vorssaint/Core/BatteryCareStrings.swift
+        Sources/Vorssaint/Core/BatteryCarePreferences.swift
+        Sources/Vorssaint/Services/BatteryCare/BatteryCareModels.swift
+        Sources/Vorssaint/Services/BatteryCare/BatteryPolicy.swift
+        Sources/Vorssaint/Services/BatteryCare/BatterySchedule.swift
+        Sources/Vorssaint/Services/BatteryCare/BatteryHardware.swift
+        Sources/Vorssaint/Services/BatteryCare/BatterySensor.swift
+        Sources/Vorssaint/Services/BatteryCare/BatteryCareXPC.swift
+        Sources/Vorssaint/Services/SystemMonitor/SMCClient.swift
         Sources/Vorssaint/Core/FanControlStrings.swift
         Sources/Vorssaint/Core/ConnectedDevicesStrings.swift
         Sources/Vorssaint/Services/FanControl/FanControlSupport.swift
@@ -570,6 +582,21 @@ swiftc -O -target "$TARGET" -sdk "$SDK" "${SDK_COMPAT_FLAGS[@]}" "${BUILD_VARIAN
     -o "build/$FAN_HELPER_ID"
 "build/$FAN_HELPER_ID" --selftest
 
+echo "▸ Compiling protected battery helper…"
+swiftc -O -target "$TARGET" -sdk "$SDK" "${SDK_COMPAT_FLAGS[@]}" "${BUILD_VARIANT_FLAGS[@]}" \
+    Sources/Vorssaint/Core/AppCodeIdentity.swift \
+    Sources/Vorssaint/Services/BatteryCare/BatteryCareModels.swift \
+    Sources/Vorssaint/Services/BatteryCare/BatteryPolicy.swift \
+    Sources/Vorssaint/Services/BatteryCare/BatterySchedule.swift \
+    Sources/Vorssaint/Services/BatteryCare/BatteryHardware.swift \
+    Sources/Vorssaint/Services/BatteryCare/BatterySensor.swift \
+    Sources/Vorssaint/Services/BatteryCare/BatteryCareXPC.swift \
+    Sources/Vorssaint/Services/SystemMonitor/SMCClient.swift \
+    Sources/Vorssaint/Services/FanControl/FanControlSupport.swift \
+    Sources/Vorssaint/Services/Metrics/TemperatureSensorSelector.swift \
+    Sources/BatteryCareHelper/*.swift -o "build/$BATTERY_HELPER_ID"
+"build/$BATTERY_HELPER_ID" --selftest
+
 echo "▸ Compiling Now Playing adapter…"
 swiftc -O -target "$TARGET" -sdk "$SDK" "${SDK_COMPAT_FLAGS[@]}" -emit-library \
     -module-name VorssaintNowPlaying \
@@ -619,6 +646,13 @@ mkdir -p "$STAGE/Contents/MacOS" "$STAGE/Contents/Resources" \
     "$STAGE/Contents/Library/LaunchDaemons" "$STAGE/Contents/Library/LaunchServices"
 cp "build/$EXECUTABLE" "$STAGE/Contents/MacOS/$EXECUTABLE"
 cp "build/$FAN_HELPER_ID" "$STAGE/Contents/Library/LaunchServices/$FAN_HELPER_ID"
+cp "build/$BATTERY_HELPER_ID" "$STAGE/Contents/Library/LaunchServices/$BATTERY_HELPER_ID"
+BATTERY_PLIST="$STAGE/Contents/Library/LaunchDaemons/$BATTERY_HELPER_ID.plist"
+cp Resources/io.github.xztyle.Aster.battery-care.plist "$BATTERY_PLIST"
+/usr/libexec/PlistBuddy -c "Set :Label $BATTERY_HELPER_ID" "$BATTERY_PLIST"
+/usr/libexec/PlistBuddy -c "Set :BundleProgram Contents/Library/LaunchServices/$BATTERY_HELPER_ID" "$BATTERY_PLIST"
+/usr/libexec/PlistBuddy -c "Delete :MachServices:io.github.xztyle.Aster.battery-care" "$BATTERY_PLIST"
+/usr/libexec/PlistBuddy -c "Add :MachServices:$BATTERY_HELPER_ID bool true" "$BATTERY_PLIST"
 mkdir -p "$STAGE/Contents/Frameworks"
 cp "build/$NOW_PLAYING_ADAPTER" "$STAGE/Contents/Frameworks/$NOW_PLAYING_ADAPTER"
 cp Resources/now-playing.pl "$STAGE/Contents/Resources/now-playing.pl"
@@ -660,7 +694,9 @@ FAN_HELPER_VERSION="$(
 )"
 /usr/libexec/PlistBuddy -c "Add :VorssaintFanControlHelperVersion string '$FAN_HELPER_VERSION'" \
     "$STAGE/Contents/Info.plist"
-printf 'APPL????' > "$STAGE/Contents/PkgInfo"
+BATTERY_HELPER_VERSION="$(/usr/bin/shasum -a 256 "build/$BATTERY_HELPER_ID" | /usr/bin/awk '{print $1}')"
+/usr/libexec/PlistBuddy -c "Add :AsterBatteryCareHelperVersion string '$BATTERY_HELPER_VERSION'" "$STAGE/Contents/Info.plist"
+printf 'APPL????'  > "$STAGE/Contents/PkgInfo"
 cp build/AppIcon.icns "$STAGE/Contents/Resources/AppIcon.icns"
 cp build/MenuBarIcon.png build/MenuBarIcon@2x.png build/BrandMark.png "$STAGE/Contents/Resources/"
 if [[ -f build/Assets.car ]]; then
@@ -716,6 +752,19 @@ codesign_fan_helper() {
     fi
 }
 
+codesign_battery_helper() {
+    local target="$1"
+    if [[ -n "$DEVID" ]]; then
+        codesign_with_timestamp_retry --force --strip-disallowed-xattrs --options runtime --timestamp \
+            --identifier "$BATTERY_HELPER_ID" --sign "$DEVID" "$target"
+    elif legacy_identity_installed; then
+        codesign --force --strip-disallowed-xattrs --identifier "$BATTERY_HELPER_ID" \
+            --sign "$LEGACY_IDENTITY" "$target"
+    else
+        codesign --force --strip-disallowed-xattrs --identifier "$BATTERY_HELPER_ID" --sign - "$target"
+    fi
+}
+
 codesign_now_playing_adapter() {
     local target="$1"
     if [[ -n "$DEVID" ]]; then
@@ -734,6 +783,7 @@ sign_bundle() {
     local executable="$bundle/Contents/MacOS/$EXECUTABLE"
     local helper="$bundle/Contents/Library/LaunchServices/$FAN_HELPER_ID"
     local adapter="$bundle/Contents/Frameworks/$NOW_PLAYING_ADAPTER"
+    local battery="$bundle/Contents/Library/LaunchServices/$BATTERY_HELPER_ID"
 
     if [[ -n "$DEVID" ]]; then
         echo "  signing with Developer ID (hardened runtime): $DEVID"
@@ -743,6 +793,7 @@ sign_bundle() {
         echo "  signing ad-hoc (no identity installed — run Tools/setup-signing.sh)"
     fi
     [[ -f "$helper" ]] && codesign_fan_helper "$helper"
+    [[ -f "$battery" ]] && codesign_battery_helper "$battery"
     [[ -f "$adapter" ]] && codesign_now_playing_adapter "$adapter"
     codesign_app "$bundle"
 
@@ -752,11 +803,13 @@ sign_bundle() {
         echo "  re-signing after filesystem metadata settled"
         xattr -c -r "$bundle" 2>/dev/null || true
         [[ -f "$helper" ]] && codesign_fan_helper "$helper"
+    [[ -f "$battery" ]] && codesign_battery_helper "$battery"
         [[ -f "$adapter" ]] && codesign_now_playing_adapter "$adapter"
         codesign_app "$bundle"
     fi
     [[ -f "$executable" ]] && codesign --verify --strict "$executable"
     [[ -f "$helper" ]] && codesign --verify --strict "$helper"
+    [[ -f "$battery" ]] && codesign --verify --strict "$battery"
     [[ -f "$adapter" ]] && codesign --verify --strict "$adapter"
     codesign --verify --deep --strict "$bundle"
 }
