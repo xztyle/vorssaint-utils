@@ -87,6 +87,7 @@ struct ScreenshotBackdropPopover<Model: BackdropEditing>: View {
     @ObservedObject var model: Model
     @ObservedObject private var l10n = L10n.shared
     let showsAdjustments: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var wallpapers: [URL] = []
     @State private var customIsGradient = false
@@ -432,7 +433,7 @@ struct ScreenshotBackdropPopover<Model: BackdropEditing>: View {
         applied.padding = model.backdropStyle.padding
         applied.cornerRadius = model.backdropStyle.cornerRadius
         applied.blur = model.backdropStyle.blur
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+        withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.85)) {
             model.backdropStyle = applied
         }
     }

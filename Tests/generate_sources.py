@@ -830,7 +830,7 @@ def main():
                     for prefix in ["    private func hoverChanged(", "    private func scheduleAutoDismiss(",
                                    "    private func perform("])
           + "}\nstruct Preview {\nlet embedded: Bool\nlet hoverChanged: (Bool) -> Void\n"
-          + declaration(preview, "    private func previewHoverChanged(").replace("private func", "func", 1)
+          + declaration("Sources/Vorssaint/UI/Screenshot/ScreenshotQuickPreviewView.swift", "    private func previewHoverChanged(").replace("private func", "func", 1)
           + "}\n}\n")
     selection = "Sources/Vorssaint/Services/QuickTools/ScreenshotSelectionController.swift"
     refresh_methods = [

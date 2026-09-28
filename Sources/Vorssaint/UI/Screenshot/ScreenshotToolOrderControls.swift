@@ -14,6 +14,7 @@ struct ScreenshotToolOrderControls: View {
     @State private var recordingTool: ScreenshotSupport.Tool?
     @State private var errorText: String?
     @StateObject private var keyboard = ScreenshotShortcutContext()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var strings: ScreenshotFeatureStrings {
         FeatureStrings.screenshot(l10n.language)
@@ -168,7 +169,7 @@ struct ScreenshotToolOrderControls: View {
         guard let index = order.firstIndex(of: tool) else { return }
         let destination = index + offset
         guard order.indices.contains(destination) else { return }
-        withAnimation(.easeInOut(duration: 0.14)) {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.14)) {
             order.swapAt(index, destination)
             persist(order)
         }
