@@ -36,6 +36,7 @@ final class ClipboardLibraryStore {
     let databaseURL: URL
     private var db: OpaquePointer?
     private var saved: [UUID: ClipboardHistoryEntry] = [:]
+    private var savedPositions: [UUID: Int] = [:]
     private var savedCollections: [ClipboardCollection] = []
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
@@ -61,8 +62,11 @@ final class ClipboardLibraryStore {
 
     func load() throws -> ClipboardLibrarySnapshot {
         var entries: [ClipboardHistoryEntry] = []
-        try rows("SELECT payload FROM clips ORDER BY copied DESC, position") { statement in
-            entries.append(try JSONDecoder().decode(ClipboardHistoryEntry.self, from: blob(statement, 0)))
+        var positions: [UUID: Int] = [:]
+        try rows("SELECT payload,position FROM clips ORDER BY copied DESC, position") { statement in
+            let entry = try JSONDecoder().decode(ClipboardHistoryEntry.self, from: blob(statement, 0))
+            entries.append(entry)
+            positions[entry.id] = Int(sqlite3_column_int64(statement, 1))
         }
         var collections: [ClipboardCollection] = []
         try rows("SELECT payload FROM state WHERE key='collections'") { statement in
@@ -70,6 +74,7 @@ final class ClipboardLibraryStore {
         }
         guard Set(entries.map(\.id)).count == entries.count else { throw ClipboardLibraryError.invalidArchive }
         saved = Dictionary(uniqueKeysWithValues: entries.map { ($0.id, $0) })
+        savedPositions = positions
         savedCollections = collections
         return ClipboardLibrarySnapshot(entries: entries, collections: collections)
     }
@@ -77,16 +82,19 @@ final class ClipboardLibraryStore {
     func save(_ snapshot: ClipboardLibrarySnapshot) throws {
         guard Set(snapshot.entries.map(\.id)).count == snapshot.entries.count else { throw ClipboardLibraryError.invalidArchive }
         let current = Dictionary(uniqueKeysWithValues: snapshot.entries.map { ($0.id, $0) })
+        let positions = Dictionary(uniqueKeysWithValues: snapshot.entries.enumerated().map { ($0.element.id, $0.offset) })
         try transaction {
             for id in saved.keys where current[id] == nil { try delete(id) }
             for (position, entry) in snapshot.entries.enumerated() {
                 if saved[entry.id] != entry { try upsert(entry, position: position) }
+                else if savedPositions[entry.id] != position { try updatePosition(entry.id, position: position) }
             }
             if snapshot.collections != savedCollections {
                 try run("INSERT OR REPLACE INTO state VALUES('collections',?)", [], data: JSONEncoder().encode(snapshot.collections))
             }
         }
         saved = current
+        savedPositions = positions
         savedCollections = snapshot.collections
         tightenPermissions()
     }
@@ -105,6 +113,10 @@ final class ClipboardLibraryStore {
     private func delete(_ id: UUID) throws {
         try run("DELETE FROM search WHERE rowid=(SELECT rowid FROM clips WHERE id=?)", [id.uuidString])
         try run("DELETE FROM clips WHERE id=?", [id.uuidString])
+    }
+
+    private func updatePosition(_ id: UUID, position: Int) throws {
+        try run("UPDATE clips SET position=? WHERE id=?", ["\(position)", id.uuidString])
     }
 
     func search(_ query: String, limit: Int = 50_000) throws -> [UUID] {

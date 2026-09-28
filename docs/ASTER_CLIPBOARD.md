@@ -156,3 +156,13 @@ The production paste methods run against test doubles for immediate focus,
 slower activation, missing focus, a terminated app and missing permission.
 The clipboard suite passed 693 checks. The optimized bundle and packaged
 selftest passed. A real paste into another app is still a separate Mac UI gate.
+
+## Same-time history order
+
+Two copies can have the same recorded time. The database previously skipped a
+position update when their content was unchanged, so moving those cards could
+restore the old order after a restart. It now saves position changes in the same
+transaction as content changes. A reopened database retains the new order,
+including when older copies acquire an equal timestamp. The focused clipboard
+suite passes 695 checks. This is a storage check; actual drawer navigation and
+paste into another app still need live acceptance.
