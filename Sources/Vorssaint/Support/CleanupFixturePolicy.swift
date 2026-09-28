@@ -9,6 +9,14 @@ enum CleanupFixturePolicy {
         Data(("Aster cleanup fixture 1\n" + root.path + "\n").utf8)
     }
 
+    static func signedPreparedRoot(_ path: String) -> URL? {
+        guard path.hasPrefix("/"),
+              let root = try? StorageLocalAccess.canonicalRoot(URL(fileURLWithPath: path, isDirectory: true)),
+              root.path.hasPrefix("/private/tmp/"),
+              (try? needsPreparation(root)) == false else { return nil }
+        return root
+    }
+
     static func needsPreparation(_ root: URL) throws -> Bool {
         guard !UninstallerSupport.isSymbolicLink(root) else { throw StorageInspectionFailure.excluded }
         guard FileManager.default.fileExists(atPath: root.path) else { return true }
