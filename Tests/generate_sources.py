@@ -810,6 +810,8 @@ def main():
     write("CaptureReceiverConstruction.swift", "import AppKit\nimport CryptoKit\nimport ImageIO\n"
           + "extension ScreenshotFixtureReceiverTests {\n"
           + declaration("Sources/Vorssaint/Support/ScreenshotCaptureFixture.swift",
+                        "    private static func requestedDirectory(").replace("private static func", "static func", 1)
+          + declaration("Sources/Vorssaint/Support/ScreenshotCaptureFixture.swift",
                         "    private static func fixtureDirectory(").replace("private static func", "static func", 1)
           + "\n" + declaration("Sources/Vorssaint/Support/ScreenshotCaptureFixture.swift",
                         "    private static func canonicalDirectory(").replace("private static func", "static func", 1)

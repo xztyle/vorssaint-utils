@@ -7,9 +7,20 @@ import AppKit
 /// No application window is created; the pasteboard is a private test-only board.
 enum ScreenshotFixtureReceiverTests {
     static func run(_ suite: TestSuite) {
+        fixtureEntrypoint(suite)
         fixturePaths(suite)
         rejectsTemporaryRootItself(suite)
         receiverImportsImage(suite)
+    }
+
+    private static func fixtureEntrypoint(_ suite: TestSuite) {
+        let configured = "/private/tmp/aster-capture-configured"
+        let argument = "/private/tmp/aster-capture-argument"
+        suite.expect(requestedDirectory(arguments: ["Aster"], bundleDirectory: configured) == configured
+                     && requestedDirectory(arguments: ["Aster", "--capture-fixture=\(argument)"],
+                                           bundleDirectory: configured) == argument
+                     && requestedDirectory(arguments: ["Aster"], bundleDirectory: nil) == nil,
+                     "signed fixture bundle key launches early while an explicit argument takes precedence")
     }
 
     private static func fixturePaths(_ suite: TestSuite) {
@@ -29,6 +40,10 @@ enum ScreenshotFixtureReceiverTests {
             _ = try fixtureDirectory("/private/tmp")
             suite.expect(false, "the shared temporary root is never a fixture directory")
         } catch { suite.expect(true, "the shared temporary root is never a fixture directory") }
+        do {
+            _ = try fixtureDirectory("relative-capture-root")
+            suite.expect(false, "fixture root must be an absolute path")
+        } catch { suite.expect(true, "fixture root must be an absolute path") }
     }
 
     private static func receiverImportsImage(_ suite: TestSuite) {
