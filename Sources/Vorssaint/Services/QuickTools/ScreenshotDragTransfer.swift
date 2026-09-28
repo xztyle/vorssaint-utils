@@ -108,6 +108,7 @@ struct ScreenshotPreviewDragSurface: NSViewRepresentable {
         private var down: NSEvent?
         private var started = false
         private var swiping = false
+        private var trackpadTracking = false
         private var cancelled = false
         private var escapeMonitor: Any?
         private var sourceScreen: CGRect = .zero
@@ -119,6 +120,7 @@ struct ScreenshotPreviewDragSurface: NSViewRepresentable {
         deinit { if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) } }
 
         override func mouseDown(with event: NSEvent) {
+            guard !trackpadTracking else { return }
             down = event
             started = false
             swiping = false
@@ -129,6 +131,7 @@ struct ScreenshotPreviewDragSurface: NSViewRepresentable {
             otherScreens = NSScreen.screens.filter { $0.frame != sourceScreen }.map(\.frame)
         }
         override func mouseUp(with event: NSEvent) {
+            guard !trackpadTracking, down != nil else { return }
             lastPoint = window?.convertPoint(toScreen: event.locationInWindow) ?? lastPoint
             if swiping { finishSwipe(cancelled: cancelled) }
             else if !started { edit?() }
@@ -136,10 +139,64 @@ struct ScreenshotPreviewDragSurface: NSViewRepresentable {
         }
         override func cancelOperation(_ sender: Any?) {
             cancelled = true
+            if trackpadTracking { cancelTrackpadSwipe(); return }
             if swiping { finishSwipe(cancelled: true); return }
             super.cancelOperation(sender)
         }
+        private func cancelTrackpadSwipe() {
+            trackpadTracking = false
+            swiping = false
+            if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
+            escapeMonitor = nil
+            window?.setFrameOrigin(swipeOrigin)
+            window?.alphaValue = 1
+            swipe?(false)
+        }
+        override func scrollWheel(with event: NSEvent) {
+            guard !swiping, !started, let window, let screen = window.screen,
+                  ScreenshotPreviewSwipeGesture.canTrack(
+                    deltaX: event.scrollingDeltaX, deltaY: event.scrollingDeltaY,
+                    inverted: event.isDirectionInvertedFromDevice,
+                    precise: event.hasPreciseScrollingDeltas,
+                    enabled: NSEvent.isSwipeTrackingFromScrollEventsEnabled) else {
+                super.scrollWheel(with: event)
+                return
+            }
+            trackSwipe(event, in: window, screen: screen.frame)
+        }
+
+        private func trackSwipe(_ event: NSEvent, in window: NSWindow, screen: CGRect) {
+            let inverted = event.isDirectionInvertedFromDevice
+            let origin = window.frame.origin
+            let travel = window.frame.maxX - screen.minX + 12
+            swiping = true
+            trackpadTracking = true
+            swipeOrigin = origin
+            swipe?(true)
+            monitorEscape(forSwipe: true)
+            event.trackSwipeEvent(options: [.lockDirection, .clampGestureAmount],
+                dampenAmountThresholdMin: inverted ? 0 : -1,
+                max: inverted ? 1 : 0) { [weak self, weak window] amount, phase, complete, stop in
+                guard let self, let window else { return }
+                guard self.trackpadTracking else { stop.pointee = true; return }
+                let progress = ScreenshotPreviewSwipeGesture.trackpadProgress(
+                    amount: amount, inverted: inverted)
+                if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion || phase != [] || complete {
+                    self.moveSwipe(window, offset: -progress * travel, origin: origin)
+                    window.alphaValue = 1 - progress
+                }
+                guard complete else { return }
+                self.trackpadTracking = false
+                self.swiping = false
+                if let escapeMonitor = self.escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
+                self.escapeMonitor = nil
+                if progress >= 0.95 { self.dismiss?() }
+                else { window.setFrameOrigin(origin); window.alphaValue = 1; self.swipe?(false) }
+            }
+        }
+
         override func mouseDragged(with event: NSEvent) {
+            guard !trackpadTracking else { return }
             let point = window?.convertPoint(toScreen: event.locationInWindow) ?? .zero
             lastPoint = point
             if swiping { updateSwipe(to: point); return }
@@ -169,14 +226,19 @@ struct ScreenshotPreviewDragSurface: NSViewRepresentable {
         }
         private func updateSwipe(to point: CGPoint) {
             guard let window else { return }
-            let dx = min(0, point.x - startPoint.x)
-            window.setFrameOrigin(CGPoint(x: swipeOrigin.x + dx, y: swipeOrigin.y))
+            moveSwipe(window, offset: point.x - startPoint.x, origin: swipeOrigin)
+        }
+
+        private func moveSwipe(_ window: NSWindow, offset: CGFloat, origin: CGPoint) {
+            let dx = min(0, offset)
+            window.setFrameOrigin(CGPoint(x: origin.x + dx, y: origin.y))
             window.alphaValue = max(0.65, 1 + dx / max(window.frame.width, 1) * 0.35)
         }
 
         private func finishSwipe(cancelled: Bool) {
             guard swiping, let window else { return }
             swiping = false
+            down = nil
             if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
             escapeMonitor = nil
             let dx = lastPoint.x - startPoint.x
@@ -197,7 +259,7 @@ struct ScreenshotPreviewDragSurface: NSViewRepresentable {
                 window.animator().alphaValue = dismisses ? 0 : 1
             }, completionHandler: { [weak self] in
                 if dismisses { self?.dismiss?() }
-                else { self?.swipe?(false) }
+                else { self?.started = false; self?.swipe?(false) }
             })
         }
 
@@ -205,7 +267,11 @@ struct ScreenshotPreviewDragSurface: NSViewRepresentable {
             escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 guard event.keyCode == 53 else { return event }
                 self?.cancelled = true
-                if forSwipe { self?.finishSwipe(cancelled: true); return nil }
+                if forSwipe {
+                    if self?.trackpadTracking == true { self?.cancelTrackpadSwipe() }
+                    else { self?.finishSwipe(cancelled: true) }
+                    return nil
+                }
                 return event
             }
         }
@@ -214,6 +280,7 @@ struct ScreenshotPreviewDragSurface: NSViewRepresentable {
         func draggingSession(_ session: NSDraggingSession, endedAt point: NSPoint,
                              operation: NSDragOperation) {
             down = nil
+            started = false
             if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
             escapeMonitor = nil
             dragging?(false)

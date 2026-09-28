@@ -67,9 +67,19 @@ extension ScreenshotPreviewPolicy {
     }
 }
 
-/// A leftward gesture moves the actual card. Other directions start a native
-/// image drag, and a display on the left remains available as a drop target.
+/// A leftward mouse drag or two-finger swipe moves the actual card. Other
+/// mouse directions start a native image drag, including toward a left display.
 enum ScreenshotPreviewSwipeGesture {
+    static func canTrack(deltaX: CGFloat, deltaY: CGFloat, inverted: Bool,
+                         precise: Bool, enabled: Bool) -> Bool {
+        let left = inverted ? deltaX : -deltaX
+        return precise && enabled && left > 0 && left >= abs(deltaY) * 1.25
+    }
+
+    static func trackpadProgress(amount: CGFloat, inverted: Bool) -> CGFloat {
+        min(1, max(0, inverted ? amount : -amount))
+    }
+
     static func canBegin(dx: CGFloat, dy: CGFloat, sourceScreen: CGRect,
                          otherScreens: [CGRect], y: CGFloat) -> Bool {
         guard dx <= -7, abs(dx) >= abs(dy) * 1.25,

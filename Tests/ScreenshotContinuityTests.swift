@@ -57,6 +57,19 @@ enum ScreenshotContinuityTests {
     private static func dismissGesture(_ suite: TestSuite) {
         let screen = CGRect(x: 0, y: 0, width: 1440, height: 900)
         let gesture = ScreenshotPreviewSwipeGesture.self
+        suite.expect(gesture.canTrack(deltaX: 10, deltaY: 1, inverted: true,
+                                      precise: true, enabled: true)
+                     && gesture.canTrack(deltaX: -10, deltaY: 1, inverted: false,
+                                         precise: true, enabled: true)
+                     && !gesture.canTrack(deltaX: 1, deltaY: 10, inverted: true,
+                                          precise: true, enabled: true)
+                     && !gesture.canTrack(deltaX: 10, deltaY: 0, inverted: true,
+                                          precise: false, enabled: true),
+                     "two-finger left swipe works with either scroll direction and ignores wheels")
+        suite.expect(gesture.trackpadProgress(amount: 0.5, inverted: true) == 0.5
+                     && gesture.trackpadProgress(amount: -0.5, inverted: false) == 0.5
+                     && gesture.trackpadProgress(amount: -0.5, inverted: true) == 0,
+                     "trackpad movement follows the physical leftward gesture")
         suite.expect(gesture.canBegin(dx: -8, dy: 1, sourceScreen: screen,
                                       otherScreens: [], y: 120),
                      "a horizontal left drag moves the card itself")
