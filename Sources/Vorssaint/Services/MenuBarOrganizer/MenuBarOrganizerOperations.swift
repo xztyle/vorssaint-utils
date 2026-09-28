@@ -84,7 +84,11 @@ extension MenuBarOrganizerService {
         operationTask = Task { [weak self] in
             guard let self else { return }
             defer { if !stopping { operationTask = nil } }
-            if await applyLayout(undoLayout) { saveCurrentLayout(); self.undoLayout = nil }
+            if await applyLayout(undoLayout) {
+                saveCurrentLayout()
+                if MenuBarLayoutPolicy.allItemsAvailable(undoLayout, items: items) { self.undoLayout = nil }
+                else { operationMessage = text.errorUnavailable }
+            }
         }
     }
 

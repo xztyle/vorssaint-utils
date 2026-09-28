@@ -23,6 +23,10 @@ enum MenuBarRestorationTests {
                      "being somewhere left of Clock is not proof Siri crossed Control Center")
         suite.expect(MenuBarLayoutPolicy.plan(MenuBarLayout.capture(old), items: old).isEmpty,
                      "an already restored layout generates no input at all")
+        suite.expect(!MenuBarLayoutPolicy.allItemsAvailable(MenuBarLayout.capture(old), items: old.filter { $0.id != id("WiFi") }),
+                     "an absent native icon keeps the Undo snapshot available for recovery")
+        suite.expect(MenuBarLayoutPolicy.allItemsAvailable(MenuBarLayout.capture(old), items: old),
+                     "all restored identities allow Undo to complete")
     }
 
     static func geometry(_ suite: TestSuite) {

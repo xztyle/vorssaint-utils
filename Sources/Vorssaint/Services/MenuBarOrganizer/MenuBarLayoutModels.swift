@@ -191,6 +191,11 @@ enum MenuBarLayoutPolicy {
                 in: MenuBarOrganizerSupport.orderedItems(items, in: step.section).map(\.id))
     }
 
+    static func allItemsAvailable(_ layout: MenuBarLayout, items: [ManagedMenuBarItem]) -> Bool {
+        let live = Dictionary(grouping: items.filter { $0.identityState == .stable }, by: \.id)
+        return layout.entries.allSatisfy { live[$0.identity]?.count == 1 }
+    }
+
     static func isSatisfied(_ layout: MenuBarLayout, items: [ManagedMenuBarItem]) -> Bool {
         let live = Dictionary(grouping: items, by: \.id)
         return MenuBarOrganizerSection.allCases.allSatisfy { section in
