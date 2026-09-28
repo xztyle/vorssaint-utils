@@ -3,6 +3,8 @@
 
 import AppKit
 
+MenuBarAXDiagnosticProbe.runIfRequested()
+
 if CommandLine.arguments.contains("--menu-bar-inventory") {
     MenuBarInventoryProbe.runAndExit()
 }
