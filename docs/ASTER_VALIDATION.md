@@ -515,3 +515,22 @@ strict signature verification. Its executable SHA-256 is
 `c95c67add5af816e18f1f109e855952237dd48e7735ca673a3c9427e7bb1f944`.
 It has not replaced the installed app. A live three-copy review and Trash
 recovery check with generated files remain open.
+
+## Battery sleep handoff gate — 2026-09-28
+
+The battery branch `18a5337` closes a gap after a helper restart: if sleep
+begins before the first timer tick, an enabled, qualified charge policy now
+claims a verified hold. It first checks for competing battery apps. On wake,
+the helper reevaluates the saved range; with battery care off, sleep makes no
+hardware write. Fake-transport cases cover all three paths. The focused
+battery suite passed **168 checks**, and its optimized bundle and packaged
+helper selftest passed.
+
+Detached integration `f8ed6f4` passed **80,706 checks** plus preference cleanup
+with zero failures. Its optimized signed bundle, packaged helper selftest and
+app selftest passed. The metadata-free candidate at
+`/private/tmp/aster-integrated-battery-sleep-txxSwi/Aster.app` passed deep,
+strict signature verification. Its executable SHA-256 is
+`9a5b91905f15edc341a5e356ae2ef3261e40985213f6e4b6baa1cb34ea66b6b1`.
+It has not replaced the installed app. Real sleep, lid and wake behavior still
+require physical acceptance after the protected battery journal is verified.
