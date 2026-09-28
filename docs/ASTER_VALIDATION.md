@@ -473,3 +473,27 @@ strict signature verification. Its executable SHA-256 is
 `7c8d5b4f1db6636f6907047990e0ef92c8d94a286d9f64aeb1db76678a5087ea`.
 It has not replaced the installed app. Upstream Vorssaint still ends at
 `0a28f0d`, which Aster main already contains.
+
+## Menu bar collateral-move gate — 2026-09-28
+
+The menu-bar branch `d10706b` now checks the rest of the stable menu bar after
+each icon move. If another icon changes section, changes order or disappears,
+Aster refuses to acknowledge the move, marks recovery needed and pauses
+automatic rearrangement. On restart, a saved original layout that differs
+from the current physical layout also pauses automation instead of silently
+resuming it. The focused menu suite passed **409 checks**; its optimized bundle
+and packaged selftest passed. A model case catches the earlier Docker move that
+also swapped Siri and Control Center.
+
+Detached integration `109292f` passed **80,697 checks** plus preference cleanup
+with zero failures. Its optimized bundle and packaged selftest passed. A
+metadata-free candidate at
+`/private/tmp/aster-integrated-menu-guard-l53TbB/Aster.app` passed deep,
+strict signature verification. Its executable SHA-256 is
+`1394195ed2660c7077c9c68ddfdb5417b1e156353e6599a50060b801a51e85d9`.
+It has not replaced the installed app.
+
+A read-only inventory on the owner's Mac still shows a different physical icon
+order from the saved original baseline. The new startup check would detect
+that mismatch, but no icon was moved or restored during this gate. Actual
+reorder, Undo, recovery and restart behavior still require live acceptance.
