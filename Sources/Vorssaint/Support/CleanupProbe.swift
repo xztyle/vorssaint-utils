@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Vorssaint
 
 import AppKit
+import Combine
 import SwiftUI
 
 /// Explicit generated-only acceptance profile. No ordinary delegate, scheduler,
@@ -14,6 +15,8 @@ enum CleanupProbe {
     }
     private static var window: NSWindow?
     private static var resizeObserver: NSObjectProtocol?
+    private static var resultObserver: AnyCancellable?
+    private static var resultWritePending = false
 
     static func runIfRequested() {
         guard let root else { return }
@@ -22,6 +25,7 @@ enum CleanupProbe {
         let app = NSApplication.shared
         app.setActivationPolicy(.regular)
         StorageInspectionService.shared.roots = [root.appendingPathComponent("Files", isDirectory: true)]
+        observeResults()
         let window = makeWindow()
         self.window = window
         resizeObserver = NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification,
@@ -31,6 +35,33 @@ enum CleanupProbe {
         app.activate(ignoringOtherApps: true)
         app.run()
         exit(0)
+    }
+
+    private static func observeResults() {
+        resultObserver = StorageInspectionService.shared.objectWillChange.sink {
+            guard !resultWritePending else { return }
+            resultWritePending = true
+            DispatchQueue.main.async {
+                resultWritePending = false
+                writeResults()
+            }
+        }
+        writeResults()
+    }
+
+    private static func writeResults() {
+        guard let root else { return }
+        let service = StorageInspectionService.shared
+        let filesRoot = root.appendingPathComponent("Files", isDirectory: true)
+        guard service.roots == [filesRoot], (try? CleanupFixturePolicy.needsPreparation(root)) == false else { return }
+        do {
+            let data = try CleanupFixtureReceipt.data(root: filesRoot, scan: service.result,
+                duplicates: service.duplicates, receipts: service.receipts, selection: service.selection,
+                malware: service.malware, busy: service.busy)
+            guard PrivateFileStore.write(data, to: root.appendingPathComponent("action-state.json")) else {
+                throw StorageInspectionFailure.failed
+            }
+        } catch { fputs("Cleanup fixture receipt failed: \(error)\n", stderr) }
     }
 
     private static func makeWindow() -> NSWindow {

@@ -40,7 +40,7 @@ private struct StorageDuplicateGroupView: View {
                 }
                 if group.files.count > shown { Button(text[.more]) { shown += 50 } }
             }
-        }
+        }.accessibilityElement(children: .contain)
     }
 }
 
@@ -84,7 +84,7 @@ struct StorageRecoveryView: View {
                         } else { Text("\(text[.failed]): \(failure(receipt.failure))").foregroundStyle(.orange) }
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }
-            }
+            }.accessibilityElement(children: .contain)
         }
     }
     private func failure(_ detail: String?) -> String {

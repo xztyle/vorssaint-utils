@@ -119,8 +119,13 @@ with complete coverage and a successful verified update.
 `--cleanup-fixture=<empty private directory>` opens the actual view with generated
 files and no ordinary app delegate, background features or permission prompts.
 An arbitrary existing nonempty directory is refused. A matching preparation
-marker permits reuse without rewriting fixtures. This route disables personal
-folder/app pickers, engine installation and System Settings launch. Root UI
+marker permits reuse without rewriting fixtures, including files already moved
+out of the fixture. `action-state.json` records generated-scope files, selections,
+duplicate groups and keeper choices, returned Trash URLs for those generated
+originals, and malware outcome counts. The observer runs only in fixture mode,
+after the service publishes a change. It reads no file contents, excludes outside
+paths and diagnostic/finding text, and does not infer that a UI interaction passed.
+This route disables personal folder/app pickers, engine installation and System Settings launch. Root UI
 acceptance is recorded separately in `ASTER_VALIDATION.md`; CLI checks do not
 claim that UI interactions, Finder Put Back, cloud providers or external-volume
 Trash behavior were exercised on the owner's data.
@@ -143,3 +148,14 @@ duplicate results appeared. The change improves the review controls, but it is
 not claimed to fix the tool crash. No duplicate-results UI acceptance pass is
 claimed, including choosing a keeper or removing a reviewed duplicate through
 that screen. The automated keeper/removal-policy checks passed independently.
+
+The same tool-only crash also occurred after a reviewed Trash action from the
+working Storage list: the selected generated `Large fixture.bin` disappeared from
+its original location, then the tool crashed while reading the recovery result;
+Aster stayed running. Recovery via Finder was not yet verified at that point.
+Duplicate and recovery result groups now use explicit accessibility containment,
+a bounded semantic grouping change whose live result still needs verification.
+The fixture observer records future service outcomes and cannot reconstruct an
+earlier process's in-memory Trash receipt. Five new receipt checks verify scope
+filtering, keeper identity, returned Trash locations, and omission of private
+content; the combined storage-inspection and repository run passes 339 checks.

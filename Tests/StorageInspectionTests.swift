@@ -10,6 +10,7 @@ enum StorageInspectionTests {
         policies(suite)
         engineResults(suite)
         locales(suite)
+        CleanupFixtureReceiptTests.run(suite)
     }
 
     private static func fixtures(_ suite: TestSuite) throws {
