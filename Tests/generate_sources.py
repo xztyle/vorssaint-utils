@@ -11,9 +11,10 @@ changes shape; the Swift compiler then checks the generated source normally.
 from pathlib import Path
 import json
 import re
+from generated_source_output import GeneratedSourceOutput
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT = ROOT / "build/generated-tests"
+write = GeneratedSourceOutput(ROOT / "build/generated-tests").write
 
 
 def declaration(path, prefix, scope=None):
@@ -35,18 +36,11 @@ def declaration(path, prefix, scope=None):
     return f'#sourceLocation(file: {json.dumps(path)}, line: {start + 1})\n{body}\n#sourceLocation()\n'
 
 
-def write(name, text):
-    path = OUTPUT / name
-    if not path.exists() or path.read_text() != text:
-        path.write_text(text)
-
-
 def availability_declaration(path, prefix):
     return declaration(path, prefix).replace(".feature.isAvailable", ".feature.isAvailable(in: ReviewDefaults.current)")
 
 
 def main():
-    OUTPUT.mkdir(parents=True, exist_ok=True)
     write("NotchActivityPicker.swift", "import SwiftUI\n"
           + declaration("Sources/Vorssaint/UI/Notch/NotchView.swift", "struct NotchShape: Shape {")
           + declaration("Sources/Vorssaint/UI/Notch/NotchView.swift", "struct NotchActivityPicker: View {"))

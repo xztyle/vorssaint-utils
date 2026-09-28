@@ -247,7 +247,7 @@ discard_test_preferences() {
 # Standalone automated tests: pure contracts plus isolated disk, subprocess,
 # keyboard-data and media fixtures. No application windows or device capture.
 if (( TEST )); then
-    python3 Tests/generate_sources.py
+    GENERATED_TEST_SOURCES=("${(@f)$(python3 Tests/generate_sources.py)}")
     TEST_OBJECT_DIR="build/objects/tests"
     mkdir -p "$TEST_OBJECT_DIR"
     TEST_SOURCES=(
@@ -528,7 +528,7 @@ if (( TEST )); then
         Sources/Vorssaint/Services/ManagedDownloads/WhatsAppDownloadSupport.swift
         Sources/Vorssaint/Core/SecureInputSupport.swift
         Tests/*.swift
-        build/generated-tests/*.swift
+        "${GENERATED_TEST_SOURCES[@]}"
     )
     TEST_OUTPUT_FILE_MAP="$TEST_OBJECT_DIR/output-file-map.json"
     write_swift_output_file_map "$TEST_OUTPUT_FILE_MAP" "$TEST_OBJECT_DIR" "${TEST_SOURCES[@]}"

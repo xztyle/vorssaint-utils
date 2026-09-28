@@ -31,6 +31,9 @@ hardware/permission-dependent behavior remains unverified.
 
 - Fast history search at realistic large history sizes.
 - Paste-informed visual cards, clear previews and an efficient keyboard workflow.
+- The primary history opens as a drawer from the very bottom of the active display,
+  across the screen and over the Dock. It is not a floating window above the Dock.
+  Opening and closing use vertical motion, with Reduce Motion respected.
 - Named pinned collections, editing and reordering.
 - Preserve rich text, images and file references as appropriate for their types.
 - Durable history, explicit retention, backups and migration without silent loss.
