@@ -295,7 +295,8 @@ installed app.
 A generated-only app was selected in the installed Aster uninstaller, moved to
 Trash, and restored with matching bytes through Finder's manual Move Here flow.
 Finder's Put Back was disabled for this dot-prefixed test app. A visible-name
-generated app remains to be tested; no personal app was removed.
+generated app is now signed and staged under `/private/tmp` for that test; it
+has not been placed in Applications. No personal app was removed.
 
 Current detached integration `e51800e` combines current main and all five
 feature branches. Its optimized release build, metadata-free deep signature
@@ -310,6 +311,12 @@ while the screenshot fixture was open. A clean full rerun after closing the
 fixture is required; no current full-suite pass is claimed. The protected
 battery journal still needs its independent administrator read before the
 production app or helper is replaced.
+
+The full combined run after the trackpad change completed **70,970 checks**.
+Only those same 14 layout checks failed; all other suites, including the 834
+screenshot checks, passed, and preference cleanup passed. A distinct signed
+generated-image trackpad fixture is staged for the live gesture check but has
+not been launched while the Mac is locked.
 
 Replacement acceptance has not passed. Main retains the baseline and evidence
 docs; feature merges await their actual-Mac gates. Each feature needs its reviewed
