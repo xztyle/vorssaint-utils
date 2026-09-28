@@ -33,6 +33,7 @@ final class ClipboardIgnoredApps: ObservableObject {
     /// Every app that held the front since the history last looked at the
     /// pasteboard. Seeded with whoever is in front when the window opens.
     private var candidates: Set<String> = []
+    private(set) var lastConfidentSource: (id: String, name: String)?
     private var activationObserver: NSObjectProtocol?
     /// True while the history itself is running; the observer only lives when
     /// the history is on AND there is at least one app to look for.
@@ -80,8 +81,12 @@ final class ClipboardIgnoredApps: ObservableObject {
         syncObserver()
     }
 
+    var currentSourceIsExcluded: Bool {
+        !candidates.isDisjoint(with: lookup)
+    }
+
     private var shouldWatch: Bool {
-        historyIsRunning && !lookup.isEmpty
+        historyIsRunning
     }
 
     private func syncObserver() {
@@ -114,6 +119,10 @@ final class ClipboardIgnoredApps: ObservableObject {
     func excludedSourceSinceLastCheck() -> Bool {
         guard shouldWatch else { return false }
         let excluded = !candidates.isDisjoint(with: lookup)
+        let app = NSWorkspace.shared.frontmostApplication
+        if candidates.count == 1, let id = app?.bundleIdentifier, candidates.contains(id), !excluded {
+            lastConfidentSource = (id, app?.localizedName ?? id)
+        } else { lastConfidentSource = nil }
         candidates = Self.frontmostBundleID().map { [$0] } ?? []
         return excluded
     }

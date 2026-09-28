@@ -24,7 +24,7 @@ struct ClipboardEntryPreviewSidebar: View {
                 if editingEntryID == entry.id {
                     textEditor(entry)
                 } else if entry.kind == .text {
-                    ClipboardTextPreview(text: entry.text)
+                    ClipboardRichPreview(entry: entry)
                 } else {
                     contentScrollView(entry)
                 }
@@ -39,6 +39,10 @@ struct ClipboardEntryPreviewSidebar: View {
                 cancelEditing()
             }
         }
+        .onChange(of: isEditing) { _, editing in
+            if editing, let entry, entry.kind == .text, editingEntryID == nil { beginEditing(entry) }
+        }
+        .onAppear { if isEditing, let entry, entry.kind == .text { beginEditing(entry) } }
         .onDisappear { cancelEditing() }
     }
 
@@ -249,7 +253,7 @@ struct ClipboardEntryPreviewSidebar: View {
                     .font(.system(size: 9.5))
                     .foregroundStyle(Color.accentColor)
             }
-            Text(entry.copiedAt, style: .time)
+            Text(entry.copiedAt.formatted(date: .omitted, time: .shortened))
                 .font(.system(size: 9.5))
                 .foregroundStyle(.tertiary)
             Spacer()
@@ -264,7 +268,7 @@ struct ClipboardEntryPreviewSidebar: View {
                 .disabled(!ClipboardHistoryEditing.canSave(original: entry.text, draft: draft))
             } else {
                 if entry.kind == .text {
-                    Button(text.edit) {
+                    Button(ClipboardLibraryStrings.current.editCopy) {
                         beginEditing(entry)
                     }
                 }

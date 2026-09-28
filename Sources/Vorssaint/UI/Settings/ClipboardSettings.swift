@@ -53,6 +53,7 @@ struct ClipboardSettings: View {
                 }
                 .settingsFormSectionAnchor(.clipboardHistory)
 
+                ClipboardLibrarySettings()
                 clipboardShortcutSection
                 clipboardMenuBarPreviewSection
 
@@ -69,12 +70,7 @@ struct ClipboardSettings: View {
                         .foregroundStyle(.secondary)
                     ClipboardIgnoredAppsList()
                         .disabled(!enabled)
-                    Picker(text.limit, selection: $limit) {
-                        ForEach(Defaults.allowedClipboardHistoryLimits, id: \.self) { value in
-                            Text(value == 0 ? text.limitUnlimited : "\(value)").tag(value)
-                        }
-                    }
-                    .disabled(!enabled)
+
                 }
 
                 // Its own section because it is the one setting here that keeps

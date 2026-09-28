@@ -20,6 +20,7 @@ struct ClipboardHistoryWriteResult {
 
 enum ClipboardHistoryWrite {
     case text(String)
+    case representations(plain: String, formats: [String: Data])
     case image(png: Data, tiff: Data?)
     case files([NSURL])
     case rich(NSAttributedString, plain: String)
@@ -37,6 +38,12 @@ enum ClipboardHistoryWrite {
             switch self {
             case let .text(text):
                 succeeded = pasteboard.setString(text, forType: .string)
+            case let .representations(plain, formats):
+                succeeded = pasteboard.setString(plain, forType: .string)
+                for (type, data) in formats.sorted(by: { $0.key < $1.key }) {
+                    guard succeeded, !isExpired() else { succeeded = false; break }
+                    succeeded = pasteboard.setData(data, forType: NSPasteboard.PasteboardType(type))
+                }
             case let .image(png, tiff):
                 succeeded = pasteboard.setData(png, forType: .png)
                 if succeeded, let tiff, !isExpired() {

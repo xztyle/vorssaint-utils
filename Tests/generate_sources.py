@@ -164,14 +164,19 @@ def main():
                         "final class NotchAudioLevelService:")
           + "}\n")
     clipboard = "Sources/Vorssaint/Services/Clipboard/ClipboardHistoryService.swift"
+    clipboard_paste = "Sources/Vorssaint/Services/Clipboard/ClipboardHistoryPaste.swift"
+    clipboard_library = "Sources/Vorssaint/Services/Clipboard/ClipboardHistoryLibrary.swift"
     write("ClipboardPreview.swift", "import Foundation\nimport Combine\n"
           + "extension ClipboardPreviewContract {\nfinal class Service: Fixture {\n"
-          + declaration(clipboard, "    @Published private(set) var entries:")
+          + declaration(clipboard, "    @Published var entries:")
           + declaration(clipboard, "    func updateText(")
-          + "".join(declaration(clipboard, prefix).replace("private ", "", 1) for prefix in [
-              "    func togglePin(", "    func copy(_ entry:", "    private func touch(",
-              "    private var firstRecentIndex:", "    private func normalizeEntryOrder(",
-              "    func filteredEntries(", "    private func foldedCandidates("])
+          + "".join(declaration(clipboard, prefix) for prefix in [
+              "    func togglePin(", "    var firstRecentIndex:", "    func normalizeEntryOrder(",
+              "    func filteredEntries(", "    func indexedEntries(", "    func foldedCandidates("])
+          + declaration(clipboard_paste, "    func copy(_ entry:")
+          + declaration(clipboard_paste, "    func touch(")
+          + "".join(declaration(clipboard_library, prefix) for prefix in [
+              "    func ensureDefaultCollection(", "    func addToCollection(", "    func removeFromCollections("])
           + "func setEntries(_ values: [ClipboardHistoryEntry]) { entries = values }\n"
           + "}\n}\n")
     write("CommandBarInputSource.swift", "import Foundation\n"
@@ -207,8 +212,8 @@ def main():
     bar = "Sources/Vorssaint/Services/CommandBar/CommandBarService.swift"
     write("QuickPaste.swift", "import Foundation\n"
           + "extension ClipboardFeatureTests.QuickPasteHost {\n"
-          + declaration("Sources/Vorssaint/Services/Clipboard/ClipboardHistoryService.swift",
-                        "    private func pasteIntoPreviousApp(").replace("private func", "func", 1)
+          + declaration("Sources/Vorssaint/Services/Clipboard/ClipboardHistoryWindow.swift",
+                        "    func pasteIntoPreviousApp(").replace("private func", "func", 1)
           + "}\n")
     write("CommandBarCopyAnswer.swift", "import Foundation\n"
           + "extension CommandBarFeatureTests.CopyAnswerHost {\n"
