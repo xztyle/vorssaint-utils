@@ -3,35 +3,35 @@
 
 import AppKit
 
+/// Drawer placement always uses the full display frame, including the Dock.
 enum ClipboardHistoryWindowSizing {
-    static let compactDefault = NSSize(width: 560, height: 420)
-    static let compactMinimum = NSSize(width: 560, height: 300)
-    static let previewExtra = NSSize(width: 280, height: 80)
-
-    static func minimumSize(preview: Bool) -> NSSize {
-        NSSize(width: compactMinimum.width + (preview ? previewExtra.width : 0),
-               height: compactMinimum.height + (preview ? previewExtra.height : 0))
+    static func frame(on screen: NSRect) -> NSRect {
+        let height = min(screen.height, max(280, min(440, screen.height * 0.46)))
+        return NSRect(x: screen.minX, y: screen.minY, width: screen.width, height: height)
     }
 
-    static func contentSize(preview: Bool, savedWidth: Double, savedHeight: Double,
-                            visibleFrame: NSRect) -> NSSize {
-        let minimum = minimumSize(preview: preview)
-        let width = savedWidth.isFinite && savedWidth >= compactMinimum.width
-            ? CGFloat(savedWidth) : compactDefault.width
-        let height = savedHeight.isFinite && savedHeight >= compactMinimum.height
-            ? CGFloat(savedHeight) : compactDefault.height
-        let requested = NSSize(width: width + (preview ? previewExtra.width : 0),
-                               height: height + (preview ? previewExtra.height : 0))
-        return NSSize(width: max(minimum.width, min(requested.width, visibleFrame.width - 32)),
-                      height: max(minimum.height, min(requested.height, visibleFrame.height - 32)))
+    static func contentOrigin(height: CGFloat, presented: Bool) -> NSPoint {
+        NSPoint(x: 0, y: presented ? 0 : -height)
     }
 
-    static func savedCompactSize(from contentSize: NSSize, preview: Bool) -> NSSize? {
-        let width = contentSize.width - (preview ? previewExtra.width : 0)
-        let height = contentSize.height - (preview ? previewExtra.height : 0)
-        guard width.isFinite, height.isFinite,
-              width >= compactMinimum.width, height >= compactMinimum.height else { return nil }
-        return NSSize(width: width, height: height)
+    static func duration(presented: Bool, reduceMotion: Bool) -> TimeInterval {
+        reduceMotion ? 0 : (presented ? 0.22 : 0.16)
+    }
+}
+
+/// An old dismissal completion must never close a newly opened drawer.
+struct ClipboardDrawerPresentation {
+    private(set) var revision = 0
+    private(set) var isPresented = false
+
+    mutating func request(_ presented: Bool) -> Int {
+        revision &+= 1
+        isPresented = presented
+        return revision
+    }
+
+    func accepts(_ token: Int, presented: Bool) -> Bool {
+        revision == token && isPresented == presented
     }
 }
 
@@ -121,6 +121,15 @@ struct ClipboardHistoryEntry: Codable, Equatable, Identifiable {
     let imageHash: String?
     let imageWidth: Int?
     let imageHeight: Int?
+    var title: String = ""
+    var firstCopiedAt: Date = Date()
+    var copyCount: Int = 1
+    var sourceApp: String? = nil
+    var sourceBundleID: String? = nil
+    var recognizedText: String = ""
+    /// Type to private payload filename. Rich representations remain byte-exact.
+    var representations: [String: String] = [:]
+    var collectionIDs: [UUID] = []
 
     init(id: UUID = UUID(),
          text: String,
@@ -135,6 +144,7 @@ struct ClipboardHistoryEntry: Codable, Equatable, Identifiable {
         self.id = id
         self.text = text
         self.copiedAt = copiedAt
+        self.firstCopiedAt = copiedAt
         self.pinnedAt = pinnedAt
         self.kind = kind
         self.filePaths = filePaths
@@ -145,7 +155,7 @@ struct ClipboardHistoryEntry: Codable, Equatable, Identifiable {
     }
 
     var isPinned: Bool {
-        pinnedAt != nil
+        pinnedAt != nil || !collectionIDs.isEmpty
     }
 
     var fileNames: [String] {
@@ -203,7 +213,7 @@ struct ClipboardHistoryEntry: Codable, Equatable, Identifiable {
     func matchesContent(of other: ClipboardHistoryEntry) -> Bool {
         guard kind == other.kind else { return false }
         switch kind {
-        case .text: return text == other.text
+        case .text: return text == other.text && representations == other.representations
         case .image: return imageHash != nil && imageHash == other.imageHash
         case .files: return filePaths == other.filePaths
         }
@@ -224,6 +234,7 @@ struct ClipboardHistoryEntry: Codable, Equatable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case id, text, copiedAt, pinnedAt, kind, filePaths, imageFile, imageHash, imageWidth, imageHeight
+        case title, firstCopiedAt, copyCount, sourceApp, sourceBundleID, recognizedText, representations, collectionIDs
     }
 
     init(from decoder: Decoder) throws {
@@ -239,6 +250,14 @@ struct ClipboardHistoryEntry: Codable, Equatable, Identifiable {
         imageHash = try container.decodeIfPresent(String.self, forKey: .imageHash)
         imageWidth = try container.decodeIfPresent(Int.self, forKey: .imageWidth)
         imageHeight = try container.decodeIfPresent(Int.self, forKey: .imageHeight)
+        title = try container.decodeIfPresent(String.self, forKey: .title) ?? ""
+        firstCopiedAt = try container.decodeIfPresent(Date.self, forKey: .firstCopiedAt) ?? copiedAt
+        copyCount = try container.decodeIfPresent(Int.self, forKey: .copyCount) ?? 1
+        sourceApp = try container.decodeIfPresent(String.self, forKey: .sourceApp)
+        sourceBundleID = try container.decodeIfPresent(String.self, forKey: .sourceBundleID)
+        recognizedText = try container.decodeIfPresent(String.self, forKey: .recognizedText) ?? ""
+        representations = try container.decodeIfPresent([String: String].self, forKey: .representations) ?? [:]
+        collectionIDs = try container.decodeIfPresent([UUID].self, forKey: .collectionIDs) ?? []
     }
 }
 
@@ -770,7 +789,7 @@ enum ClipboardHistoryPasteboardText {
     private static func trimmed(_ raw: String?) -> String? {
         guard let raw else { return nil }
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        return text.isEmpty ? nil : text
+        return text.isEmpty ? nil : raw
     }
 }
 
@@ -786,7 +805,9 @@ enum ClipboardHistorySensitiveText {
     /// already gathers the types of every item on it, so one read covers a
     /// mark written on its own item as well as one written next to the text.
     static func isConcealed(_ types: [String]) -> Bool {
-        types.contains(concealedPasteboardType)
+        !Set(types).isDisjoint(with: [concealedPasteboardType,
+            "org.nspasteboard.TransientType", "org.nspasteboard.AutoGeneratedType",
+            "com.agilebits.onepassword", "com.typeit4me.clipping", "de.petermaurer.TransientPasteboardType"])
     }
 
     static func looksSensitive(_ text: String) -> Bool {
@@ -852,5 +873,17 @@ enum ClipboardHistoryImageSupport {
     static func isImageFilePath(_ path: String, fileManager: FileManager = .default) -> Bool {
         guard isImageFileName(path) else { return false }
         return fileManager.fileExists(atPath: path)
+    }
+}
+
+extension DefaultsKey {
+    static let clipboardRetentionDays = "clipboardRetentionDays"
+}
+
+
+enum ClipboardLibraryFocus: Int, CaseIterable {
+    case search, results, collections
+    func next(reverse: Bool) -> ClipboardLibraryFocus {
+        Self(rawValue: (rawValue + (reverse ? 2 : 1)) % 3)!
     }
 }

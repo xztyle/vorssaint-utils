@@ -16,11 +16,20 @@ enum ClipboardFeatureTests {
     /// Accessibility grant, the beep and the paste all recorded as events.
     final class QuickPasteHost {
         final class App {
+            let processIdentifier: Int32 = 42
             let isTerminated: Bool
             init(isTerminated: Bool) { self.isTerminated = isTerminated }
-            func activate(options: [Int]) { host?.events.append("activate") }
+            func activate(options: [Int]) { host?.events.append("activate"); host?.frontmost = self }
         }
         typealias NSRunningApplication = App
+        enum ClipboardLibraryProbe { static var root: URL? { nil } }
+        final class Workspace {
+            static let shared = Workspace()
+            var frontmostApplication: App? { host?.frontmost }
+        }
+        typealias NSWorkspace = Workspace
+        var frontmost: App?
+        var switchBeforePaste = false
         enum Sound {
             static func beep() { host?.events.append("beep") }
         }
@@ -32,7 +41,10 @@ enum ClipboardFeatureTests {
         typealias Permissions = Access
         final class Queue {
             static let main = Queue()
-            func asyncAfter(deadline: DispatchTime, execute work: @escaping () -> Void) { work() }
+            func asyncAfter(deadline: DispatchTime, execute work: @escaping () -> Void) {
+                if host?.switchBeforePaste == true { host?.frontmost = nil }
+                work()
+            }
         }
         typealias DispatchQueue = Queue
         static var host: QuickPasteHost?
@@ -46,6 +58,7 @@ enum ClipboardFeatureTests {
 
     static func run(_ suite: TestSuite) {
         ClipboardPreviewContract.run(suite)
+        ClipboardLibraryTests.run(suite)
         func expectEqual(_ actual: String, _ expected: String, _ label: String,
                          file: StaticString = #filePath, line: UInt = #line) {
             suite.expect(actual == expected, "\(label): got \(actual), expected \(expected)",
@@ -146,36 +159,41 @@ enum ClipboardFeatureTests {
         suite.expect(Defaults.registeredDefaults[DefaultsKey.clipboardHistoryQuickPreview] as? Bool == false,
                "clipboard history quick preview is closed by default")
 
-        // MARK: Clipboard quick window sizing
+        // MARK: Clipboard bottom drawer geometry and interrupted transitions
 
         let desktop = NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let compactSize = ClipboardHistoryWindowSizing.contentSize(
-            preview: false, savedWidth: 0, savedHeight: 0, visibleFrame: desktop)
-        let previewSize = ClipboardHistoryWindowSizing.contentSize(
-            preview: true, savedWidth: 0, savedHeight: 0, visibleFrame: desktop)
-        suite.expect(compactSize == NSSize(width: 560, height: 420)
-                && previewSize == NSSize(width: 840, height: 500),
-               "clipboard quick window retains its original compact and preview sizes by default")
-        suite.expect(ClipboardHistoryWindowSizing.minimumSize(preview: false)
-                == NSSize(width: 560, height: 300)
-                && ClipboardHistoryWindowSizing.minimumSize(preview: true)
-                    == NSSize(width: 840, height: 380),
-               "the narrowest clipboard window leaves room for batch actions in both layouts")
-        let taller = ClipboardHistoryWindowSizing.contentSize(
-            preview: true, savedWidth: 700, savedHeight: 640, visibleFrame: desktop)
-        suite.expect(taller == NSSize(width: 980, height: 720)
-                && ClipboardHistoryWindowSizing.savedCompactSize(from: taller, preview: true)
-                    == NSSize(width: 700, height: 640),
-               "a resized preview returns to the same chosen list size")
-        let shortScreen = NSRect(x: 0, y: 0, width: 1050, height: 700)
-        suite.expect(ClipboardHistoryWindowSizing.contentSize(
-            preview: true, savedWidth: 1000, savedHeight: 900, visibleFrame: shortScreen)
-                == NSSize(width: 1018, height: 668),
-               "a saved size is limited to the visible display")
-        suite.expect(ClipboardHistoryWindowSizing.contentSize(
-            preview: false, savedWidth: .infinity, savedHeight: -1, visibleFrame: desktop)
-                == compactSize,
-               "invalid saved dimensions fall back to the original size")
+        let drawer = ClipboardHistoryWindowSizing.frame(on: desktop)
+        suite.expect(drawer.minY == desktop.minY && drawer.width == desktop.width,
+                     "history reaches both display edges and covers the bottom Dock region")
+        suite.expect(drawer.height == 414 && drawer.maxY < desktop.maxY,
+                     "drawer keeps the working app visible above its cards")
+        let secondary = NSRect(x: -1920, y: -1080, width: 1920, height: 1080)
+        let secondaryDrawer = ClipboardHistoryWindowSizing.frame(on: secondary)
+        suite.expect(secondaryDrawer.minX == secondary.minX && secondaryDrawer.minY == secondary.minY
+                     && secondaryDrawer.maxX == secondary.maxX && secondaryDrawer.height == 440,
+                     "a display with negative coordinates uses its own full bottom edge")
+        let tinyScreen = NSRect(x: 0, y: 0, width: 640, height: 240)
+        suite.expect(ClipboardHistoryWindowSizing.frame(on: tinyScreen) == tinyScreen,
+                     "a very short display cannot overflow beyond its frame")
+        let hidden = ClipboardHistoryWindowSizing.contentOrigin(height: drawer.height, presented: false)
+        suite.expect(hidden.y + drawer.height == 0 && hidden.x == 0
+                     && ClipboardHistoryWindowSizing.contentOrigin(height: drawer.height, presented: true) == .zero,
+                     "clipped content travels exactly from below the drawer to its visible bounds")
+        suite.expect(ClipboardHistoryWindowSizing.duration(presented: true, reduceMotion: true) == 0
+                     && ClipboardHistoryWindowSizing.duration(presented: false, reduceMotion: true) == 0,
+                     "reduced motion opens and closes immediately")
+        suite.expect(ClipboardHistoryWindowSizing.duration(presented: true, reduceMotion: false) > 0
+                     && ClipboardHistoryWindowSizing.duration(presented: false, reduceMotion: false) > 0,
+                     "normal presentation animates both reveal and dismissal")
+        var presentation = ClipboardDrawerPresentation()
+        let open = presentation.request(true)
+        suite.expect(presentation.accepts(open, presented: true), "fresh reveal owns the visible drawer")
+        let close = presentation.request(false)
+        suite.expect(!presentation.accepts(open, presented: true) && presentation.accepts(close, presented: false),
+                     "closing invalidates an earlier reveal")
+        let reopen = presentation.request(true)
+        suite.expect(!presentation.accepts(close, presented: false) && presentation.accepts(reopen, presented: true),
+                     "a late dismissal cannot hide a drawer that was reopened")
 
         // MARK: Clipboard menu bar preview
 
@@ -753,6 +771,11 @@ enum ClipboardFeatureTests {
             suite.expect(host.events == expected,
                    "quick paste beeps or asks for Accessibility when it cannot paste, found \(host.events)")
         }
+        let switched = QuickPasteHost()
+        switched.switchBeforePaste = true
+        switched.pasteIntoPreviousApp(QuickPasteHost.App(isTerminated: false))
+        suite.expect(switched.events == ["activate", "beep"],
+                     "focus change during paste delay sends no global keystroke")
         for trusted in [true, false] {
             let host = QuickPasteHost()
             host.trusted = trusted
@@ -778,6 +801,10 @@ enum ClipboardPreviewContract {
             pendingWrite = completion
         }
         var encodedHistoryByteLimit = ClipboardHistoryEditing.maxEncodedHistoryBytes
+        var collections: [ClipboardCollection] = []
+        var library: ClipboardLibraryStore?
+        static let persistQueue = DispatchQueue(label: "fixture-library")
+        func scheduleSearch() {}
         func trimToLimit() {}
         func save() {}
     }
@@ -801,8 +828,8 @@ enum ClipboardPreviewContract {
                      "changing pin metadata retains the preview of identical copied content")
         suite.expect(service.updateText(pinned, to: "Edited but never copied")
                      && service.entries.first?.text == "Edited but never copied"
-                     && service.latestPasteboardEntry == nil,
-                     "editing the current saved item cannot advertise text that was never copied")
+                     && service.latestPasteboardEntry?.text == pinned.text,
+                     "editing creates a separate item and preserves the copied original")
         service.setEntries([current, other])
         service.latestPasteboardEntry = current
         service.setEntries([other])
@@ -825,11 +852,11 @@ enum ClipboardPreviewContract {
         service.pendingWrite?(true)
         service.pendingWrite = nil
         suite.expect(service.latestPasteboardEntry?.text == current.text
-                     && service.entries.first { $0.id == current.id }?.text == "Edited while copy was pending",
+                     && service.entries.first { $0.id == current.id }?.text == current.text,
                      "copy completion advertises exactly the older payload actually written")
         service.togglePin(service.entries.first { $0.id == current.id }!)
-        suite.expect(service.latestPasteboardEntry == nil,
-                     "pinning after a delayed copy cannot replace its preview with an uncopied edit")
+        suite.expect(service.latestPasteboardEntry?.text == current.text,
+                     "pinning after a delayed copy retains the unmodified original")
         let image = ClipboardHistoryEntry(text: "", kind: .image, imageFile: "saved.png")
         service.setEntries([image])
         service.latestPasteboardEntry = image
@@ -839,24 +866,11 @@ enum ClipboardPreviewContract {
         suite.expect(service.latestPasteboardEntry == pinnedImage,
                      "immutable image content keeps its preview even when a legacy entry lacks a hash")
 
-        // Escaped backslashes double in the saved file: two of these pinned
-        // entries fit in 5,000 bytes and three do not.
-        var heavy = (0..<3).map { ClipboardHistoryEntry(text: String(repeating: "\\", count: 1_000 + $0)) }
-        heavy[0].pinnedAt = Date()
-        heavy[1].pinnedAt = Date()
-        service.setEntries(heavy)
-        service.encodedHistoryByteLimit = 5_000
-        service.togglePin(heavy[2])
-        suite.expect(service.entries == heavy,
-                     "a pin the saved file cannot hold beside the other pinned items is refused")
-        suite.expect(!service.updateText(heavy[0], to: String(repeating: "\\", count: 1_500))
-                     && service.entries == heavy,
-                     "an edit that makes the pinned items too large for the saved file is refused")
-        suite.expect(service.updateText(heavy[2], to: String(repeating: "\\", count: 1_500)),
-                     "an unpinned item can still grow, since saving trims it instead")
-        service.togglePin(heavy[0])
-        suite.expect(service.entries.first { $0.id == heavy[0].id }?.isPinned == false,
-                     "unpinning is never refused by the size of the saved file")
+        let longEntry = ClipboardHistoryEntry(text: String(repeating: "\\", count: 100_000))
+        service.setEntries([longEntry])
+        service.togglePin(longEntry)
+        suite.expect(service.entries.first?.isPinned == true,
+                     "pinning long content has no aggregate JSON truncation limit")
         searchFolding(suite)
     }
 

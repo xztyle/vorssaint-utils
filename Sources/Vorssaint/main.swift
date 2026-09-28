@@ -3,6 +3,8 @@
 
 import AppKit
 
+ClipboardLibraryProbe.runIfRequested()
+
 SuperKeyMappingGuard.runIfRequestedAndExit()
 Defaults.register()
 MouseAccelerationGuard.runIfRequestedAndExit()
