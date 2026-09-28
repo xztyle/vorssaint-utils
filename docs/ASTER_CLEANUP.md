@@ -185,3 +185,12 @@ the keeper becomes unavailable, Aster clears that choice and requires a new
 explicit keeper before any further removal. Generated three-copy checks cover
 these cases; the focused storage suite passes 101 checks. The real three-copy
 UI flow still needs a live generated-file check.
+
+## Malware result scope
+
+The malware report now clears when a different folder is chosen, a folder is
+rescanned, a new malware scan starts, or a scanned file is successfully moved
+to Trash. This prevents an old finding or clean result from appearing to
+describe a changed file set. The focused storage suite passed 101 checks, and
+the optimized signed build and app selftest passed. Live UI behavior with a
+changed generated folder remains to be checked.
