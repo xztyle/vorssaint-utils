@@ -6,6 +6,8 @@ enum MenuBarOrganizerTests {
     static func run(_ suite: TestSuite) {
         windowNumbers(suite)
         MenuBarItemEventTests.run(suite)
+        MenuBarRestorationTests.run(suite)
+        MenuBarPointerRecoveryTests.run(suite)
         accessibilityFrames(suite)
         diagnosticPrivacy(suite)
         redactedHostTitles(suite)
@@ -150,7 +152,8 @@ enum MenuBarOrganizerTests {
         let original = MenuBarLayout.capture(items, original: true)
         suite.expect(original.entries.allSatisfy { $0.section == .visible }, "baseline restores all source items to reachability")
         let plan = MenuBarLayoutPolicy.plan(original, items: items)
-        suite.expect(plan.count == 2 && plan.first?.before == identity("Clock"), "protected clock anchors restoration without being dragged")
+        suite.expect(plan.count == 1 && plan.first?.identity == identity("B") && plan.first?.before == identity("Clock"),
+                     "only the misplaced item moves; already-correct neighbors and the protected anchor stay still")
         suite.expect(!MenuBarLayoutPolicy.isSatisfied(original, items: items), "incorrect membership fails full layout verification")
         let restored = [item("A", x: 0), item("B", x: 30), item("Clock", x: 60, movable: false)]
         suite.expect(MenuBarLayoutPolicy.isSatisfied(original, items: restored), "restored membership and order verify")

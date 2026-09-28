@@ -32,8 +32,8 @@ extension MenuBarOrganizerService {
                   moved.windowID == current.windowID, moved.section == section else {
                 operationMessage = text.errorVerification; return false
             }
-            if let target, let neighbor = items.first(where: { $0.id == target }),
-               moved.frame.maxX > neighbor.frame.minX + 3 {
+            if let target, !MenuBarLayoutPolicy.satisfies(MenuBarMovePlanStep(identity: identity,
+                before: target, section: section), items: items) {
                 operationMessage = text.errorVerification; return false
             }
             operationMessage = nil
@@ -72,6 +72,7 @@ extension MenuBarOrganizerService {
         guard await settleAndRefresh() else { return false }
         if MenuBarLayoutPolicy.isSatisfied(layout, items: items) { return true }
         for step in MenuBarLayoutPolicy.plan(layout, items: items) {
+            if MenuBarLayoutPolicy.satisfies(step, items: items) { continue }
             guard !Task.isCancelled, await moveItem(step.identity, before: step.before,
                 to: step.section, restoring: restoring) else { return false }
         }
@@ -83,7 +84,11 @@ extension MenuBarOrganizerService {
         operationTask = Task { [weak self] in
             guard let self else { return }
             defer { if !stopping { operationTask = nil } }
-            if await applyLayout(undoLayout) { saveCurrentLayout(); self.undoLayout = nil }
+            if await applyLayout(undoLayout) {
+                saveCurrentLayout()
+                if MenuBarLayoutPolicy.allItemsAvailable(undoLayout, items: items) { self.undoLayout = nil }
+                else { operationMessage = text.errorUnavailable }
+            }
         }
     }
 
