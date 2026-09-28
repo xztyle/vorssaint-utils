@@ -14,6 +14,7 @@ enum ClipboardLibraryTests {
         do {
             try durableSearchAndBackup(suite, root: root)
             try sameTimeOrderSurvivesRestart(suite, root: root)
+            try mergePreservesSameTimeOrder(suite, root: root)
             try legacyMigration(suite, root: root)
             try transactionFailure(suite, root: root)
             try representationBackup(suite, root: root)
@@ -87,6 +88,28 @@ enum ClipboardLibraryTests {
         try loaded.save(tied)
         suite.expect(try ClipboardLibraryStore(root: mixedDirectory).load() == tied,
                      "a new timestamp tie keeps its order after reopening older stored positions")
+    }
+
+    private static func mergePreservesSameTimeOrder(_ suite: TestSuite, root: URL) throws {
+        let copiedAt = Date(timeIntervalSince1970: 100)
+        let first = ClipboardHistoryEntry(text: "first", copiedAt: copiedAt)
+        let second = ClipboardHistoryEntry(text: "second", copiedAt: copiedAt)
+        let third = ClipboardHistoryEntry(text: "third", copiedAt: copiedAt)
+        let fourth = ClipboardHistoryEntry(text: "fourth", copiedAt: copiedAt)
+        let newer = ClipboardHistoryEntry(text: "newer", copiedAt: copiedAt.addingTimeInterval(1))
+        var oldFirst = first
+        oldFirst.title = "outdated backup title"
+        let existing = ClipboardLibrarySnapshot(entries: [second, first], collections: [])
+        let incoming = ClipboardLibrarySnapshot(entries: [oldFirst, third, fourth, newer], collections: [])
+        let merged = ClipboardLibraryArchive.merge(incoming, into: existing)
+        suite.expect(merged.entries.map(\.id) == [newer.id, second.id, first.id, third.id, fourth.id],
+                     "backup merge keeps saved order for equal-time cards and sorts newer copies first")
+        suite.expect(merged.entries[2].title == first.title,
+                     "backup merge keeps the existing edit when a UUID appears in both libraries")
+        let directory = root.appendingPathComponent("merged-same-time-order")
+        try ClipboardLibraryStore(root: directory).save(merged)
+        let reopened = try ClipboardLibraryStore(root: directory).load()
+        suite.expect(reopened == merged, "merged card order survives a database restart")
     }
 
     private static func legacyMigration(_ suite: TestSuite, root: URL) throws {
