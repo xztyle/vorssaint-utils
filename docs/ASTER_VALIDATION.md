@@ -160,8 +160,16 @@ battery restoration remain ahead of uninstall. Its initial 3,403 scoped checks
 found two failures: an expected feature count and translated punctuation. A full
 run then found one unswept test preference namespace. All were corrected. The
 latest combined full suite passed **70,530 checks** and preference cleanup. The
-initial combined optimized build and packaged selftest also passed; packaging
-the latest menu fix into the combined candidate is in progress.
+latest combined optimized build, packaged selftest and strict signature checks
+passed. This candidate (integration commit `4496af9`) is now installed at
+`/Applications/Aster.app`, with the previous app retained in a local backup. Its
+installed selftest passed. A passive LaunchServices diagnostic confirmed that
+Accessibility remains granted and all ten menu items resolve, with two protected.
+The installed app can still authenticate to the battery service, which remains
+disabled under normal system control with no hardware ownership or recovery owed.
+This installation does not establish replacement acceptance: the outstanding live
+checks and charging qualification above are still required. Main retains the
+reviewed baseline and evidence docs; feature merges await acceptance.
 
 Each feature needs its reviewed implementation, relevant automated tests, optimized
 build and selftest, actual-Mac interaction evidence and recorded unresolved limits.
