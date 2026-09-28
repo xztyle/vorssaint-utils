@@ -304,13 +304,11 @@ suite completed 79,560 checks with the same 14 notch and switcher visibility
 failures already reproduced before this update; all other suites passed. New
 menu-bar icon labels were rebranded to Aster in every provided localization.
 
-Current detached integration `82e741e` combines upstream main and all five
-feature branches. The prior integration revision passed its optimized release
-build, metadata-free deep signature check and packaged selftest. That verified
-bundle is staged at
-`/private/tmp/aster-integrated-trackpad-g7dldatp/Aster.app`, not installed.
-That signed bundle predates the latest upstream merge and eased swipe and must
-be rebuilt before any installation.
+Current detached integration `cbbccbe` combines upstream main and all five
+feature branches. Its optimized release build and packaged selftest pass. A
+metadata-free copy at `/private/tmp/aster-integrated-eased-23_9ahme/Aster.app`
+passes deep strict signature verification. It is not installed; the protected
+battery journal must be read before replacing the production app or helper.
 The combined screenshot suite passes 834 checks. The last full combined run,
 before the trackpad addition and feature-count correction, reported 15 failures
 in 70,968 checks: one stale feature count, one notch-rail visibility check and
