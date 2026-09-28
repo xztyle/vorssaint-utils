@@ -211,8 +211,8 @@ Two unregistered generated startup plists are prepared for the live retry; the
 security result view and updated receipt observer still need that check.
 
 `006ef0f` stops the cleaner's progress glyph animation under Reduce Motion.
-The optimized build passed. A clean copied bundle still needs signature
-verification before this revision is installed.
+The optimized build passed. The later combined signed bundle includes this
+change and remains uninstalled.
 
 ClamAV 1.5.4 was installed through Homebrew for optional local scans. No scanning
 daemon was started. Official definitions passed detached-signature verification.
@@ -243,7 +243,8 @@ entry points were reconciled. Menu and battery restoration remain ahead of norma
 uninstall. Earlier integration failures in expected feature count, translated
 punctuation and test preference cleanup were corrected.
 
-Integration `8076c3e` now contains all five latest feature branches. Its
+Integration `8076c3e` combined the five feature branches before the cleanup
+fixture retry. Its
 optimized build and packaged selftest passed. The full suite passed **70,812
 checks**, including 257 repository and 830 screenshot checks; preference cleanup
 passed. The previous full run failed one source guard because capture borderless
@@ -252,17 +253,35 @@ the exact combined source passed the final repeat. Earlier, `080a8df` fixed a
 real menu event-tap source failure path and replaced another brittle guard with
 lifecycle checks. Its feature branch had passed 405 menu and 257 repository checks.
 
-The latest bundle was copied without synced-folder metadata to
+That bundle was copied without synced-folder metadata to
 `/Applications/.Aster-verified-8076c3e-ac6d74f7.app` and passed deep strict
 signature verification. Its executable SHA256 is
 `30f823a3ba7454d6b8ebd621c1722283aa327a5c42f06a305e4dc569d6f1b4cd`.
 It has not replaced the installed app. A separate generated-image development
 fixture checked the bare screenshot preview without changing the battery helper.
 The installed app remains the restored `1b7637c`, and the stopped helper's broken
-registration is unresolved as described above. All current feature heads are
-pushed: battery `558b5dd`, clipboard `7c77372`, menu `b7a54cb`, capture `f78c1d2`,
-cleanup `006ef0f`. Their combined automated gate is green; actual-Mac
-replacement acceptance remains incomplete.
+registration is unresolved as described above.
+
+The first signed cleanup fixture opened ordinary onboarding because macOS
+resolved its prepared `/private/tmp` path to `/tmp` before a path check. It was
+closed without setup. Cleanup branch `aa51c35` now resolves the path through
+the scanner's canonical path check, requires the prepared marker, and accepts
+the `/tmp` alias in a regression check. Its scoped suite passed 97 checks and
+the development build passed. A newly signed, distinct generated-only fixture
+opened the intended cleanup view. The actual UI showed two generated startup
+entries without the earlier accessibility-reader crash. A generated duplicate
+was reviewed, moved to Trash, shown in the recovery view, and restored through
+Finder Put Back with a matching SHA256. No personal file was scanned or removed.
+
+Current detached integration `b0da423` contains cleanup `aa51c35` and the
+other four feature heads. Its optimized build and packaged selftest passed.
+The full suite passed **70,815 checks** and preference cleanup passed. A fresh
+metadata-free bundle at `/Applications/.Aster-verified-b0da423-ew52lblr.app`
+passed deep strict signature verification, with executable SHA256
+`19bd2ac2872a09a645dada8857babd165c7835f609ca1cac4b8eaee995e755d1`.
+It has not replaced the installed app. All feature heads are pushed: battery
+`558b5dd`, clipboard `7c77372`, menu `b7a54cb`, capture `f78c1d2`, cleanup
+`aa51c35`. Actual-Mac replacement acceptance remains incomplete.
 
 Replacement acceptance has not passed. Main retains the baseline and evidence
 docs; feature merges await their actual-Mac gates. Each feature needs its reviewed
