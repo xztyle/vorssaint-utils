@@ -80,33 +80,45 @@ final class MenuBarOrganizerService: ObservableObject {
 
     func start() async {
         defer { if !stopping { operationTask = nil } }
-        do {
-            library = try store.library()
-            desiredLayout = try store.layout(for: DefaultsKey.menuBarOrganizerLayout) ?? MenuBarLayout()
-            baseline = try store.layout(for: DefaultsKey.menuBarOrganizerBaseline)
-            libraryIsValid = true
-        } catch { libraryIsValid = false; operationMessage = extra.corruptStore; return }
+        do { try loadStoredState() }
+        catch { libraryIsValid = false; operationMessage = extra.corruptStore; return }
         let snapshot = await provider.snapshot(hiddenDividerMidX: nil,
             alwaysHiddenDividerMidX: nil, excludedWindowIDs: [])
         guard !Task.isCancelled, snapshot.enumerationSucceeded, !snapshot.items.isEmpty else {
             operationMessage = text.automaticMoveUnavailable; return
         }
-        if baseline == nil {
-            baseline = MenuBarLayout.capture(snapshot.items, original: true)
-            do { try store.save(baseline!, for: DefaultsKey.menuBarOrganizerBaseline) }
-            catch { operationMessage = extra.corruptStore; return }
-        }
+        let pendingRecovery: Bool
+        do { pendingRecovery = try prepareBaseline(from: snapshot.items) }
+        catch { operationMessage = extra.corruptStore; return }
         guard !Task.isCancelled, AppFeature.menuBarOrganizer.isAvailable,
               UserDefaults.standard.bool(forKey: DefaultsKey.menuBarOrganizerEnabled),
               AXIsProcessTrusted(), MenuBarManagerDetection.runningManagers().isEmpty else { return }
         createControls()
         isRunning = true
-        recoveryNeeded = false
+        recoveryNeeded = pendingRecovery
+        automationPaused = pendingRecovery
+        if pendingRecovery { operationMessage = extra.restoreFailed }
         installObservers()
         syncHotkeys()
         scheduleRefreshTimer()
         _ = await refreshNow()
-        if !desiredLayout.entries.isEmpty { await reconcile() }
+        if !pendingRecovery && !desiredLayout.entries.isEmpty { await reconcile() }
+    }
+
+    private func loadStoredState() throws {
+        library = try store.library()
+        desiredLayout = try store.layout(for: DefaultsKey.menuBarOrganizerLayout) ?? MenuBarLayout()
+        baseline = try store.layout(for: DefaultsKey.menuBarOrganizerBaseline)
+        libraryIsValid = true
+    }
+
+    private func prepareBaseline(from items: [ManagedMenuBarItem]) throws -> Bool {
+        if baseline == nil {
+            let original = MenuBarLayout.capture(items, original: true)
+            try store.save(original, for: DefaultsKey.menuBarOrganizerBaseline)
+            baseline = original
+        }
+        return baseline.map { !MenuBarLayoutPolicy.isSatisfied($0, items: items) } ?? false
     }
 
     func createControls() {

@@ -14,6 +14,20 @@ enum MenuBarRestorationTests {
                    make("Control", 150, .visible, false), make("Siri", 180, .visible), make("Clock", 210, .visible, false)]
         let moved = [make("ChatGPT", 0), make("Claude", 30), make("WiFi", 60), make("Docker", 100, .hidden),
                      make("Siri", 150, .visible), make("Control", 180, .visible, false), make("Clock", 210, .visible, false)]
+        let isolated = [make("ChatGPT", 0), make("Claude", 30), make("WiFi", 60), make("Docker", 100, .hidden),
+                        make("Control", 150, .visible, false), make("Siri", 180, .visible), make("Clock", 210, .visible, false)]
+        suite.expect(MenuBarLayoutPolicy.preservesUnmovedItems(id("Docker"), before: old, after: isolated),
+                     "moving Docker alone preserves every other stable icon's section and order")
+        suite.expect(!MenuBarLayoutPolicy.preservesUnmovedItems(id("Docker"), before: old, after: moved),
+                     "Docker's successful move cannot hide the observed Siri and Control Center swap")
+        suite.expect(!MenuBarLayoutPolicy.preservesUnmovedItems(id("Docker"), before: old,
+            after: isolated.filter { $0.id != id("WiFi") }),
+                     "an unrelated missing icon makes the move unsafe to acknowledge")
+        let restartBaseline = [make("WiFi", 0, .visible), make("Siri", 30, .visible)]
+        let changedBeforeRestart = [make("Siri", 0, .visible), make("WiFi", 30, .visible)]
+        suite.expect(!MenuBarLayoutPolicy.isSatisfied(MenuBarLayout.capture(restartBaseline, original: true),
+            items: changedBeforeRestart),
+                     "a saved original order detects unresolved physical changes at app restart")
         let plan = MenuBarLayoutPolicy.plan(MenuBarLayout.capture(old), items: moved)
         suite.expect(plan.map(\.identity) == [id("Docker"), id("Siri")],
                      "Undo first returns Docker to its old section, then fixes the changed native order without touching Wi-Fi")

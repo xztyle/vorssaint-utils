@@ -156,6 +156,13 @@ struct MenuBarMovePlanStep: Equatable {
 }
 
 enum MenuBarLayoutPolicy {
+    static func preservesUnmovedItems(_ identity: MenuBarItemIdentity,
+                                      before: [ManagedMenuBarItem], after: [ManagedMenuBarItem]) -> Bool {
+        let original = MenuBarLayout.capture(before).entries.filter { $0.identity != identity }
+        let current = MenuBarLayout.capture(after).entries.filter { $0.identity != identity }
+        return original == current
+    }
+
     static func plan(_ layout: MenuBarLayout, items: [ManagedMenuBarItem]) -> [MenuBarMovePlanStep] {
         let live = Dictionary(grouping: items, by: \.id)
         var order = Dictionary(uniqueKeysWithValues: MenuBarOrganizerSection.allCases.map {
