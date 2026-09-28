@@ -44,9 +44,18 @@ the final app and helper, verified packaging/signing, and ran the packaged app
 selftest successfully. The read-only probe now includes firmware
 `mBoot-18000.161.10` in its qualification fingerprint.
 
-Pure policy and injected controller tests are separate from hardware proof. No
-Aster charging write, daemon installation, sleep/reboot test or calibration cycle
-is recorded yet.
+Root installed the signed battery build at `/Applications/Aster.app` and the owner
+approved its background service. First registration required handling macOS's
+`.notFound` and pending-approval states; the fixes passed an optimized build,
+packaged selftest and 121 battery checks. Authenticated status reached the running
+daemon with policy disabled. The initial qualification attempted its charging
+stage, timed out after 90 seconds without measured charge power, and restored
+system control with no hardware ownership or pending recovery.
+
+System Settings showed macOS's own 80% charge limit blocking charging at the
+current 80%. Permission to temporarily change it to 100% and restore 80% is
+pending. The limit remains unchanged. There is no successful power-flow
+qualification, sleep/reboot test or calibration cycle yet.
 
 Required remaining actual-Mac checks include the bounded charge/hold/discharge/
 charge qualification, range and thermal behavior, cancellation and restoration,
@@ -64,9 +73,13 @@ records a 2056 × 440 point panel at (0,0), matching the screen's bottom and wid
 at window level 21 above Dock level 20. Search, image preview, formatted rich-text
 preview and the transition into edit-a-copy were exercised. Copy put PNG/TIFF on
 the named fixture pasteboard. Normal dismissal raced later UI inspection; the
-fixture alone now stays open while the owner works elsewhere. That fixture change
-and the remaining editing, collections, large-history and real paste checks still
-need acceptance. A CUA no-window timeout was not proof of a frozen app.
+fixture alone now stays open while the owner works elsewhere. Its rebuilt app
+passed selftest. Actual UI checks then saved an edited copy while preserving the
+original rich text, created a colored collection and pinned the copy into it,
+found and previewed generated item 49,999 in a 50,000-entry library, and copied
+RTF/plain text before dismissing the drawer. General clipboard capture, direct
+paste, cross-app drag and display/Space checks remain open. A CUA no-window timeout
+was not proof of a frozen app.
 
 Menu-bar implementation `7b03b9f` passed 9,845 focused checks. Root rebuilt its final
 source, packaged/signed the app and ran the packaged selftest successfully. Actual
@@ -74,13 +87,32 @@ read-only inventory found one display and 11 items: seven stable, four provision
 six movable; no competing manager. No live menu layout change has been made.
 Save and verify restoration of the original layout during the interaction gate.
 
+The owner granted Accessibility. The first GUI startup crashed because macOS 26
+returned a remote status-window number of 8,589,934,592, beyond a WindowServer
+UInt32 identifier. Root replaced the trapping conversion with exact validation;
+the regression, optimized build, packaged selftest and next GUI launch passed.
+The live manager still left ten of eleven items unresolved and locked. Root is
+testing standard AXPosition/AXSize fallback and cache fixes before attempting
+movement. Turning the manager off removed its controls and cleared the completed
+restoration baseline; no user icon was deliberately moved.
+
 All browser research and browser acceptance checks use the Codex in-app browser.
 The owner's personal browser is excluded from the workflow.
 
 ## Capture and cleanup
 
-Research is complete. Capture and cleanup implementation are underway; integrated
-UI tests are pending.
+Capture's initial focused suites and optimized build passed. Actual UI editing
+added an arrow to generated Capture 3; Done returned it to the corner with the
+same capture ID and revision 1. The separate generated-only drop receiver then
+crashed on an AppKit text-view initializer. The worker added actual construction
+and image-import regressions and is rebuilding the correction before retrying
+the drag. This test fixture failure is recorded separately from the menu crash.
+
+Cleanup's first optimized integration build passed. Generated-file tests include
+an actual Trash move and restoration through its returned URL. Its actual ClamAV
+backend scanned private snapshots of benign/EICAR controls after verifying official
+definitions and produced the expected one finding while retaining the originals.
+Final source review, build and UI acceptance remain in progress.
 Use generated local files for all removal, image input and malware test actions.
 Do not send messages, upload to remote services or delete personal files for tests.
 
