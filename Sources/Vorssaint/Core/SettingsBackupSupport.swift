@@ -101,6 +101,8 @@ enum SettingsBackupSupport {
     /// when they would otherwise slip in through the registered set.
     static let machineStateKeys: Set<String> = [
         DefaultsKey.batteryCareHelperVersion,
+        DefaultsKey.menuBarOrganizerBaseline,
+        DefaultsKey.menuBarOrganizerSetupComplete,
         DefaultsKey.dockPreviewRestoreAutohide,
         // A Bluetooth restore owed by one sleeping Mac means nothing on another.
         DefaultsKey.bluetoothSleepRestorePending,

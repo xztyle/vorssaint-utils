@@ -58,6 +58,11 @@ def main():
           + declaration("Sources/Vorssaint/Services/QuickTools/ScreenshotService.swift",
                         "    static func imageCapture(")
           + "}\n")
+    write("MenuBarActivation.swift", "import Foundation\n"
+          + "extension MenuBarActivationTests {\nfinal class Host: Fixture {\n"
+          + declaration("Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarOrganizerOperations.swift", "    func activateItem(")
+          + declaration("Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarOrganizerOperations.swift", "    func restoreActivationVisibility(")
+          + "}\n}\n")
     panel = "Sources/Vorssaint/App/AppDelegate.swift"
     write("UpdateIntroFlow.swift", "import AppKit\nimport Foundation\n"
           + "extension UpdateIntroFlowTests {\nfinal class Host: Fixture {\n"
@@ -1083,6 +1088,8 @@ def main():
             .replace("private static", "static", 1)
           + declaration(self_uninstall, "    static func clearPermissions(")
           + declaration(self_uninstall, "    static func uninstallCompletely(")
+          + declaration(self_uninstall, "    private static func clearPermissionsAfterMenuRestoration(")
+          + declaration(self_uninstall, "    private static func uninstallAfterMenuRestoration(")
           + declaration(self_uninstall, "    private static func removeSudoersRuleIfPresent(")
           + declaration(self_uninstall, "    private static func resetTCC(")
             .replace("private static", "@discardableResult static", 1)

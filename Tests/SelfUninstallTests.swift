@@ -7,6 +7,16 @@ import Foundation
 /// tccutil and every removal step replaced by doubles that log what ran.
 enum SelfUninstallContract {
     static var events: [String] = []
+    static var menuRestoreAllowed = true
+    @MainActor
+    struct MenuBarOrganizerService {
+        static let shared = MenuBarOrganizerService()
+        func prepareForSystemRemoval() async -> Bool { menuRestoreAllowed }
+    }
+    struct MenuBarProductStrings {
+        static func localized(_ language: String) -> Self { Self() }
+        let restoreFailed = "menu recovery required"
+    }
     static var suspensionAllowed = true
     static var sleepRestoreAllowed = true
     static var detachAllowed = true
@@ -24,6 +34,7 @@ enum SelfUninstallContract {
             var pending: [() -> Void] = []
             func async(execute: @escaping () -> Void) { pending.append(execute) }
             func flush() {
+                RunLoop.main.run(until: Date().addingTimeInterval(0.03))
                 while !pending.isEmpty { pending.removeFirst()() }
             }
         }
@@ -89,6 +100,7 @@ enum SelfUninstallContract {
     static func run(_ suite: TestSuite) {
         func reset(allowRule: Bool) {
             events = []
+            menuRestoreAllowed = true
             suspensionAllowed = true
             sleepRestoreAllowed = true
             detachAllowed = true
@@ -106,6 +118,19 @@ enum SelfUninstallContract {
         DispatchQueue.main.flush()
         suite.expect(blocked == false && !events.contains("tccutil") && !events.contains("login"),
                      "battery recovery blocks permission and login removal")
+
+        reset(allowRule: true)
+        menuRestoreAllowed = false
+        var menuCleared: Bool?
+        Host.clearPermissions { menuCleared = $0 }
+        DispatchQueue.main.flush()
+        suite.expect(menuCleared == false && events.isEmpty,
+                     "failed menu restoration prevents permission removal")
+        var menuFailure: String?
+        Host.uninstallCompletely { menuFailure = $0 }
+        DispatchQueue.main.flush()
+        suite.expect(menuFailure == "menu recovery required" && events.isEmpty,
+                     "failed menu restoration preserves app and preferences")
 
         reset(allowRule: true)
         suspensionAllowed = false

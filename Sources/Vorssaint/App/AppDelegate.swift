@@ -165,7 +165,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
                     .dockPreview, .finderCutPaste, .finderRename, .autoQuit, .dockClick,
                     .middleClick, .windowMaximizer, .keyboardDebounce, .windowLayout,
                     .textSnippets, .brightness, .radialMenu, .mouseButtonShortcuts,
-                    .mouseClickDebounce, .superKey, .quitWindowProtection, .mixer, .musicBlock, .notch,
+                    .mouseClickDebounce, .superKey, .quitWindowProtection, .menuBarOrganizer, .mixer, .musicBlock, .notch,
                 ])
             }
             .store(in: &cancellables)
@@ -259,6 +259,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if inputSourceRestorationPending { return .terminateLater }
+        if MenuBarOrganizerService.shared.isRunning {
+            MenuBarOrganizerService.shared.restoreBeforeQuit { sender.terminate(nil) }
+            return .terminateCancel
+        }
         guard CommandBarService.shared.hasBorrowedInputSource else { return .terminateNow }
         inputSourceRestorationPending = true
         // Terminate-later runs a modal loop, which may be nested inside a
@@ -274,6 +278,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     func applicationWillTerminate(_ notification: Notification) {
         isTerminating = true
         CommandBarService.shared.restoreBorrowedInputSource()
+        MenuBarOrganizerService.shared.finishTermination()
         if AppFeature.notch.isAvailable { NotchService.shared.stop(restoreCapture: false) }
         // Quitting properly means the start worked, whenever it happened.
         endStartupWatch()
@@ -1884,21 +1889,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     /// the icon in its hidden section, which explains it never reappearing
     /// on this machine. The hint names whichever one is running by its own
     /// localized app name.
-    private static let menuBarManagerBundlePrefixes = [
-        "com.jordanbaird.Ice",
-        "com.surteesstudios.Bartender",
-        "com.dwarvesv.minimalbar",
-        "com.mortenjust.Dozer",
-    ]
-
     private static func runningMenuBarManagerName() -> String? {
-        for app in NSWorkspace.shared.runningApplications {
-            guard let bundleID = app.bundleIdentifier else { continue }
-            if menuBarManagerBundlePrefixes.contains(where: { bundleID.hasPrefix($0) }) {
-                return app.localizedName
-            }
-        }
-        return nil
+        MenuBarManagerDetection.runningManagers().first?.name
     }
 
     /// Quits and reopens the app. Full Disk Access only applies to a fresh

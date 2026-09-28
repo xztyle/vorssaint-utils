@@ -24,7 +24,7 @@ enum AppFeature: String, CaseIterable {
     // Sound
     case mixer, soundOutputSwitcher, audioPriority, micMute, musicBlock
     // Energy and display
-    case keepAwake, batteryCare, brightness, extraBrightness, bluetoothSleep
+    case keepAwake, batteryCare, brightness, extraBrightness, bluetoothSleep, menuBarOrganizer
     // Tools
     case quickLauncher, quickToggles, colorPicker, screenOCR, cleaningMode, mediaTools,
          cleaner, uninstaller, homebrew, appUpdates, screenshot, cameraPreview, radialMenu, scratchpad,
@@ -108,7 +108,7 @@ extension AppFeature {
             return .clipboardFiles
         case .mixer, .soundOutputSwitcher, .audioPriority, .micMute, .musicBlock:
             return .sound
-        case .keepAwake, .batteryCare, .brightness, .extraBrightness, .bluetoothSleep:
+        case .keepAwake, .batteryCare, .brightness, .extraBrightness, .bluetoothSleep, .menuBarOrganizer:
             return .energyDisplay
         case .quickLauncher, .quickToggles, .colorPicker, .screenOCR, .cleaningMode, .mediaTools,
              .cleaner, .uninstaller, .homebrew, .appUpdates, .screenshot, .cameraPreview, .radialMenu,
@@ -189,6 +189,7 @@ extension AppFeature {
         case .notchCalendar: return "calendar"
         case .notchAgents: return "sparkles"
         case .notch: return "macbook"
+        case .menuBarOrganizer: return "menubar.rectangle"
         case .radialMenu: return "circle.grid.cross"
         case .scratchpad: return "note.text"
         case .commandBar: return "command"
@@ -207,7 +208,13 @@ extension AppFeature {
 
     var availabilityKey: String { DefaultsKey.featureAvailable(rawValue) }
 
-    var isBeta: Bool { self == .fanControl || self == .killProcess }
+    var isBeta: Bool { self == .fanControl || self == .killProcess || self == .menuBarOrganizer }
+
+    static func isSupported(_ feature: AppFeature, onOperatingSystemMajorVersion major: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion) -> Bool {
+        feature != .menuBarOrganizer || (14...26).contains(major)
+    }
+
+    var isSupportedOnCurrentSystem: Bool { Self.isSupported(self) }
 
     /// Availability read straight from defaults. Existing features stay
     /// available on update; explicit beta opt-ins may start unavailable.
@@ -259,6 +266,7 @@ extension AppFeature {
         case .notchCalendar: return [DefaultsKey.notchCalendarEnabled]
         case .notchAgents: return [DefaultsKey.notchAgentsEnabled]
         case .notch: return [DefaultsKey.notchEnabled]
+        case .menuBarOrganizer: return [DefaultsKey.menuBarOrganizerEnabled]
         case .radialMenu: return [DefaultsKey.radialMenuEnabled]
         case .clipboardHistory: return [DefaultsKey.clipboardHistoryEnabled]
         case .pastePlain: return [DefaultsKey.pastePlainEnabled]
@@ -331,6 +339,7 @@ extension AppFeature {
         case .notchNotifications: return [.accessibility]
         case .notchCalendar: return [.calendar]
         case .notch: return [.accessibility, .automationPlayback]
+        case .menuBarOrganizer: return [.accessibility]
         case .mouseAcceleration:
             return []
         case .scrollInverter, .scrollHorizontal, .focusFollowsMouse, .smoothScroll, .mouseNavigation, .mouseButtonShortcuts, .middleClick,
@@ -409,7 +418,7 @@ extension AppFeature {
         Dictionary(uniqueKeysWithValues: allCases.map {
             ($0.availabilityKey,
              $0 != .focusFollowsMouse && $0 != .fanControl && $0 != .diskImageInstaller
-                && $0 != .killProcess && $0 != .scrollHorizontal && $0 != .portManager && $0 != .wallpaper
+                && $0 != .menuBarOrganizer && $0 != .killProcess && $0 != .scrollHorizontal && $0 != .portManager && $0 != .wallpaper
                 && $0 != .audioPriority && $0 != .batteryCare)
         })
     }

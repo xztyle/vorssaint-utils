@@ -20,6 +20,16 @@ enum SelfUninstall {
     /// on the main queue with whether the rule and permissions were removed.
     /// Used by "Clear all permissions".
     static func clearPermissions(completion: @escaping (Bool) -> Void) {
+        Task { @MainActor in
+            guard await MenuBarOrganizerService.shared.prepareForSystemRemoval() else {
+                completion(false)
+                return
+            }
+            clearPermissionsAfterMenuRestoration(completion: completion)
+        }
+    }
+
+    private static func clearPermissionsAfterMenuRestoration(completion: @escaping (Bool) -> Void) {
         func stop(sleepRestored: Bool = false) {
             DispatchQueue.main.async {
                 if sleepRestored { KeepAwakeManager.shared.resumeAfterSystemTeardown() }
@@ -69,6 +79,16 @@ enum SelfUninstall {
     /// bundle to the Trash and quits. Used by "Uninstall Aster completely".
     /// A failure passes the message explaining what stopped it.
     static func uninstallCompletely(onFailure: @escaping (String) -> Void) {
+        Task { @MainActor in
+            guard await MenuBarOrganizerService.shared.prepareForSystemRemoval() else {
+                onFailure(MenuBarProductStrings.localized(L10n.shared.language).restoreFailed)
+                return
+            }
+            uninstallAfterMenuRestoration(onFailure: onFailure)
+        }
+    }
+
+    private static func uninstallAfterMenuRestoration(onFailure: @escaping (String) -> Void) {
         // A failed reset may have changed some grants. Recheck them before
         // rearming services in the app that remains installed.
         func stop(_ body: String, sleepRestored: Bool = false) {

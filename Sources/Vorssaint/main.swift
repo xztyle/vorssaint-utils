@@ -4,6 +4,9 @@
 import AppKit
 
 ClipboardLibraryProbe.runIfRequested()
+if CommandLine.arguments.contains("--menu-bar-inventory") {
+    MenuBarInventoryProbe.runAndExit()
+}
 
 SuperKeyMappingGuard.runIfRequestedAndExit()
 Defaults.register()

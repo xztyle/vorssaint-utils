@@ -89,7 +89,7 @@ enum SettingsDirectory {
             switch item.id {
             case .page(.general), .page(.features),
                  .setting(.panelConfiguration): return true
-            default: return item.destination.page == .monitor
+            default: return [.monitor, .menuBarOrganizer].contains(item.destination.page)
             }
         }
         let island = grouped.first(where: { $0.id == 4 })?.items.filter {
@@ -199,6 +199,14 @@ enum SettingsDirectory {
                                         (.bluetoothSleep, [FeatureStrings.bluetoothSleep(language).pageTitle,
                                                            FeatureStrings.bluetoothSleep(language).enable]),
                                        ]),
+                SettingsDirectoryItem(page: .menuBarOrganizer,
+                                       title: FeatureStrings.menuBarOrganizer(language).pageTitle,
+                                       icon: "menubar.rectangle",
+                                       keywords: [FeatureStrings.menuBarOrganizer(language).hidden,
+                                                  FeatureStrings.menuBarOrganizer(language).secondaryBar,
+                                                  MenuBarProductStrings.localized(language).profiles,
+                                                  MenuBarProductStrings.localized(language).rules,
+                                                  MenuBarProductStrings.localized(language).search]),
                 SettingsDirectoryItem(page: .monitor, title: s.tabMonitor, icon: "chart.line.uptrend.xyaxis",
                                        keywords: [s.menuBarSpacingLabel, s.menuBarHideIconToggle],
                                        featureKeywords: [

@@ -257,6 +257,7 @@ if (( TEST )); then
         Sources/Vorssaint/Core/QuitProtectionSupport.swift
         Sources/Vorssaint/Core/QuitProtectionStrings.swift
         Sources/Vorssaint/Core/Defaults.swift
+        Sources/Vorssaint/Core/DefaultsRegistration.swift
         Sources/Vorssaint/Core/NotchStrings.swift
         Sources/Vorssaint/Core/NotchTourStrings.swift
         Sources/Vorssaint/Core/NotchEditorStrings.swift
@@ -383,6 +384,14 @@ if (( TEST )); then
         Sources/Vorssaint/Services/Recorder/RecorderEditDocument.swift
         Sources/Vorssaint/Core/AppInfo.swift
         Sources/Vorssaint/Core/GlobalShortcut.swift
+        Sources/Vorssaint/Core/GlobalShortcutRole.swift
+        Sources/Vorssaint/Core/MenuBarOrganizerDefaults.swift
+        Sources/Vorssaint/Core/MenuBarOrganizerStrings.swift
+        Sources/Vorssaint/Core/MenuBarProductStrings.swift
+        Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarOrganizerSupport.swift
+        Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarLayoutModels.swift
+        Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarLayoutStore.swift
+        Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarSearchSupport.swift
         Sources/Vorssaint/Core/SymbolicHotKeys.swift
         Sources/Vorssaint/Services/SystemShortcutTakeoverSupport.swift
         Sources/Vorssaint/Core/Localization.swift
