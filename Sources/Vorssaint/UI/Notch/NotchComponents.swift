@@ -199,7 +199,7 @@ struct NotchRail<Item: Identifiable, Content: View>: View {
                 ForEach(rowStarts, id: \.self) { start in row(start, cell: cell) }
             }
         } else {
-            scrollingRail
+            scrollingRail.id(rows)
         }
     }
 
