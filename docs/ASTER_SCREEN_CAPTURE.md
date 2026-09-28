@@ -109,7 +109,39 @@ Implementation branch: `feature/screen-capture`.
   image attachment; its saved PNG exactly matches that committed revision.
   That interaction was intended as a cancellation check but completed a drop,
   so actual drag cancellation remains unverified.
-- Production screen-recording permission, real capture, multi-display/Spaces,
-  and external application receivers remain the root's acceptance gate. The
-  fixture proves editing and real preview-to-rich-text drag with generated
-  images; it does not request capture permission or record the user's screen.
+- The isolated fixture proves editing and native preview-to-rich-text drag with
+  generated images. It does not request capture permission or record the screen.
+
+## Production capture evidence — 2026-09-28
+
+Root exercised installed integration build `1b7637c`, whose capture source matches
+`cf1f9f2`, on Mac16,5 / macOS 26.6.2. This preceded the navigation candidate
+`bdc9adb`; the observations below do not validate that navigation fix.
+
+- The user approved macOS's direct screen-capture prompt. Capture Now then captured
+  a region of a generated local heading in the Codex in-app browser. The resulting
+  image was 1490 × 260 pixels at 2× scale, and its preview appeared at the bottom left.
+- Root changed Preview Lifetime from 30 seconds to Until closed for this test.
+  That test preference is still in effect unless root subsequently restores it.
+- Edit opened the Screenshot editor through the Window menu. Root drew a red
+  arrow. Done returned the committed image, including the arrow, to the preview.
+- Copy from the preview followed by Command-V in TextEdit inserted the image into
+  a generated RTFD duplicate document, “Untitled (PasteTarget copy)”. A screenshot
+  visually confirms the captured image and red arrow. No byte comparison of that
+  TextEdit attachment is claimed.
+- A native drag began and created a 47,010-byte PNG under the app's temporary
+  `CaptureTransfers` directory. Its SHA-256 is
+  `3917a710c65b6014d5727ead253ec53e6dd19935ce99aa376ff713fc0d042062`.
+  Automated cross-app drag attempts did not deliver an image to the in-app
+  browser or TextEdit. The browser's explicit Paste action reported its virtual
+  clipboard empty. These observations do not establish whether the native
+  cross-app drop succeeds or fails.
+- Root asked the user to drag the prepared preview manually into the generated
+  TextEdit document on the right half of the screen. That result is pending.
+  The app remained alive as PID 73188, with no crash observed during these steps.
+
+Production capture, edit-to-preview continuity and external TextEdit copy/paste
+are now observed. Manual external drag acceptance, actual drag cancellation,
+multi-display and Spaces behavior remain unverified. The earlier generated-image
+fixture drag receipts remain separate evidence and do not stand in for this
+pending production cross-app drop.
