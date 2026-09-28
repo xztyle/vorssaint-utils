@@ -51,14 +51,19 @@ final class BatteryCareService: ObservableObject {
             return
         }
         do {
-            if daemon.status == .notRegistered { try daemon.register() }
+            // A bundled daemon can report notFound before its first registration.
+            if daemon.status == .notRegistered || daemon.status == .notFound { try daemon.register() }
             refreshRegistration()
             if needsApproval { SMAppService.openSystemSettingsLoginItems() }
             if registered {
                 UserDefaults.standard.set(buildVersion, forKey: DefaultsKey.batteryCareHelperVersion)
                 refresh()
             }
-        } catch { snapshot.reason = .helperUnavailable; snapshot.diagnostic = String(describing: error) }
+        } catch {
+            refreshRegistration()
+            if needsApproval { SMAppService.openSystemSettingsLoginItems() }
+            else { snapshot.reason = .helperUnavailable; snapshot.diagnostic = String(describing: error) }
+        }
     }
 
     func refresh() {

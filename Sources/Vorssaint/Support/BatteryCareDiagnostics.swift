@@ -30,9 +30,18 @@ enum BatteryCareDiagnostics {
               AppCodeIdentity.requirement(identifier: BatteryCareIdentifiers.helperID) != "never" else { exit(1) }
         let service = SMAppService.daemon(plistName: BatteryCareIdentifiers.plistName)
         do {
-            if service.status == .notRegistered { try service.register() }
-            print("battery-service-status=\(service.status.rawValue)")
-        } catch { fputs("\(error)\n", stderr); exit(1) }
+            if service.status == .notRegistered || service.status == .notFound { try service.register() }
+        } catch {
+            if service.status != .requiresApproval {
+                fputs("\(error)\n", stderr)
+                exit(1)
+            }
+        }
+        guard service.status == .enabled || service.status == .requiresApproval else {
+            fputs("Battery service did not register.\n", stderr)
+            exit(1)
+        }
+        print("battery-service-status=\(service.status.rawValue)")
     }
 
     private static func connect(request: Data?) -> Never {

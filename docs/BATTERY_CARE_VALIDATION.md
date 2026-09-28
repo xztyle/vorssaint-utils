@@ -83,3 +83,30 @@ Aster.app/Contents/MacOS/Aster --battery-request '{"version":1,"kind":"returnToS
 Register and request entry points require the Battery care feature availability
 preference and stable signing. Registration can require macOS approval. The
 helper's `--probe` and `--selftest` are read-only. Neither starts its daemon loop.
+
+## Root integration checks
+
+The final source was rebuilt, packaged with the stable local certificate, and
+passed the packaged app selftest. The app was installed at `/Applications/Aster.app`.
+macOS initially reported `.notFound` before first registration; authorization now
+attempts registration for that state, matching the existing fan-service behavior.
+macOS can throw `Operation not permitted` after registering a service pending
+approval. Both entry points now inspect the resulting approval state instead of
+misreporting that expected pending state as an unavailable helper.
+
+The owner approved Aster under App Background Activity. Authenticated status then
+reached the running root daemon, reporting no ownership, recovery or competing
+controller and a disabled policy. The subsequent bounded qualification tried its
+initial charging stage. The Mac stayed at 80%, not charging, with 0 W battery
+power; after 90 seconds the helper restored system control and reported failed
+verification. It retained neither hardware ownership nor a pending recovery.
+
+System Settings independently showed the native charge limit set to 80% and
+“Charged to 80% Limit”. That setting was not changed. A temporary change to 100%,
+followed by restoring 80%, awaits the owner's approval before retrying. This run
+proves service startup and the timed failure/restoration path, not successful
+charge, hold or discharge qualification. Battery policy remains off.
+
+The registration fixes passed an optimized build and packaged selftest. The
+battery suite still passes 121 checks. The physical acceptance list above remains
+open; no successful calibration, sleep or reboot claim follows from these checks.
