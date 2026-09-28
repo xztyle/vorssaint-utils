@@ -396,3 +396,22 @@ Its executable SHA-256 is
 It has not been installed. The currently installed helper remains spawn-failed
 with EX_CONFIG, and the protected battery journal still requires an administrator
 read before registration repair or app replacement.
+
+## Clipboard focus gate — 2026-09-28
+
+The clipboard branch `e2b5f7d` now waits up to 0.8 seconds for the previously
+active app to regain focus after a history selection. It sends Command-V only
+when that exact app is foreground; termination or missing focus sends no paste
+keystroke. The existing Accessibility gate remains. Production method bodies
+were exercised with immediate and delayed activation, failed activation,
+terminated app and missing permission. The clipboard suite passed 693 checks;
+the optimized branch bundle and packaged selftest passed.
+
+Detached integration `90f3a8a` includes this change and passed **80,690 checks**
+plus preference cleanup, with zero failures. Its optimized bundle and packaged
+selftest passed. A metadata-free copy at
+`/private/tmp/aster-integrated-clipboard-focus-hjhitsj1/Aster.app` passed deep,
+strict signature verification. Its executable SHA-256 is
+`e32d59fe96158e495969438e3483a9757c2af6494c0b038e223862a7837eba48`.
+It has not replaced the installed app. Actual automatic paste into another app
+remains a live Mac check; the Mac was locked during this gate.
