@@ -49,11 +49,12 @@ final class StorageInspectionService: ObservableObject {
         panel.allowsMultipleSelection = true
         guard panel.runModal() == .OK else { return }
         roots = Array(panel.urls.prefix(8)).map { (try? StorageLocalAccess.canonicalRoot($0)) ?? $0 }
-        result = .init(); duplicates = .init(); selection = []; hasScanned = false
+        result = .init(); duplicates = .init(); selection = []; malware = nil; hasScanned = false
     }
 
     func scan() {
-        guard !roots.isEmpty else { return }
+        guard availability, !busy, !roots.isEmpty else { return }
+        malware = nil
         let roots = roots
         work({ [weak self] cancellation, _ in
             var last = Date.distantPast
@@ -97,6 +98,7 @@ final class StorageInspectionService: ObservableObject {
             guard let self else { return }
             self.receipts += receipts
             let moved = Set(receipts.filter { $0.trash != nil }.map { $0.original.path })
+            if !moved.isEmpty { self.malware = nil }
             self.result.files.removeAll { moved.contains($0.id) }
             self.selection.subtract(moved)
             for file in files where moved.contains(file.id) {
@@ -153,7 +155,8 @@ final class StorageInspectionService: ObservableObject {
     func scanMalware() {
         let files = result.files
         let partial = result.isPartial
-        guard !files.isEmpty else { return }
+        guard availability, !busy, !files.isEmpty else { return }
+        malware = nil
         work({ cancellation, process -> ClamAVScanResult in
             guard let backend = self.backend() else { return .init(incomplete: true, failed: true) }
             var report = backend.scan(files, cancellation: cancellation, processCancellation: process)
