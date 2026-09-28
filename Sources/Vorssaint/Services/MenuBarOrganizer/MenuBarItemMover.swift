@@ -44,9 +44,15 @@ final class MenuBarItemMover {
         let source = try source()
         let down = try event(.leftMouseDown, source: source, point: point, item: item)
         let up = try event(.leftMouseUp, source: source, point: point, item: item)
-        down.postToPid(targetPID(item))
-        defer { up.postToPid(targetPID(item)) }
+        let relay = MenuBarItemEventRelay(pid: targetPID(item))
+        try relay.start()
+        defer { relay.close() }
+        let release = try releaseGuard(up, pid: targetPID(item))
+        defer { release.releaseIfArmed() }
+        try await relay.send(down, press: release)
         try await Task.sleep(for: .milliseconds(35))
+        try await relay.send(up, press: release)
+        release.confirmRelease()
     }
 
     private func check(_ item: ManagedMenuBarItem) throws {
@@ -106,17 +112,38 @@ final class MenuBarItemMover {
         let source = try source()
         let down = try event(.leftMouseDown, source: source, point: start, item: item, moving: true)
         let up = try event(.leftMouseUp, source: source, point: end, item: item, moving: true)
+        let relay = MenuBarItemEventRelay(pid: targetPID)
+        try relay.start()
+        defer { relay.close() }
+        let release = try releaseGuard(up, pid: targetPID)
+        defer { release.releaseIfArmed() }
         CGWarpMouseCursorPosition(start)
-        down.postToPid(targetPID)
-        defer { up.postToPid(targetPID) }
+        try await relay.send(down, press: release)
         try await Task.sleep(for: .milliseconds(18))
+        try await postDragSteps(item: item, source: source, from: start, to: end, relay: relay, press: release)
+        try await relay.send(up, press: release)
+        release.confirmRelease()
+    }
+
+    private func postDragSteps(item: ManagedMenuBarItem, source: CGEventSource, from start: CGPoint,
+                               to end: CGPoint, relay: MenuBarItemEventRelay, press: MenuBarPressReleaseGuard) async throws {
         for step in 1...10 {
             let fraction = CGFloat(step) / 10
             let point = CGPoint(x: start.x + (end.x - start.x) * fraction,
                                 y: start.y + (end.y - start.y) * fraction)
-            try event(.leftMouseDragged, source: source, point: point, item: item, moving: true).postToPid(targetPID)
+            try await relay.send(event(.leftMouseDragged, source: source, point: point, item: item, moving: true), press: press)
             try await Task.sleep(for: .milliseconds(8))
         }
+    }
+
+    private func releaseGuard(_ up: CGEvent, pid: pid_t) throws -> MenuBarPressReleaseGuard {
+        guard let releaseEvent = up.copy() else { throw MenuBarItemMoveError.eventCreationFailed }
+        let guardItem = MenuBarPressReleaseGuard {
+            releaseEvent.post(tap: .cgSessionEventTap)
+            releaseEvent.postToPid(pid)
+        }
+        guardItem.schedule()
+        return guardItem
     }
 
     static var hasAnyOpenMenu: Bool {
