@@ -149,3 +149,33 @@ optimized app/helper build, packaged selftest, helper replacement, and the next
 hardware retry with raw telemetry logging. The updated helper has not yet been
 tested against actual adapter cut or physical unplug. The remaining hardware
 acceptance list is unchanged.
+
+## Helper replacement launch failure
+
+The combined optimized app/helper build containing the adapter correction passed
+its packaged selftest. After installation and service replacement, the first
+helper launch failed at 10:10:21 with a code-signing spawn-constraint mismatch
+(`c[5]p[1]m[1]e[0]`). Later launch attempts reported a missing program even though
+the bundled executable existed at the correct path. The initial code-signing
+failure is the relevant evidence; no helper charging request ran afterward.
+
+A read-only Security framework query found that the default lightweight code
+requirement of each locally signed helper contains only its own code hash. The
+old and new helpers have different hashes but the same certificate-based
+designated requirement. A cached previous spawn hash is therefore a supported
+hypothesis, not a proven reading of the saved service constraint.
+
+Source inspection also found a definite registration race: synchronous
+`unregister()` does not wait for the old process to exit. The SDK documents that
+re-registration is safe after the asynchronous completion. The replacement path
+now waits for that completion and dispatches registration to the main queue,
+matching [Apple DTS guidance](https://developer.apple.com/forums/thread/783539).
+The restore/ownership/recovery checks still run before unregistering. Failed
+unregister completion leaves the replacement unregistered.
+
+The SDK call typecheck passed, and scoped tests passed 149 battery checks plus
+246 repository checks, 395 total. They verify that neither restoration alone nor
+an unfinished unregister can register the replacement, and that completion errors
+stop registration. The primary agent owns the combined rebuild and safe recovery
+through the previous verified helper. Recovery and a successful replacement launch
+remain pending; no security setting or launch constraint was weakened.

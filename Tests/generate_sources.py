@@ -46,6 +46,7 @@ def main():
           + declaration("Sources/Vorssaint/Services/BatteryCare/BatteryCareService.swift",
                         "    private func upgradeIfNeeded(").replace("private func", "func", 1)
               .replace("UserDefaults.standard", "defaults")
+              .replace("DispatchQueue.main.async", "self.mainQueue.async")
           + "}\n")
     write("NotchActivityPicker.swift", "import SwiftUI\n"
           + declaration("Sources/Vorssaint/UI/Notch/NotchView.swift", "struct NotchShape: Shape {")

@@ -149,13 +149,16 @@ final class BatteryCareService: ObservableObject {
                 self.removing = false
                 return
             }
-            do {
-                try self.daemon.unregister()
-                self.connection?.invalidate()
-                self.connection = nil
-                self.removing = false
-                self.authorize()
-            } catch { self.removing = false; self.snapshot.reason = .helperUnavailable }
+            // Synchronous unregister returns before launchd reaps the old service.
+            self.daemon.unregister { error in
+                DispatchQueue.main.async {
+                    self.removing = false
+                    guard error == nil else { self.snapshot.reason = .helperUnavailable; return }
+                    self.connection?.invalidate()
+                    self.connection = nil
+                    self.authorize()
+                }
+            }
         }
         return true
     }

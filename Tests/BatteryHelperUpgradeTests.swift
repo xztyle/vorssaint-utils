@@ -13,15 +13,33 @@ enum BatteryHelperUpgradeTests {
                          "unknown CLI registration or older helper begins a safe upgrade")
             suite.expect(service.log.events == ["returnToSystem"], "upgrade waits for restoration before unregistering")
             service.complete?(true)
+            suite.expect(service.log.events == ["returnToSystem", "unregister"] && service.removing,
+                         "upgrade waits for asynchronous unregister before registering the replacement")
+            service.daemon.complete?(nil)
+            suite.expect(service.log.events == ["returnToSystem", "unregister"] && service.removing,
+                         "unregister completion waits for the next main-queue turn")
+            service.mainQueue.run()
             suite.expect(service.log.events == ["returnToSystem", "unregister", "invalidate", "authorize"],
                          "successful restoration precedes unregister, connection reset and registration")
         }
         blockedRestoration(suite)
+        unregisterFailure(suite)
         let same = Service(old: "current")
         suite.expect(!same.upgradeIfNeeded() && same.log.events.isEmpty, "a matching helper does not restart repeatedly")
         let unknownBundle = Service(old: nil)
         unknownBundle.buildVersion = ""
         suite.expect(!unknownBundle.upgradeIfNeeded(), "missing bundle hash never initiates an unverifiable upgrade")
+    }
+
+    private static func unregisterFailure(_ suite: TestSuite) {
+        let service = Service(old: nil)
+        _ = service.upgradeIfNeeded()
+        service.complete?(true)
+        service.daemon.complete?(NSError(domain: "fixture", code: 1))
+        service.mainQueue.run()
+        suite.expect(service.log.events == ["returnToSystem", "unregister"] && !service.removing
+            && service.snapshot.reason == .helperUnavailable,
+                     "failed unregister never registers over the previous service")
     }
 
     private static func blockedRestoration(_ suite: TestSuite) {
@@ -44,8 +62,17 @@ enum BatteryHelperUpgradeTests {
     }
     final class Daemon {
         let log: Log
+        var complete: ((Error?) -> Void)?
         init(_ log: Log) { self.log = log }
-        func unregister() throws { log.events.append("unregister") }
+        func unregister(completionHandler: @escaping (Error?) -> Void) {
+            log.events.append("unregister")
+            complete = completionHandler
+        }
+    }
+    final class MainQueue {
+        var pending: (() -> Void)?
+        func async(execute: @escaping () -> Void) { pending = execute }
+        func run() { let work = pending; pending = nil; work?() }
     }
     final class Connection {
         let log: Log
@@ -54,6 +81,7 @@ enum BatteryHelperUpgradeTests {
     }
     final class Service {
         let log = Log()
+        let mainQueue = MainQueue()
         let defaults: Preferences
         var daemon: Daemon
         var connection: Connection?

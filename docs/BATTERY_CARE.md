@@ -112,7 +112,8 @@ After replacing an installed app, its normal Battery care refresh compares the
 saved helper hash with the bundled helper hash. An unknown saved hash, including
 registration through `--battery-register`, also requires an upgrade. The app first
 requests Return to macOS and verifies that ownership and recovery are both clear.
-Only then does it unregister the old service and register the bundled service.
+Only then does it unregister the old service. It waits for macOS to finish that
+operation, then registers the bundled service on the next main-queue turn.
 Failed restoration retains registration. macOS may require approval again.
 Diagnostic status/register commands alone do not perform this upgrade; open the
 Battery care panel or run the normal app with Battery care enabled. The status
