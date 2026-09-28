@@ -55,7 +55,7 @@ enum StorageInspectionFailure: String, Error {
 
 struct StorageDuplicateGroup: Identifiable {
     let id = UUID()
-    let files: [StorageFileSnapshot]
+    var files: [StorageFileSnapshot]
     var keeperID: String?
 }
 
@@ -74,6 +74,16 @@ struct StorageInspectionLimits {
 }
 
 enum StorageInspectionPolicy {
+    static func remainingGroups(_ groups: [StorageDuplicateGroup], moved: Set<String>) -> [StorageDuplicateGroup] {
+        groups.compactMap { original in
+            var group = original
+            group.files.removeAll { moved.contains($0.id) }
+            guard group.files.count > 1 else { return nil }
+            if !group.files.contains(where: { $0.id == group.keeperID }) { group.keeperID = nil }
+            return group
+        }
+    }
+
     static func isWithin(_ url: URL, root: URL) -> Bool {
         url.path == root.path || url.path.hasPrefix(root.path + "/")
     }

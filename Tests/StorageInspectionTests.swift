@@ -55,6 +55,7 @@ enum StorageInspectionTests {
         groups[0].keeperID = groups[0].files[1].id
         suite.expect(StorageInspectionPolicy.removalsAllowed([chosen.id], groups: groups), "one reviewed copy can be removed while its explicit keeper remains")
         suite.expect(!StorageInspectionPolicy.removalsAllowed(Set(groups[0].files.map(\.id)), groups: groups), "all copies can never be removed from a duplicate group")
+        try remainingDuplicateChoices(suite, root: root, chosen: chosen, keeper: groups[0].files[1])
         let rejected = StorageTrashService.move([chosen], groups: groups, cancellation: .init()) { _ in throw StorageInspectionFailure.denied }
         suite.expect(rejected[0].trash == nil && FileManager.default.fileExists(atPath: chosen.id), "failed Trash operation keeps the source and returns a path-specific failure")
         try Data("edited after review".utf8).write(to: chosen.url)
@@ -67,6 +68,31 @@ enum StorageInspectionTests {
             suite.expect(FileManager.default.fileExists(atPath: trash.path) && !FileManager.default.fileExists(atPath: fresh.id), "real Trash move of a generated fixture preserves its returned recovery URL")
             try FileManager.default.moveItem(at: trash, to: fresh.url)
         } else { suite.expect(false, "generated fixture Trash move failed: \(receipts.first?.failure ?? "unknown")") }
+    }
+
+    private static func remainingDuplicateChoices(_ suite: TestSuite, root: URL,
+                                                   chosen: StorageFileSnapshot, keeper: StorageFileSnapshot) throws {
+        try Data("identical fixture\n".utf8).write(to: root.appendingPathComponent("third.txt"))
+        let scanned = StorageFolderScanner.scan(roots: [root], cancellation: .init())
+        guard var group = StorageDuplicateFinder.find(scanned.files, cancellation: .init()).groups
+            .first(where: { $0.files.count == 3 }),
+              let third = group.files.first(where: { $0.id != chosen.id && $0.id != keeper.id }) else {
+            suite.expect(false, "three generated identical copies remain available for review")
+            return
+        }
+        group.keeperID = keeper.id
+        let remaining = StorageInspectionPolicy.remainingGroups([group], moved: [chosen.id])
+        suite.expect(remaining.count == 1 && remaining[0].id == group.id
+                     && remaining[0].files.count == 2 && remaining[0].keeperID == keeper.id,
+                     "after one Trash move the keeper and remaining extra copy stay visible")
+        suite.expect(StorageInspectionPolicy.removalsAllowed([third.id], groups: remaining),
+                     "the remaining extra copy can be selected without rescanning")
+        suite.expect(StorageInspectionPolicy.remainingGroups([group], moved: [chosen.id, third.id]).isEmpty,
+                     "a duplicate group closes only when one copy remains")
+        let lostKeeper = StorageInspectionPolicy.remainingGroups([group], moved: [keeper.id])
+        suite.expect(lostKeeper.first?.keeperID == nil
+                     && !StorageInspectionPolicy.removalsAllowed([third.id], groups: lostKeeper),
+                     "a missing keeper requires a fresh explicit keeper choice")
     }
 
     private static func parentReplacement(_ suite: TestSuite, root: URL) throws {
