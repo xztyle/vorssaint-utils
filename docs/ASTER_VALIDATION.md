@@ -347,3 +347,33 @@ implementation, relevant tests, optimized build/selftest, actual behavior eviden
 and recorded limits. After all five acceptance merges, repeat the combined build
 and appropriate integration checks. No release, version tag or published installer
 has been authorized.
+
+## Current automated gate — 2026-09-28
+
+Main now includes upstream Vorssaint through `0a28f0d`. Aster's switcher cards
+and notch rail now reset native scroll position when their content changes, and
+long selection jumps reveal the target immediately. This corrected the 14 layout
+visibility failures above without removing the assertions or increasing waits.
+The switcher source was split into two focused files; source checks follow the
+moved card code. Main passed **79,663 checks** and preference cleanup at
+`717128f`.
+
+Detached integration `e67dfa0` includes that main fix and all five feature
+branches. Its full suite passed **80,687 checks** and preference cleanup, with
+zero failures. Its optimized bundle built, its packaged selftest passed, and a
+metadata-free copy at
+`/private/tmp/aster-integrated-green-7kx37j1i/Aster.app` passed deep, strict
+signature verification. Its executable SHA-256 is
+`41751aaaa242bfc4a5cd03d005bbbdcbe13cdfc5d87ca837fd690218ab3e2d72`.
+This includes 834 screenshot checks for image-only previews,
+hover actions, native image drag and continuous left-swipe dismissal. The screen
+capture branch remains `9906312`, with pointer and two-finger trackpad swipes
+that move the card itself, ease short gestures back, and finish a completed
+gesture beyond the left display edge before closing it.
+
+These automated results do not establish how the swipe feels on the owner's
+screen. The Mac was locked during this gate, so the staged generated-image
+fixture was not launched. Actual swipe motion, hover controls and cross-app
+image drop still need a live check. The protected battery journal also remains
+unreadable without administrator access. No production bundle or helper has
+been replaced; replacement acceptance and Setapp cancellation remain pending.
