@@ -225,3 +225,16 @@ independent hashes of their executable and launch plist. Changing a temporary
 copy of either plist changes its computed version. This is build-time evidence;
 it does not repair the currently broken saved registration. The protected
 journal must still be checked before any unregister or production install.
+
+## Hold and adapter-power invariant
+
+The hold command leaves the adapter path enabled and inhibits charging. When
+deliberate discharge ends, the hardware writer restores the adapter path before
+inhibiting charge. A focused fake-transport check now asserts both the final
+key values and that write order; the battery suite passed 163 checks. This is
+the intended way to avoid repeated small discharge/charge cycles within the
+saved range. It does not prove the Mac's real battery power flow in hold.
+
+The latest read-only probe found the owner Mac unplugged at 49%, 33.95°C and
+-5.20 W. No SMC write occurred. Live hold and range tests require an attached
+adapter, a restored helper registration and the protected journal check.

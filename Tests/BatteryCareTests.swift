@@ -205,9 +205,15 @@ enum BatteryCareTests {
         let fake = FakeBatteryTransport()
         let hardware = try! BatteryHardware(transport: fake)
         try! hardware.apply(.hold)
-        suite.expect(fake.values["CHTE"] == [1, 0, 0, 0], "CHTE uses observed little-endian bytes")
+        suite.expect(fake.values["CHTE"] == [1, 0, 0, 0] && fake.values["CHIE"] == [0],
+                     "hold inhibits charging while leaving adapter power connected")
         try! hardware.apply(.discharge)
         suite.expect(fake.values["CHTE"] == [0, 0, 0, 0] && fake.values["CHIE"] == [8], "discharge clears inhibit first")
+        fake.writeKeys.removeAll()
+        try! hardware.apply(.hold)
+        suite.expect(fake.values["CHIE"] == [0] && fake.values["CHTE"] == [1, 0, 0, 0]
+            && fake.writeKeys == ["CHIE", "CHTE"],
+            "ending discharge reconnects adapter before inhibiting charge")
         try! hardware.apply(.system)
         suite.expect(fake.values["CHIE"] == [0] && fake.values["CHTE"] == [0, 0, 0, 0], "return clears both controls")
         fake.values["CHIE"] = [8]
@@ -278,6 +284,7 @@ final class FakeBatteryTransport: BatteryKeyTransport {
     var ignoreWrites = false
     var wrongShape = false
     var writeCount = 0
+    var writeKeys: [String] = []
 
     func inspectKey(named name: String) throws -> SMCClient.Key {
         .init(code: 0, name: name, dataSize: wrongShape ? 2 : name == "CHTE" ? 4 : 1,
@@ -287,6 +294,7 @@ final class FakeBatteryTransport: BatteryKeyTransport {
     func writeBytes(_ bytes: [UInt8], to key: SMCClient.Key) throws {
         writeCount += 1
         if denyWrites { throw BatteryHardwareError.unavailable }
+        writeKeys.append(key.name)
         if !ignoreWrites { values[key.name] = bytes }
     }
 }
