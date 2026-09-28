@@ -12,6 +12,7 @@ from pathlib import Path
 import json
 import re
 from generated_source_output import GeneratedSourceOutput
+from generated_menu_bar_sources import generate_menu_bar_sources
 
 ROOT = Path(__file__).resolve().parents[1]
 write = GeneratedSourceOutput(ROOT / "build/generated-tests").write
@@ -58,11 +59,7 @@ def main():
           + declaration("Sources/Vorssaint/Services/QuickTools/ScreenshotService.swift",
                         "    static func imageCapture(")
           + "}\n")
-    write("MenuBarActivation.swift", "import Foundation\n"
-          + "extension MenuBarActivationTests {\nfinal class Host: Fixture {\n"
-          + declaration("Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarOrganizerOperations.swift", "    func activateItem(")
-          + declaration("Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarOrganizerOperations.swift", "    func restoreActivationVisibility(")
-          + "}\n}\n")
+    generate_menu_bar_sources(write, declaration)
     panel = "Sources/Vorssaint/App/AppDelegate.swift"
     write("UpdateIntroFlow.swift", "import AppKit\nimport Foundation\n"
           + "extension UpdateIntroFlowTests {\nfinal class Host: Fixture {\n"

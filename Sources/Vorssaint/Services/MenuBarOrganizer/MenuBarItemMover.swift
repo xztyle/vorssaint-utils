@@ -20,18 +20,34 @@ final class MenuBarItemMover {
         defer { isMoving = false }
         try await waitForIdleInput()
         try checkFrame(item)
-        let pointer = CGEvent(source: nil)?.location ?? item.frame.origin
+        guard MenuBarMoveGeometry.isOnMenuRow(destinationFrame, screens: Self.screenFrames()),
+              abs(destinationFrame.minY - item.frame.minY) <= 1 else { throw MenuBarItemMoveError.itemUnavailable }
+        try await dragWithCursor(item, to: MenuBarMoveGeometry.point(in: destinationFrame, after: placeAfter))
+    }
+
+    private func dragWithCursor(_ item: ManagedMenuBarItem, to end: CGPoint) async throws {
+        let pointer = mouseLocation(item)
         let displays = Self.activeDisplays()
+        var restorePointer = false
         displays.forEach { _ = CGDisplayHideCursor($0) }
         CGAssociateMouseAndMouseCursorPosition(0)
         defer {
-            CGWarpMouseCursorPosition(pointer)
+            if restorePointer { CGWarpMouseCursorPosition(pointer) }
             CGAssociateMouseAndMouseCursorPosition(1)
             displays.forEach { _ = CGDisplayShowCursor($0) }
         }
-        let end = CGPoint(x: placeAfter ? destinationFrame.maxX + 2 : destinationFrame.minX - 2,
-                          y: destinationFrame.midY)
-        try await postCommandDrag(item: item, to: end)
+        do {
+            try await postCommandDrag(item: item, to: end)
+            restorePointer = await waitForRestingFrame(item)
+            if !restorePointer { throw MenuBarItemMoveError.verificationFailed }
+        } catch {
+            restorePointer = await recoverRelease(item, at: end)
+            throw error
+        }
+    }
+
+    private func mouseLocation(_ item: ManagedMenuBarItem) -> CGPoint {
+        CGEvent(source: nil)?.location ?? item.frame.origin
     }
 
     func click(item: ManagedMenuBarItem) async throws {
@@ -70,6 +86,7 @@ final class MenuBarItemMover {
         }
         guard let frame = MenuBarWindowServerBridge.shared.frame(for: item.windowID),
               MenuBarOrganizerSupport.frameMatchScore(frame, item.frame) != nil,
+              MenuBarMoveGeometry.isOnMenuRow(frame, screens: Self.screenFrames()),
               NSRunningApplication(processIdentifier: item.ownerPID)?.isTerminated == false
         else { throw MenuBarItemMoveError.itemUnavailable }
     }
@@ -107,7 +124,7 @@ final class MenuBarItemMover {
     }
 
     private func postCommandDrag(item: ManagedMenuBarItem, to end: CGPoint) async throws {
-        let start = CGPoint(x: item.frame.midX, y: item.frame.midY)
+        let start = CGPoint(x: item.frame.midX, y: item.frame.minY)
         let targetPID = targetPID(item)
         let source = try source()
         let down = try event(.leftMouseDown, source: source, point: start, item: item, moving: true)
@@ -144,6 +161,41 @@ final class MenuBarItemMover {
         }
         guardItem.schedule()
         return guardItem
+    }
+
+    private func recoverRelease(_ item: ManagedMenuBarItem, at point: CGPoint) async -> Bool {
+        // Unstructured cleanup is not cancelled with the interrupted gesture.
+        await Task { @MainActor in
+            let relay = MenuBarItemEventRelay(pid: targetPID(item))
+            defer { relay.close() }
+            do {
+                let up = try event(.leftMouseUp, source: source(), point: point, item: item, moving: true)
+                let release = try releaseGuard(up, pid: targetPID(item))
+                defer { release.releaseIfArmed() }
+                try relay.start()
+                try await relay.send(up, press: release)
+                release.confirmRelease()
+                return await waitForRestingFrame(item)
+            } catch { return false }
+        }.value
+    }
+
+    private func waitForRestingFrame(_ item: ManagedMenuBarItem) async -> Bool {
+        var previous: CGRect?
+        for _ in 0..<20 {
+            do { try await Task.sleep(for: .milliseconds(20)) } catch { return false }
+            if let frame = MenuBarWindowServerBridge.shared.frame(for: item.windowID) {
+                if MenuBarMoveGeometry.hasSettled(frame, previous: previous, rowY: item.frame.minY) { return true }
+                previous = frame
+            }
+        }
+        return false
+    }
+
+    private static func screenFrames() -> [CGRect] {
+        let top = NSScreen.screens.first?.frame.maxY ?? 0
+        return NSScreen.screens.map { CGRect(x: $0.frame.minX, y: top - $0.frame.maxY,
+            width: $0.frame.width, height: $0.frame.height) }
     }
 
     static var hasAnyOpenMenu: Bool {

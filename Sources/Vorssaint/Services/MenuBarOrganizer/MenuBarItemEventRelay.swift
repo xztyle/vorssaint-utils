@@ -116,9 +116,17 @@ final class MenuBarItemEventRelay {
         case .sendToTarget: return postWhilePressed { mouse.postToPid(pid) } ? unchanged : nil
         case .sendExit: exitEvent?.postToPid(pid); return unchanged
         case .finish: finish(.success(())); return nil
-        case .reject: fail("window changed"); return nil
+        case .reject: recordMismatch(event, expected: mouse, session: session); fail("window changed"); return nil
         default: return unchanged
         }
+    }
+
+    private func recordMismatch(_ event: CGEvent, expected: CGEvent, session: Bool) {
+        let fields: [CGEventField] = [.mouseEventWindowUnderMousePointer, .mouseEventWindowUnderMousePointerThatCanHandleThisEvent,
+                                      MenuBarItemEventFactory.windowField]
+        let wanted = fields.map { String(expected.getIntegerValueField($0)) }.joined(separator: ",")
+        let received = fields.map { String(event.getIntegerValueField($0)) }.joined(separator: ",")
+        logger.error("Menu event rebound: session \(session), type \(event.type.rawValue), expected \(wanted, privacy: .public), received \(received, privacy: .public), x \(event.location.x), y \(event.location.y)")
     }
 
     @discardableResult

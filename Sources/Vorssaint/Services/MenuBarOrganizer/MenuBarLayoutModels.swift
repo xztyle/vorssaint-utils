@@ -158,18 +158,37 @@ struct MenuBarMovePlanStep: Equatable {
 enum MenuBarLayoutPolicy {
     static func plan(_ layout: MenuBarLayout, items: [ManagedMenuBarItem]) -> [MenuBarMovePlanStep] {
         let live = Dictionary(grouping: items, by: \.id)
-        return MenuBarOrganizerSection.allCases.flatMap { section in
-            let wanted = layout.entries.filter {
-                $0.section == section && live[$0.identity]?.count == 1
-                    && live[$0.identity]?.first?.identityState == .stable
-            }
-            return wanted.enumerated().reversed().compactMap { index, entry -> MenuBarMovePlanStep? in
-                guard live[entry.identity]?.first?.isMovable == true else { return nil }
-                return MenuBarMovePlanStep(identity: entry.identity,
-                    before: index + 1 < wanted.count ? wanted[index + 1].identity : nil,
-                    section: section)
+        var order = Dictionary(uniqueKeysWithValues: MenuBarOrganizerSection.allCases.map {
+            ($0, MenuBarOrganizerSupport.orderedItems(items, in: $0).map(\.id))
+        })
+        var steps: [MenuBarMovePlanStep] = []
+        let changed = Set(layout.entries.filter { live[$0.identity]?.first?.section != $0.section }.map(\.section))
+        let sections = MenuBarOrganizerSection.allCases.filter { changed.contains($0) }
+            + MenuBarOrganizerSection.allCases.filter { !changed.contains($0) }
+        for section in sections {
+            let wanted = layout.entries.filter { $0.section == section && live[$0.identity]?.count == 1
+                && live[$0.identity]?.first?.identityState == .stable }.map(\.identity)
+            for (index, id) in wanted.enumerated().reversed() where live[id]?.first?.isMovable == true {
+                let next = index + 1 < wanted.count ? wanted[index + 1] : nil
+                if follows(id, before: next, in: order[section] ?? []) { continue }
+                steps.append(MenuBarMovePlanStep(identity: id, before: next, section: section))
+                for key in MenuBarOrganizerSection.allCases { order[key]?.removeAll { $0 == id } }
+                let insertion = next.flatMap { order[section]?.firstIndex(of: $0) } ?? order[section, default: []].count
+                order[section, default: []].insert(id, at: insertion)
             }
         }
+        return steps
+    }
+
+    static func follows(_ identity: MenuBarItemIdentity, before target: MenuBarItemIdentity?,
+                        in order: [MenuBarItemIdentity]) -> Bool {
+        guard let index = order.firstIndex(of: identity) else { return false }
+        return index + 1 < order.count ? order[index + 1] == target : target == nil
+    }
+
+    static func satisfies(_ step: MenuBarMovePlanStep, items: [ManagedMenuBarItem]) -> Bool {
+        follows(step.identity, before: step.before,
+                in: MenuBarOrganizerSupport.orderedItems(items, in: step.section).map(\.id))
     }
 
     static func isSatisfied(_ layout: MenuBarLayout, items: [ManagedMenuBarItem]) -> Bool {
