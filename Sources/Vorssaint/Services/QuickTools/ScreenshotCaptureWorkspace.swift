@@ -106,6 +106,9 @@ final class ScreenshotCaptureWorkspace {
                 self?.removePreview(item)
             })
         preview.interactionEnded = { [weak self] in self?.enforceLimits() }
+        if fixtureDirectory != nil {
+            preview.fixtureWindowTitle = "Aster Capture \(item.id.uuidString) · revision \(item.revision)"
+        }
         item.preview = preview
         preview.show(inNotch: false)
         layout()

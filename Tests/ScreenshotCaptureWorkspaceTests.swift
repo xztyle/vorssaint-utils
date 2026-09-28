@@ -10,6 +10,7 @@ enum ScreenshotCaptureWorkspaceTests {
     }
     final class ScreenshotQuickPreviewController {
         enum Action: Hashable { case edit, pin, copy, save, saveAndCopy, discard }
+        var fixtureWindowTitle: String?
         var isInteracting = false
         var interactionEnded: (() -> Void)?
         let visibleCapacity = 6

@@ -52,6 +52,7 @@ final class ScreenshotQuickPreviewController {
     private let dragDirectory: URL?
     private var stackIndex = 0
     private var stacking = false
+    var fixtureWindowTitle: String?
     var interactionEnded: (() -> Void)?
     private var dragging = false
     private var editing = false
@@ -139,6 +140,7 @@ final class ScreenshotQuickPreviewController {
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false)
+        if let fixtureWindowTitle { panel.title = fixtureWindowTitle }
         panel.contentViewController = host
         panel.isReleasedWhenClosed = false
         panel.isOpaque = false
@@ -432,7 +434,10 @@ final class ScreenshotQuickPreviewController {
         resizePanel(showingLink: model.sharedRecord != nil)
     }
 
-    func bringForward() { panel?.orderFrontRegardless() }
+    func bringForward(takingFocus: Bool = false) {
+        panel?.orderFrontRegardless()
+        if takingFocus, fixtureWindowTitle != nil { panel?.makeKey() }
+    }
 
     private func resizePanel(showingLink: Bool) {
         if shownInNotch {

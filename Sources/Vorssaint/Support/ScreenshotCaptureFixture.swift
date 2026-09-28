@@ -40,6 +40,7 @@ enum ScreenshotCaptureFixture {
         let directory: URL
         let suiteName = "io.github.xztyle.Aster.capture-fixture.\(UUID().uuidString)"
         var workspace: ScreenshotCaptureWorkspace?
+        var receiver: ScreenshotFixtureReceiver?
         var manifest: [[String: Any]] = []
         init(directory: URL) { self.directory = directory }
 
@@ -57,6 +58,8 @@ enum ScreenshotCaptureFixture {
             }
             self.workspace = workspace
             for index in 1...3 { addImage(index, workspace: workspace) }
+            receiver = ScreenshotFixtureReceiver(workspace: workspace, directory: directory)
+            receiver?.show()
         }
 
         func applicationWillTerminate(_ notification: Notification) {

@@ -951,8 +951,9 @@ enum ScreenshotFeatureTests {
                "presenting the screenshot preview takes key focus only behind the preference, once the panel is on screen")
         let makeKeyCount = quickPreviewCode.components(separatedBy: "makeKey").count - 1
         let panelMakeKeyCount = panelBody.components(separatedBy: "makeKey").count - 1
-        suite.expect(makeKeyCount == panelMakeKeyCount + 1 && panelMakeKeyCount >= 1,
-               "hover never takes key focus; only the preferred presentation and the panel's own click hand-off may")
+        suite.expect(makeKeyCount == panelMakeKeyCount + 2 && panelMakeKeyCount >= 1
+                && quickPreviewCode.contains("if takingFocus, fixtureWindowTitle != nil"),
+               "hover never takes focus; only preferred presentation, a click, or an explicit fixture control may")
         suite.expect(panelBody.contains("sendEvent") && panelBody.contains("leftMouseDown")
                 && panelBody.contains("makeKey") && panelBody.contains("super.sendEvent"),
                "clicking the screenshot preview takes key focus and still delivers every preview button")

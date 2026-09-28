@@ -43,7 +43,13 @@ editor preferences and is removed on normal termination. The provided temporary
 root receives the initial images, each committed edit and `manifest.json`.
 External output controls are disabled or return no result in this mode. Save
 acts as Done, writing only the fixture's committed image. Editor and corner drag
-still use the real renderer. Root owns all actual GUI launches and interactions.
+still use the real renderer. A fixture control window has named Preview and Edit
+buttons for each capture. Preview window titles include the full UUID and revision.
+The same control window contains a rich text input. It imports a dragged PNG through
+AppKit, verifies a new image attachment, and writes a received PNG and JSON receipt
+with acceptance, dimensions, hash and advertised types. It reads only the drag
+pasteboard; the receiver's general copy, cut and paste commands are disabled.
+Root owns all actual GUI launches and interactions.
 
 1. Inspect the early entry in `main.swift` and `ScreenshotCaptureFixture.swift`.
 2. Launch a new app instance with a new private temporary root.
@@ -69,5 +75,9 @@ Implementation branch: `feature/screen-capture`.
 - Tests use the production preview collection with explicit window doubles,
   controlled timers, real renderer/image-provider representations and private
   history files. They do not establish actual window, permission or drop behavior.
-- Actual capture permissions, multi-display/Spaces, UI layout, drag receivers and
-  hardware behavior on Mac16,5 macOS 26.6.2 remain the root's acceptance gate.
+- Root's first fixture UI check edited Capture 3 with a red arrow and used Done.
+  The corner returned and the same capture UUID gained revision 1. Selection of
+  unnamed corner windows made the drag check ambiguous; the controls and receiver
+  were added for that acceptance check.
+- Actual capture permissions, multi-display/Spaces, drag receivers and hardware
+  behavior on Mac16,5 macOS 26.6.2 remain the root's acceptance gate.
