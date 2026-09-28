@@ -184,7 +184,6 @@ struct ScreenshotPreviewDragSurface: NSViewRepresentable {
                     amount: amount, inverted: inverted)
                 if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion || phase != [] || complete {
                     self.moveSwipe(window, offset: -progress * travel, origin: origin)
-                    window.alphaValue = 1 - progress
                 }
                 guard complete else { return }
                 self.trackpadTracking = false
@@ -232,7 +231,6 @@ struct ScreenshotPreviewDragSurface: NSViewRepresentable {
         private func moveSwipe(_ window: NSWindow, offset: CGFloat, origin: CGPoint) {
             let dx = min(0, offset)
             window.setFrameOrigin(CGPoint(x: origin.x + dx, y: origin.y))
-            window.alphaValue = max(0.65, 1 + dx / max(window.frame.width, 1) * 0.35)
         }
 
         private func finishSwipe(cancelled: Bool) {
@@ -253,8 +251,9 @@ struct ScreenshotPreviewDragSurface: NSViewRepresentable {
         private func animateSwipe(_ window: NSWindow, dismisses: Bool) {
             animatingSwipe = true
             let targetX = dismisses
-                ? ScreenshotPreviewSwipeGesture.exitX(screenMinX: sourceScreen.minX,
-                                                       width: window.frame.width)
+                ? min(window.frame.minX,
+                      ScreenshotPreviewSwipeGesture.exitX(screenMinX: sourceScreen.minX,
+                                                           width: window.frame.width))
                 : swipeOrigin.x
             let distance = abs(targetX - window.frame.minX)
             NSAnimationContext.runAnimationGroup({ context in
@@ -262,7 +261,6 @@ struct ScreenshotPreviewDragSurface: NSViewRepresentable {
                     ? 0 : min(0.24, max(0.10, TimeInterval(distance / max(window.frame.width, 1)) * 0.20))
                 context.timingFunction = CAMediaTimingFunction(name: .easeOut)
                 window.animator().setFrameOrigin(CGPoint(x: targetX, y: swipeOrigin.y))
-                window.animator().alphaValue = dismisses ? 0 : 1
             }, completionHandler: { [weak self] in
                 self?.animatingSwipe = false
                 if dismisses { self?.dismiss?() }

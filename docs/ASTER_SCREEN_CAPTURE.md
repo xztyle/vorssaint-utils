@@ -166,6 +166,9 @@ The branch also tracks a two-finger left swipe through AppKit's fluid swipe
 progress. It moves the same card across the display, follows the system's
 scroll-direction preference and eases back after a short or cancelled gesture.
 Completed gestures finish moving the card fully off-screen before it closes.
+The image stays opaque throughout the gesture and exit animation, so it does
+not fade away before reaching the left edge. An over-dragged card never moves
+rightward during dismissal.
 Mouse drags still
 start native image transfers in the other directions. [CleanShot's feature
 list](https://cleanshot.com/features) calls out swipe control for its Quick
@@ -174,6 +177,7 @@ existing pointer gesture; real trackpad feel remains a live acceptance check.
 
 The `feature/screen-capture` branch passes 834 screenshot checks after the
 trackpad and adaptive pointer swipe changes, including the eased gesture ending.
+The opaque swipe refinement also passes all 834 screenshot checks.
 Its optimized bundle builds. A distinct signed generated-image
 fixture showed a 320 × 178 point image-only card. The computer-control tool
 could not route a reliable drag to this transient panel. Hands-on confirmation
