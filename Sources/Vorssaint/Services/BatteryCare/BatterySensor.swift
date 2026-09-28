@@ -28,8 +28,16 @@ enum BatterySensor {
         let current = signedAmperage(props["Amperage"] ?? props["InstantAmperage"])
         let watts = volts.flatMap { v in current.map { v * $0 / 1000 } }
         return BatterySample(at: date, percent: percent, temperature: temperature,
-                             connected: props["ExternalConnected"] as? Bool,
-                             charging: props["IsCharging"] as? Bool, watts: watts)
+                             connected: adapterPresent(props),
+                             charging: props["IsCharging"] as? Bool, watts: watts,
+                             externalPowerConnected: props["ExternalConnected"] as? Bool)
+    }
+
+    private static func adapterPresent(_ props: [String: Any]) -> Bool? {
+        // CHIE cuts effective AC without unplugging the adapter. A physical
+        // disconnect must still win over a lagging effective-power reading.
+        if let raw = props["AppleRawExternalConnected"] { return raw as? Bool }
+        return props["ExternalConnected"] as? Bool
     }
 
     private static func number(_ value: Any?) -> Double? {

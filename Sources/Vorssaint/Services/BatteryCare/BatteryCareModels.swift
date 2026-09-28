@@ -36,10 +36,13 @@ struct BatterySample: Codable, Equatable {
     var at: Date
     var percent: Int?
     var temperature: Double?
+    /// Physical adapter presence when the registry exposes it, otherwise legacy AC presence.
     var connected: Bool?
     var charging: Bool?
     var watts: Double?
     var adapterWatts: Double?
+    /// Effective AC availability can become false during an intentional adapter cut.
+    var externalPowerConnected: Bool?
 
     func isFresh(at now: Date) -> Bool {
         guard let percent, let temperature, let watts, connected != nil, charging != nil else { return false }

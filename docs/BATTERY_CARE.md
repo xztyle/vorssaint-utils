@@ -34,6 +34,14 @@ a six-hour deadline. Charge inhibit and adapter cut are never deliberately activ
 together. A missing or stale sensor restores AC and inhibits charging under an
 active policy. Missing signed-current readings cannot qualify discharge.
 
+The battery sample separates physical adapter presence (`connected`, from
+`AppleRawExternalConnected` when available) from effective AC availability
+(`externalPowerConnected`, from `ExternalConnected`). An intentional adapter cut
+can remove effective AC while the cable remains attached. A physical disconnect
+still cancels qualification and discharge. A malformed physical-presence reading
+fails closed; systems without that reading keep the conservative effective-AC
+fallback. Measured current, temperature and freshness guards remain required.
+
 Heat protection stops immediately at the cutoff and resumes only after a full
 minute at or below the resume temperature. Resume must be at least two degrees
 below cutoff. Temperature means the battery sensor, not CPU temperature.
@@ -99,6 +107,16 @@ owner's approval in System Settings. Requests are closed intents; there is no
 arbitrary key writer, executable path or shell argument channel. Both client and
 server pin the other party's identifier and the current signing certificate.
 Ad-hoc signatures fail closed. `--battery-register` does not bypass macOS approval.
+
+After replacing an installed app, its normal Battery care refresh compares the
+saved helper hash with the bundled helper hash. An unknown saved hash, including
+registration through `--battery-register`, also requires an upgrade. The app first
+requests Return to macOS and verifies that ownership and recovery are both clear.
+Only then does it unregister the old service and register the bundled service.
+Failed restoration retains registration. macOS may require approval again.
+Diagnostic status/register commands alone do not perform this upgrade; open the
+Battery care panel or run the normal app with Battery care enabled. The status
+field `helperBuild` is the protocol version, not the bundled executable hash.
 
 Tests in `BatteryCareTests.swift` and `BatteryControllerTests.swift` exercise the
 pure policy and an injected transport/state store. Run `./build.sh --test-suite=battery-care`, the optimized app build, app selftest and helper

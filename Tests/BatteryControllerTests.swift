@@ -10,11 +10,14 @@ enum BatteryControllerTests {
         drift(suite)
         restart(suite)
         qualification(suite)
+        qualificationUnplug(suite)
+        dischargeUnplug(suite)
         badRequest(suite)
     }
 
     static func fixture(_ store: MemoryBatteryStore, _ transport: FakeBatteryTransport,
-                        competitors: @escaping () -> [String] = { [] }) -> BatteryController {
+                        competitors: @escaping () -> [String] = { [] },
+                        adapterPresent: @escaping () -> Bool = { true }) -> BatteryController {
         var readingNumber = 0
         let time = Date()
         return BatteryController(journal: store, automaticallyStart: false,
@@ -22,8 +25,12 @@ enum BatteryControllerTests {
                 let discharge = transport.values["CHIE"] == [8]
                 let charge = !discharge && transport.values["CHTE"] == [0, 0, 0, 0]
                 readingNumber += 1
-                return .init(at: time.addingTimeInterval(Double(readingNumber) / 1000), percent: 60, temperature: 30, connected: true,
-                             charging: charge, watts: discharge ? -10 : charge ? 10 : 0)
+                let connected = adapterPresent()
+                return BatterySensor.decode(["CurrentCapacity": 60, "MaxCapacity": 100, "Temperature": 3032,
+                    "AppleRawExternalConnected": connected, "ExternalConnected": connected && !discharge,
+                    "IsCharging": connected && charge, "Voltage": 10000,
+                    "Amperage": !connected || discharge ? -1000 : charge ? 1000 : 0],
+                    at: time.addingTimeInterval(Double(readingNumber) / 1000))
             }, readCompetitors: competitors, fingerprint: "fixture")
     }
 
@@ -100,6 +107,45 @@ enum BatteryControllerTests {
                      "charge and discharge unlock only after complete flow sequence")
         suite.expect(transport.values["CHIE"] == [0] && transport.values["CHTE"] == [0, 0, 0, 0],
                      "qualification restores system control")
+    }
+
+    static func qualificationUnplug(_ suite: TestSuite) {
+        var connected = true
+        let transport = FakeBatteryTransport()
+        let controller = fixture(MemoryBatteryStore(), transport, adapterPresent: { connected })
+        suite.expect(controller.beginQualification(), "qualification begins with physical adapter present")
+        for _ in 0..<2 {
+            controller.qualification?.began = Date().addingTimeInterval(-11)
+            for _ in 0..<3 { controller.tick() }
+        }
+        controller.tick()
+        suite.expect(controller.qualification?.stage == 2 && controller.snapshot.sample?.connected == true
+            && controller.snapshot.sample?.externalPowerConnected == false,
+                     "intentional AC cut preserves physical presence before qualification settling completes")
+        connected = false
+        controller.tick()
+        suite.expect(controller.qualification == nil && !controller.state.chargeQualified
+            && !controller.state.dischargeQualified && !controller.state.ownsHardware,
+                     "real unplug aborts qualification and clears control qualification")
+        suite.expect(transport.values["CHIE"] == [0] && transport.values["CHTE"] == [0, 0, 0, 0],
+                     "real unplug during qualification restores both hardware controls")
+    }
+
+    static func dischargeUnplug(_ suite: TestSuite) {
+        var connected = true
+        let transport = FakeBatteryTransport()
+        let controller = fixture(MemoryBatteryStore(), transport, adapterPresent: { connected })
+        controller.probe()
+        controller.state.chargeQualified = true
+        controller.state.dischargeQualified = true
+        suite.expect(controller.handle(.init(kind: .discharge, target: 40)), "manual discharge starts on qualified transport")
+        controller.tick()
+        suite.expect(controller.state.operation?.kind == .discharge && controller.snapshot.command == .discharge,
+                     "effective AC off alone does not cancel a physically connected discharge")
+        connected = false
+        controller.tick()
+        suite.expect(controller.state.operation == nil && !controller.state.ownsHardware && transport.values["CHIE"] == [0],
+                     "physical unplug cancels manual discharge and restores the adapter path")
     }
 
     static func badRequest(_ suite: TestSuite) {

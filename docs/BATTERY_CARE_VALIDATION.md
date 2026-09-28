@@ -110,3 +110,42 @@ charge, hold or discharge qualification. Battery policy remains off.
 The registration fixes passed an optimized build and packaged selftest. The
 battery suite still passes 121 checks. The physical acceptance list above remains
 open; no successful calibration, sleep or reboot claim follows from these checks.
+
+## Native-limit retry and adapter-presence correction
+
+The owner later approved a temporary native limit of 100%. The primary agent ran
+qualification on the same Mac. Stage 0 measured charging at 43.763032 W and passed;
+stage 1 measured 0 W and passed. Verification failed five seconds after beginning
+the discharge stage, before its ten-second settling period. The helper restored
+system control with no remaining ownership or recovery. The primary agent then
+restored the native 80% limit and confirmed it in System Settings.
+
+Source inspection found that every qualification tick treated `ExternalConnected`
+as cable presence. That also describes effective AC availability, which can be
+removed by the intentional CHIE adapter cut. This explains the early failure, but
+the failed run did not retain raw registry telemetry at that exact transition.
+A subsequent read-only registry sample exposed both `AppleRawExternalConnected`
+and `ExternalConnected` as true. The correction uses the raw attachment reading
+for cable presence and preserves effective AC as separate diagnostic telemetry.
+An explicit raw false still cancels control; malformed raw data fails freshness;
+absence of the raw key keeps the conservative legacy behavior.
+
+The controller regression fixture now decodes realistic registry samples with
+raw attachment true and effective AC false during adapter cut. All four modeled
+qualification stages pass. Separate real-unplug simulations abort qualification
+and manual discharge and restore both controls. These are injected tests, not a
+claim that discharge or unplug has passed on the host.
+
+Inspection also confirmed that CLI registration leaves the saved helper hash
+unset. The old app upgrade guard skipped that case. The corrected guard follows
+the existing restore, unregister and register sequence for an unknown hash too.
+Tests execute the production upgrade method with isolated doubles and verify
+that failed restoration, remaining ownership or pending recovery cannot
+unregister the service.
+
+The correction passed `battery-care` (144 checks) and `repository` (246 checks),
+390 checks total, with two build workers. The primary agent owns the combined
+optimized app/helper build, packaged selftest, helper replacement, and the next
+hardware retry with raw telemetry logging. The updated helper has not yet been
+tested against actual adapter cut or physical unplug. The remaining hardware
+acceptance list is unchanged.
