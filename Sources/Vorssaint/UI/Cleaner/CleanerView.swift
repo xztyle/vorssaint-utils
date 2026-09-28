@@ -79,6 +79,7 @@ struct CleanerView: View {
     /// layer through the system symbol effect. Simple, native, and still
     /// while nothing is happening.
     private struct SparkleGlyph: View {
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
         var animating = false
         var size: CGFloat = 44
 
@@ -87,7 +88,7 @@ struct CleanerView: View {
                 .font(.system(size: size, weight: .light))
                 .foregroundStyle(.secondary)
                 .symbolEffect(.variableColor.iterative.reversing,
-                              options: .repeating, isActive: animating)
+                              options: .repeating, isActive: animating && !reduceMotion)
         }
     }
 
