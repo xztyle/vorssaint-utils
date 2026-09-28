@@ -335,6 +335,7 @@ final class FeatureRuntime: ObservableObject {
         .scratchpad: { ScratchpadService.shared.syncWithPreferences() },
         .commandBar: { CommandBarService.shared.syncWithPreferences() },
         .cleaner: {
+            if !AppFeature.cleaner.isAvailable { StorageInspectionService.shared.stop() }
             CleanerScheduler.shared.syncWithPreferences()
             WhatsAppDownloadScheduler.shared.syncWithPreferences()
             WhatsAppDownloadOrganizer.shared.syncWithPreferences()

@@ -48,6 +48,7 @@ enum SettingsBackupSupport {
     static let unregisteredPreferenceKeys: Set<String> = [
         DefaultsKey.batteryCarePolicy,
         DefaultsKey.clipboardRetentionDays,
+        DefaultsKey.storageLargeMegabytes, DefaultsKey.storageOldDays,
         DefaultsKey.autoQuitEnabled,
         DefaultsKey.shelfEnabled,
         DefaultsKey.finderCutPasteEnabled,
@@ -403,6 +404,8 @@ enum SettingsBackupSupport {
         case DefaultsKey.batteryCarePolicy:
             return BatteryCarePreferences.decode(value as? String) != nil
         case DefaultsKey.clipboardRetentionDays: return isInteger(value) && (value as? Int).map { [0, 1, 7, 30, 365].contains($0) } == true
+        case DefaultsKey.storageLargeMegabytes: return isInteger(value) && (1...100_000).contains((value as? NSNumber)?.intValue ?? 0)
+        case DefaultsKey.storageOldDays: return isInteger(value) && (1...3650).contains((value as? NSNumber)?.intValue ?? 0)
         case DefaultsKey.notchQuickAccessSide, DefaultsKey.notchQuickAccessSecond, DefaultsKey.notchQuickAccessThird:
             return value is String
         default: break

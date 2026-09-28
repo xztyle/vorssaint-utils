@@ -9,6 +9,7 @@ if CommandLine.arguments.contains("--menu-bar-inventory") {
 }
 
 ScreenshotCaptureFixture.runIfRequestedAndExit()
+CleanupProbe.runIfRequested()
 SuperKeyMappingGuard.runIfRequestedAndExit()
 Defaults.register()
 BatteryCareDiagnostics.runIfRequested()
