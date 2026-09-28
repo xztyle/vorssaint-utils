@@ -91,9 +91,12 @@ The owner granted Accessibility. The first GUI startup crashed because macOS 26
 returned a remote status-window number of 8,589,934,592, beyond a WindowServer
 UInt32 identifier. Root replaced the trapping conversion with exact validation;
 the regression, optimized build, packaged selftest and next GUI launch passed.
-The live manager still left ten of eleven items unresolved and locked. Root is
-testing standard AXPosition/AXSize fallback and cache fixes before attempting
-movement. Turning the manager off removed its controls and cleared the completed
+The live manager still left nine of ten items unresolved after standard AX geometry
+and cache fixes. A passive diagnostic launched through LaunchServices confirmed
+the GUI has Accessibility permission but receives blank WindowServer titles. The
+resolver wrongly rejects specific Control Center AX identifiers in that case;
+some third-party apps expose one unnamed AX icon. An evidence-backed fix is in
+progress. Turning the manager off removed its controls and cleared the completed
 restoration baseline; no user icon was deliberately moved.
 
 All browser research and browser acceptance checks use the Codex in-app browser.
@@ -101,18 +104,29 @@ The owner's personal browser is excluded from the workflow.
 
 ## Capture and cleanup
 
-Capture's initial focused suites and optimized build passed. Actual UI editing
-added an arrow to generated Capture 3; Done returned it to the corner with the
-same capture ID and revision 1. The separate generated-only drop receiver then
-crashed on an AppKit text-view initializer. The worker added actual construction
-and image-import regressions and is rebuilding the correction before retrying
-the drag. This test fixture failure is recorded separately from the menu crash.
+Capture's focused suites and optimized build passed. The separate generated-only
+drop receiver initially crashed on an AppKit text-view initializer; the corrected
+initializer, explicit text system and real image-import regressions pass. Live UI
+then added an arrow to Capture 3, returned the same capture ID/revision 1 to the
+corner, and dragged it into a native image-capable text input. The accepted PNG
+hash exactly matches the committed edited image. A second preview also dragged
+successfully. All three previews remained available. Cancel in the discard dialog
+preserved the editor. Undo removed the annotation with only 141 pixels differing
+by one 8-bit channel level after rendering. Drag cancellation, production capture
+permission and a separate receiving app remain unverified. See ASTER_SCREEN_CAPTURE.md
+on the feature branch for the precise fixture receipts.
 
-Cleanup's first optimized integration build passed. Generated-file tests include
-an actual Trash move and restoration through its returned URL. Its actual ClamAV
-backend scanned private snapshots of benign/EICAR controls after verifying official
-definitions and produced the expected one finding while retaining the originals.
-Final source review, build and UI acceptance remain in progress.
+Cleanup's final optimized build and selftest passed, with 88 core checks, 91 real
+engine checks and 9,039 related checks. Generated-file tests include an actual
+Trash move and restoration through its returned URL. The ClamAV backend verifies
+official definitions, scans private benign/EICAR snapshots and produces exactly
+the expected finding while retaining the originals. Live UI found a collapsed
+fixture window; its correction now shows 1060 × 780 points of content and the
+four generated files, with the link and package correctly skipped. Further UI
+checks were interrupted by the app-control service disconnecting; Aster remained
+running and generated no new crash report. The app-control connection did not
+recover after a reset; the owner was asked to reopen Codex. Duplicates, reviewed
+Trash, Finder recovery and malware UI checks are still open.
 Use generated local files for all removal, image input and malware test actions.
 Do not send messages, upload to remote services or delete personal files for tests.
 
@@ -134,6 +148,13 @@ GPT 6 Astra/xhigh settings. The owner was told about the limitation. All five
 feature scopes retain their separate research, implementation branches and review.
 
 ## Final gate
+
+A detached `work/integration` checkout combines the five feature branches for
+early integration testing without changing main. Shared defaults, feature labels,
+backup settings and entry points were reconciled; both menu restoration and
+battery restoration remain ahead of uninstall. Its initial 3,403 scoped checks
+found two failures: an expected feature count and translated punctuation. Both
+are corrected; the combined optimized build and follow-up checks are in progress.
 
 Each feature needs its reviewed implementation, relevant automated tests, optimized
 build and selftest, actual-Mac interaction evidence and recorded unresolved limits.
