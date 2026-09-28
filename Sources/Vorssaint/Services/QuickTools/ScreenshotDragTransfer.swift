@@ -69,12 +69,11 @@ struct ScreenshotDragTransfer {
         return provider
     }
 
-    func pasteboardItem() -> NSPasteboardItem? {
-        guard let url = file() else { return nil }
+    func pasteboardItem() -> NSPasteboardItem {
         let item = NSPasteboardItem()
         item.setData(png, forType: .png)
         if let tiff { item.setData(tiff, forType: .tiff) }
-        item.setString(url.absoluteString, forType: .fileURL)
+        if let url = file() { item.setString(url.absoluteString, forType: .fileURL) }
         return item
     }
 }

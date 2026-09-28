@@ -28,9 +28,11 @@ All preview windows remain excluded from subsequent captures.
 History keeps the same capture UUID when an edit replaces its pixels. Image and
 thumbnail files use fresh revision names. The serial write queue commits the new
 index before cleaning old files, and a failed index write retains the previous
-entry. Recording files are unchanged. Drag offers PNG, TIFF and a PNG file URL;
-all represent the committed export. Provider file requests retain the encoded
-bytes, and native drag files remain in a private app temporary folder. Cleanup
+entry. Recording files are unchanged. Drag offers PNG and TIFF, plus a PNG file
+URL when the temporary file can be written. The image representations remain
+available if that file write fails. All represent the committed export. Provider
+file requests retain the encoded bytes, and native drag files remain in a
+private app temporary folder. Cleanup
 removes only this app's transfers older than 48 hours at the next start.
 
 ## Isolated UI acceptance
@@ -178,6 +180,8 @@ existing pointer gesture; real trackpad feel remains a live acceptance check.
 The `feature/screen-capture` branch passes 834 screenshot checks after the
 trackpad and adaptive pointer swipe changes, including the eased gesture ending.
 The opaque swipe refinement also passes all 834 screenshot checks.
+The image-only fallback passes 835 screenshot checks, including a blocked
+temporary file location.
 Its optimized bundle builds. A distinct signed generated-image
 fixture showed a 320 × 178 point image-only card. The computer-control tool
 could not route a reliable drag to this transient panel. Hands-on confirmation

@@ -115,11 +115,27 @@ enum ScreenshotContinuityTests {
                      && provider.hasItemConformingToTypeIdentifier(UTType.tiff.identifier),
                      "corner drag offers actual PNG and TIFF image representations")
         verifyProvider(provider, expected: transfer.png, suite: suite)
-        guard let item = transfer.pasteboardItem(), let url = item.string(forType: .fileURL).flatMap(URL.init(string:))
+        let item = transfer.pasteboardItem()
+        guard let url = item.string(forType: .fileURL).flatMap(URL.init(string:))
         else { suite.expect(false, "native drag payload"); return }
         suite.expect(item.data(forType: .png) == transfer.png && (try? Data(contentsOf: url)) == transfer.png,
                      "native image bytes and file URL contain exactly the same edited pixels")
+        verifyImageOnlyFallback(directory: directory, suite: suite)
         verifyImage(transfer.png, suite: suite)
+    }
+
+    private static func verifyImageOnlyFallback(directory: URL, suite: TestSuite) {
+        let blocked = directory.appendingPathComponent("blocked")
+        try? Data().write(to: blocked)
+        defer { try? FileManager.default.removeItem(at: blocked) }
+        guard let image = baseImage(), let fallback = ScreenshotDragTransfer(
+            image: image, scale: 1, prefix: "ImageOnly", directory: blocked) else {
+            suite.expect(false, "image-only drag setup"); return
+        }
+        let item = fallback.pasteboardItem()
+        suite.expect(item.data(forType: .png) == fallback.png
+                     && item.string(forType: .fileURL) == nil,
+                     "image drag still offers PNG when the temporary file cannot be written")
     }
 
     private static func verifyProvider(_ provider: NSItemProvider, expected: Data, suite: TestSuite) {
