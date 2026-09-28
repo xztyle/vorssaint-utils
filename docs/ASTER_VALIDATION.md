@@ -38,29 +38,52 @@ values, with control disabled until explicit service setup and qualification.
 
 ## Battery care
 
-Implementation commits `3b06ad5` and `df50725` are on the battery feature branch.
-Scoped suites passed **9,327 checks**, including 121 battery checks. Root rebuilt
-the final app and helper, verified packaging/signing, and ran the packaged app
-selftest successfully. The read-only probe now includes firmware
-`mBoot-18000.161.10` in its qualification fingerprint.
+The feature branch is `bd51e78`. The latest integration battery suite passed
+162 checks; its optimized build and selftest passed. The signed app and helper
+retain the same local signing identity and authenticated request boundary.
 
-Root installed the signed battery build at `/Applications/Aster.app` and the owner
-approved its background service. First registration required handling macOS's
-`.notFound` and pending-approval states; the fixes passed an optimized build,
-packaged selftest and 121 battery checks. Authenticated status reached the running
-daemon with policy disabled. The initial qualification attempted its charging
-stage, timed out after 90 seconds without measured charge power, and restored
-system control with no hardware ownership or pending recovery.
+The owner approved the background service. After temporarily allowing native
+charging to 100%, the real qualification measured charging at 43.763032 W and
+then a hold at 0 W. The intentional discharge stage failed because the controller
+mistook its own adapter cutoff for physical unplugging. Later telemetry measured
+-18.2295 W. The failed sequence restored system control, with policy disabled,
+no hardware ownership and no recovery pending. macOS's limit was restored to 80%.
 
-System Settings showed macOS's own 80% charge limit blocking charging at the
-current 80%. Permission to temporarily change it to 100% and restore 80% is
-pending. The limit remains unchanged. There is no successful power-flow
-qualification, sleep/reboot test or calibration cycle yet.
+`51b137a` distinguishes physical adapter presence (`AppleRawExternalConnected`)
+from effective power connection. Regression checks cover the intentional cutoff
+and actual unplugging. The correction has not yet completed real qualification.
 
-Required remaining actual-Mac checks include the bounded charge/hold/discharge/
-charge qualification, range and thermal behavior, cancellation and restoration,
-unplug, top-up, calibration, schedules, app/helper restart, sleep and system restart.
-Do not interrupt the owner's work with a sleep or restart without coordination.
+Installing that build exposed a helper replacement problem. The first new helper
+launch failed a macOS launch constraint; later launches could not resolve the
+registered program and exited with EX_CONFIG. `b3d1ed9` fixes the premature
+re-registration race by awaiting asynchronous service removal. Restoring the
+exact previous signed app did not recover the broken registration.
+
+Battery care availability is currently off. The actual read-only hardware probe
+reports AC enabled and charge inhibit cleared; its default state object is not
+proof of the protected saved journal. The last authenticated status before the
+launch failure was disabled and unowned. A current administrator read of the
+journal is requested from the owner. Computer Use denied Terminal, so no alternate
+UI route was used to bypass that restriction.
+
+`bd51e78` adds an explicit, unregister-only maintenance diagnostic. It requires
+the feature off, stable signing and the actual restored hardware baseline. It
+awaits removal completion and does not write hardware or saved state. Execution
+is pending the independent journal check; the normal authenticated restoration
+guard remains unchanged. Re-registration and actual helper response must follow
+before another qualification attempt.
+
+`558b5dd` gives measured charge, battery temperature and power visible
+localized labels and distinct VoiceOver names. The battery development build
+passed; the existing 162 battery checks passed but do not exercise that UI.
+Solid SettingsCard content groups fit Apple's guidance to place Liquid Glass on
+floating controls rather than every data card.
+
+Remaining actual-Mac checks include full charge/hold/discharge/charge qualification,
+range and thermal behavior, cancellation/restoration, unplug, top-up, calibration,
+schedules, app/helper restart, sleep and system restart. Coordinate sleep, unplug
+and restart with the owner. Final intended use is macOS at 100% and Aster enforcing
+the saved 75–80% range; the temporary native 80% limit remains during repair.
 
 ## Clipboard and menu bar
 
@@ -86,127 +109,164 @@ cross-app drag and display/Space checks remain open: app-targeted test input did
 not establish normal foreground-app activation. A CUA no-window timeout was not
 proof of a frozen app.
 
-Menu-bar implementation `7b03b9f` passed 9,845 focused checks. Root rebuilt its final
-source, packaged/signed the app and ran the packaged selftest successfully. Actual
-read-only inventory found one display and 11 items: seven stable, four provisional,
-six movable; no competing manager. These were initial read-only checks.
+`7c77372` exposes all file URLs in a copied multi-file clip through a native
+external drag from the file icon. A generated two-file payload check passed in
+the 691-check clipboard suite, and the optimized build passed. The drawer's
+navigation and footer now use shared glass; content stays legible, with solid
+surfaces for Reduce Transparency and Increase Contrast. The external drop,
+automatic paste and shortcut still need live Mac checks.
 
-The owner granted Accessibility. The first GUI startup crashed because macOS 26
-returned a remote status-window number of 8,589,934,592, beyond a WindowServer
-UInt32 identifier. Root replaced the trapping conversion with exact validation;
-the regression, optimized build, packaged selftest and next GUI launch passed.
-The live manager still left nine of ten items unresolved after standard AX geometry
-and cache fixes. A passive diagnostic launched through LaunchServices confirmed
-the GUI has Accessibility permission but receives blank WindowServer titles. The
-resolver wrongly rejected specific Control Center AX identifiers in that case;
-some third-party apps expose one unnamed AX icon. Fix `c9e5940` passed 215 menu
-checks, 215 test-harness checks, an optimized build and selftest. A second passive
-GUI diagnostic resolved all ten icons, protected Clock and Control Center, and
-left every icon frame unchanged. The GUI process was launched by LaunchServices
-with parent PID 1. Turning the manager off removed its controls and cleared the
-completed restoration baseline before movement tests began.
+Menu-bar implementation and its earlier signing/selftests passed. Initial GUI
+checks exposed a trapping conversion of a macOS status-window ID and blank
+WindowServer titles. Exact identifier validation and AX identity resolution fixed
+those failures. A later passive GUI diagnostic resolved all ten icons and kept
+their frames unchanged. Accessibility is approved.
 
-The first actual Docker-to-Hidden action failed without moving an icon. Binding
-input to the hosted window (`2744f07`) alone did not fix delivery. A bounded
-session/host acknowledgement relay and independent release watchdog (`bf83176`,
-`ba0e9b8`) passed 266 menu checks and the combined optimized build/selftest. The
-next real GUI action succeeded: Docker moved from x=1473 to x=1708, between the
-always-hidden divider at x=1670 and hidden divider at x=1753. Both press and release
-were acknowledged for window 2611 in host PID 625. Siri and Control Center also
-exchanged order during the move; do not claim only the target changed. Undo and
-full layout restoration remain unverified. The owner was interacting with Aster,
-so further UI work is waiting for a brief coordinated test interval.
+The first successful Docker-to-Hidden move used the acknowledged event relay.
+Docker moved from x=1473 to x=1708, between the hidden-section dividers. Siri and
+Control Center also exchanged order, so this did not establish correct isolated
+reordering. Undo then moved Wi-Fi off the menu row, and Now Playing disappeared.
+Root restored both system icons through System Settings, preserving Now Playing's
+Show When Active setting. All original icons are visible again.
+
+The next corrections restrict planning to displaced items, keep drag gestures on
+the top edge, reject off-row geometry, complete acknowledged releases, wait for
+stable frames and preserve Undo when an original identity is temporarily missing.
+The installed retry exposed another concrete failure: WindowServer changes hover
+fields during a valid drag. `a226ea8` accepts those hover-field changes only for
+drag/release while preserving token, event type, host PID and explicit destination
+checks. Its 388 menu checks passed, including the recorded event patterns.
+
+The latest correction is built but not installed. Menu management is off. Original
+physical order is not yet restored, and its recovery baseline remains saved.
+Actual reorder/Undo/restoration, always-hidden access, notch panel, search,
+shortcuts, profiles, reveal rules, new/restarted icons and display/Space/full-screen
+behavior remain required live gates.
+
+`080a8df` fixed a real menu event-tap source failure path and replaced a brittle
+teardown guard with lifecycle checks. Its branch passed 405 menu and 257
+repository checks. `b7a54cb` puts the floating menu search panel on the shared
+glass surface. The development build and 405 menu checks passed. That panel and
+the corrected drag/Undo path still need live visual and behavioral checks.
 
 All browser research and browser acceptance checks use the Codex in-app browser.
 The owner's personal browser is excluded from the workflow.
 
 ## Capture and cleanup
 
-Capture's focused suites and optimized build passed. The separate generated-only
-drop receiver initially crashed on an AppKit text-view initializer; the corrected
-initializer, explicit text system and real image-import regressions pass. Live UI
-then added an arrow to Capture 3, returned the same capture ID/revision 1 to the
-corner, and dragged it into a native image-capable text input. The accepted PNG
-hash exactly matches the committed edited image. A second preview also dragged
-successfully. All three previews remained available. Cancel in the discard dialog
-preserved the editor. Undo removed the annotation with only 141 pixels differing
-by one 8-bit channel level after rendering. Drag cancellation, production capture
-permission and a separate receiving app remain unverified. See ASTER_SCREEN_CAPTURE.md
-on the feature branch for the precise fixture receipts.
+Capture's focused tests, optimized build and generated native drop fixture passed.
+The fixture preserves edited capture identity, exact transferred PNG bytes and
+multiple previews; discard cancellation and undo were also exercised. These are
+separate from the production checks below.
 
-Cleanup's final optimized build and selftest passed, with 88 core checks, 91 real
-engine checks and 9,039 related checks. Generated-file tests include an actual
-Trash move and restoration through its returned URL. The ClamAV backend verifies
-official definitions, scans private benign/EICAR snapshots and produces exactly
-the expected finding while retaining the originals. Live UI found a collapsed
-fixture window; its correction now shows 1060 × 780 points of content and the
-four generated files, with the link and package correctly skipped. Duplicate
-results repeatedly crash the app-control service's accessibility reader at
-`Array.remove(at:)`; Aster stays running and control of other apps still works.
-Restarting Codex is not required to recover those other controls. Narrowing the
-disabled duplicate controls and explicitly grouping results did not resolve this
-tool failure. A further result-header change is built but awaits its live retry.
+The owner approved Screen Recording and the follow-up direct-capture prompt.
+Installed `1b7637c`, containing capture `cf1f9f2`, captured a real 1490 × 260 pixel
+region of the generated local browser test page. It appeared in the bottom-left
+preview. Editing added a red arrow, and Done returned the arrow to the corner.
+Copying that preview and pasting into a separate TextEdit document preserved the
+image and arrow, verified visually. The original generated text document was
+preserved through TextEdit's Duplicate conversion action.
 
-A GUI-triggered duplicate scan produced exactly the generated Original.txt and
-Duplicate.txt pair with no incomplete-analysis flag; its generated-only receipt
-confirms completion, not readable UI or keeper selection. The real Storage review
-sheet showed only Large fixture.bin, and Move to Trash removed that generated
-file from its original location. The recovery panel then triggered the same
-tool-reader crash; Finder recovery remains unverified. No personal file was removed.
+An actual native drag generated a 47,010-byte PNG with SHA256
+`3917a710c65b6014d5727ead253ec53e6dd19935ce99aa376ff713fc0d042062`.
+App-bound automation did not deliver the external drop to TextEdit or the in-app
+browser. The latter also uses a separate virtual clipboard. These observations do
+not establish a product defect or a successful external drag. The old installed
+preview's lifetime is temporarily Until closed; restore the prior 30-second
+setting after acceptance unless the owner chooses otherwise.
 
-Actual malware UI checks passed: Definitions found ClamAV 1.5.4 and verified
-current official definitions, then Malware scan inspected four generated files
-and displayed one Eicar-Test-Signature match for the harmless test sample. It
-correctly displayed Partial coverage because traversal excluded a link and app
-package. The action receipt reports four scanned, zero malware-stage skips,
-one finding, no failure or cancellation, and incomplete=true. This is bounded
-engine/UI evidence, not a claim about the security of the owner's files.
-Use generated local files for all removal, image input and malware test actions.
-Do not send messages, upload to remote services or delete personal files for tests.
+`771c064` changes the resting bottom-left preview to the screenshot image
+alone. Actions appear on hover; a left-edge drag dismisses only when no other
+app accepts the drop. The screenshot suite passed 830 checks, and the separate
+development bundle built and passed selftest. A generated-image fixture was
+launched through Computer Use before any app or helper startup. Its actual
+320 × 178 point corner window showed only image pixels, with no frame, border,
+backing, caption or toolbar. Escape closed it. Pointer automation could not
+reliably address that transient window, so hover, left drag, cancellation during
+drag and external drop are still unverified in the live UI. See the capture
+branch's `ASTER_SCREEN_CAPTURE.md` for implementation and test details.
 
-ClamAV 1.5.4 was installed through Homebrew for the optional local scanning backend.
-No scanning daemon was started. Official definitions downloaded successfully;
-their detached signatures were verified against ClamAV's signing certificate.
-A bounded scan of two generated files reported the benign file as OK and the
-standard harmless EICAR test file as a match, with the expected exit status 1.
-The subsequent app UI check is recorded above. No personal files were scanned.
+Settings navigation also hung when search jumped to a disabled feature. `bdc9adb`
+replaces the nested lazy feature cards and overlapping delayed jumps with bounded
+cards and one cancellable target jump. Its relevant 1,482 checks passed; the old
+navigation failed three regression checks. The combined build contains the fix,
+but actual visible navigation must still pass after installation.
 
-## Worker limit
+Cleanup's generated engine tests, optimized build and selftest passed. Live
+result-header changes fixed an app-control accessibility-reader crash without
+requiring a Codex restart. A duplicate scan displayed exactly Original.txt and
+Duplicate.txt. Choosing Original as keeper, selecting Duplicate, reviewing both
+paths and moving Duplicate to Trash succeeded. The recovery panel showed the
+actual Trash URL. Finder Put Back restored Duplicate with the same hash as
+Original, and restored the earlier generated 8 MiB large file. No personal files
+were removed. The 180-day old-file filter selected the 400-day sample; the large
+filter showed none at 100 MB and the 8 MiB file at 1 MB.
+
+`be160e3` fixes the generated receipt observer's treatment of an existing root and
+missing original under /private/tmp. The old code fails its regression and the
+new storage suite passes 94 checks. Actual production recovery UI had already
+shown the correct Trash URL. The same commit changes security-inspection result
+headers after that separate view triggered the accessibility-reader crash.
+Two unregistered generated startup plists are prepared for the live retry; the
+security result view and updated receipt observer still need that check.
+
+`006ef0f` stops the cleaner's progress glyph animation under Reduce Motion.
+The optimized build passed. A clean copied bundle still needs signature
+verification before this revision is installed.
+
+ClamAV 1.5.4 was installed through Homebrew for optional local scans. No scanning
+daemon was started. Official definitions passed detached-signature verification.
+Actual malware UI inspected four generated files and displayed the expected
+harmless EICAR match, with Partial coverage because a link and app package were
+excluded. No personal files were scanned. This is bounded engine/UI evidence,
+not a claim that the owner's files are safe or that all malware is detectable.
+Use only generated files for removal, image input and malware acceptance checks.
+
+## Worker and model routing
 
 Five researchers and four separate implementation workers were created with the
 requested model settings. The environment refused a tenth separate worker and
 also refused restarting a finished worker. The active clipboard implementation
-worker therefore continues cleanup in its dedicated cleanup worktree with the same
+worker therefore continued cleanup in its dedicated cleanup worktree with the same
 GPT 6 Astra/xhigh settings. The owner was told about the limitation. All five
 feature scopes retain their separate research, implementation branches and review.
 
+The owner later required GPT 6 Sol at xhigh for all further work. The Astra
+workers were interrupted. Sol workers continued capture, clipboard, menu and
+battery UI work; the primary agent owns integration and Mac acceptance.
+
 ## Final gate
 
-A detached `work/integration` checkout combines the five feature branches for
-early integration testing without changing main. Shared defaults, feature labels,
-backup settings and entry points were reconciled; both menu restoration and
-battery restoration remain ahead of uninstall. Its initial 3,403 scoped checks
-found two failures: an expected feature count and translated punctuation. A full
-run then found one unswept test preference namespace. All were corrected. The
-latest combined full suite passed **70,530 checks** and preference cleanup. The
-latest combined optimized build, packaged selftest and strict signature checks
-passed. The original combined candidate was integration commit `4496af9`.
-The installed candidate is now `1b7637c`, including the acknowledged menu mover
-and cleanup result receipts. Its relevant combined suites passed 359 checks
-(266 menu, 93 cleanup), optimized build and selftest. It is installed at
-`/Applications/Aster.app`, with the previous app retained in a local backup. Its
-installed selftest passed. A passive LaunchServices diagnostic confirmed that
-Accessibility remains granted and all ten menu items resolve, with two protected.
-The installed app can still authenticate to the battery service, which remains
-disabled under normal system control with no hardware ownership or recovery owed.
-The later result-header candidate `4c1b99b` is built and awaits its installed/live
-check; it has not replaced the running app while the owner is using Aster.
-This installation does not establish replacement acceptance: the outstanding live
-checks and charging qualification above are still required. Main retains the
-reviewed baseline and evidence docs; feature merges await acceptance.
+The detached `work/integration` checkout combines all five branches before their
+acceptance merges to main. Shared defaults, feature labels, backup settings and
+entry points were reconciled. Menu and battery restoration remain ahead of normal
+uninstall. Earlier integration failures in expected feature count, translated
+punctuation and test preference cleanup were corrected.
 
-Each feature needs its reviewed implementation, relevant automated tests, optimized
-build and selftest, actual-Mac interaction evidence and recorded unresolved limits.
-Only then merge that feature into main. Repeat the combined build and appropriate
-integration checks after all five merges. No release, version tag or published
-installer has been authorized.
+Integration `8076c3e` now contains all five latest feature branches. Its
+optimized build and packaged selftest passed. The full suite passed **70,812
+checks**, including 257 repository and 830 screenshot checks; preference cleanup
+passed. The previous full run failed one source guard because capture borderless
+menus were not both explicitly sized. `f78c1d2` corrected the menu sizing, and
+the exact combined source passed the final repeat. Earlier, `080a8df` fixed a
+real menu event-tap source failure path and replaced another brittle guard with
+lifecycle checks. Its feature branch had passed 405 menu and 257 repository checks.
+
+The latest bundle was copied without synced-folder metadata to
+`/Applications/.Aster-verified-8076c3e-ac6d74f7.app` and passed deep strict
+signature verification. Its executable SHA256 is
+`30f823a3ba7454d6b8ebd621c1722283aa327a5c42f06a305e4dc569d6f1b4cd`.
+It has not replaced the installed app. A separate generated-image development
+fixture checked the bare screenshot preview without changing the battery helper.
+The installed app remains the restored `1b7637c`, and the stopped helper's broken
+registration is unresolved as described above. All current feature heads are
+pushed: battery `558b5dd`, clipboard `7c77372`, menu `b7a54cb`, capture `f78c1d2`,
+cleanup `006ef0f`. Their combined automated gate is green; actual-Mac
+replacement acceptance remains incomplete.
+
+Replacement acceptance has not passed. Main retains the baseline and evidence
+docs; feature merges await their actual-Mac gates. Each feature needs its reviewed
+implementation, relevant tests, optimized build/selftest, actual behavior evidence
+and recorded limits. After all five acceptance merges, repeat the combined build
+and appropriate integration checks. No release, version tag or published installer
+has been authorized.
