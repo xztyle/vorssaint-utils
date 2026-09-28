@@ -47,6 +47,26 @@ if CommandLine.arguments.contains("--probe") {
     exit(0)
 }
 
+if CommandLine.arguments.contains("--inspect-journal") {
+    guard CommandLine.arguments.count == 2, geteuid() == 0 else {
+        fputs("Journal inspection requires administrator access.\n", stderr)
+        exit(1)
+    }
+    do {
+        if let state = try BatteryJournal.inspectReadOnly() {
+            print("journal=present")
+            print("policyEnabled=\(state.policy.enabled)")
+            print("operation=\(state.operation?.kind.rawValue ?? "none")")
+            print("ownsHardware=\(state.ownsHardware)")
+            print("recoveryPending=\(state.recoveryPending)")
+        } else { print("journal=missing") }
+    } catch {
+        fputs("Journal inspection failed: \(error)\n", stderr)
+        exit(1)
+    }
+    exit(0)
+}
+
 guard geteuid() == 0 else { fputs("The battery daemon must run as root.\n", stderr); exit(1) }
 let requirement = AppCodeIdentity.requirement(identifier: BatteryCareIdentifiers.appID)
 guard requirement != "never" else { fputs("Stable signing is required.\n", stderr); exit(1) }

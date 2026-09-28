@@ -249,3 +249,22 @@ hardware write. Fake-transport checks cover each case; the focused battery
 suite passed 168 checks, and the optimized signed app build and packaged helper
 selftest passed. These checks do not establish live sleep or lid behavior on
 the owner Mac. The protected journal gate above remains in force.
+
+## Read-only protected journal inspection — 2026-09-28
+
+The packaged battery helper now accepts `--inspect-journal` only when started
+with administrator access. It opens the existing root-owned directory and
+`state.json` without following links, creating a lock, registering a service,
+or writing hardware. It validates the journal with the daemon's state decoder
+and prints only whether the policy is enabled, the operation kind, hardware
+ownership and pending recovery. A missing journal is reported separately.
+
+The unprivileged command refused access, and the protected directory's
+modification time did not change. The focused battery suite passed 168 checks,
+and the full combined suite passed 80,716 checks plus preference cleanup;
+the optimized signed app, app selftest, helper selftest and strict bundle
+signature verification passed. The signed candidate is staged at
+`/private/tmp/aster-journal-inspect-m3LZtM/Aster.app`; its battery helper
+SHA-256 is `b90c0a89417b4e5a2da578efae3e7baa446b0eaacbd9feae167d11dbaefa5e36`.
+An administrator-authenticated read has **not** run yet, so the journal state
+remains unknown and no registration repair or charge-key write is authorized.

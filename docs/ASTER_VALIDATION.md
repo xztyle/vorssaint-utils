@@ -687,3 +687,14 @@ regular app to activate. These observations do not prove the global shortcut
 or cross-app paste fails for physical keyboard input, so both live acceptance
 checks remain open. A manual keyboard check was requested from the owner. The
 disposable document and prior generated clipboard content were restored.
+
+## Battery journal diagnostic — 2026-09-28
+
+The battery helper gained a root-only, read-only journal inspection command.
+It prints only the protected state needed before registration repair, without
+creating a lock or writing hardware. Its unprivileged refusal, focused battery
+checks, full 80,716-check combined suite and preference cleanup, optimized
+signed build, packaged selftests and strict signature check passed. The actual
+protected journal is still unread until the owner enters
+administrator credentials. The current installed helper still fails to start
+with launchd exit 78; the combined app has not replaced it.
