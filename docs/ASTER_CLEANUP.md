@@ -12,7 +12,10 @@ and uninstaller remain separate tools.
   not a promise of immediate free space. APFS clones and hard links can share data.
 - Duplicate detection groups by length, streams SHA-256, then compares every byte.
   Hard-link aliases are counted once. Choose a keeper before selecting other copies;
-  removal refuses a group with no surviving, unchanged keeper.
+  removal refuses a group with no surviving, unchanged keeper. Only the selection
+  checkbox is disabled until a keeper is chosen; file details and Reveal remain
+  usable. Keeper accessibility labels include the filename and expose the full
+  path as a hint, using the existing localized action text.
 - Before each move, Aster checks scope, file and ancestor identities, size,
   nanosecond modification time, ownership and local eligibility again. A changed
   or unavailable item must be scanned again. It never retries with elevated access.
@@ -116,8 +119,43 @@ with complete coverage and a successful verified update.
 `--cleanup-fixture=<empty private directory>` opens the actual view with generated
 files and no ordinary app delegate, background features or permission prompts.
 An arbitrary existing nonempty directory is refused. A matching preparation
-marker permits reuse without rewriting fixtures. This route disables personal
-folder/app pickers, engine installation and System Settings launch. Root UI
+marker permits reuse without rewriting fixtures, including files already moved
+out of the fixture. `action-state.json` records generated-scope files, selections,
+duplicate groups and keeper choices, returned Trash URLs for those generated
+originals, and malware outcome counts. The observer runs only in fixture mode,
+after the service publishes a change. It reads no file contents, excludes outside
+paths and diagnostic/finding text, and does not infer that a UI interaction passed.
+This route disables personal folder/app pickers, engine installation and System Settings launch. Root UI
 acceptance is recorded separately in `ASTER_VALIDATION.md`; CLI checks do not
 claim that UI interactions, Finder Put Back, cloud providers or external-volume
 Trash behavior were exercised on the owner's data.
+
+### Duplicate-results UI limitation
+
+On Mac16,5 / macOS 26.6.2, the generated fixture scanned four files and reached
+the duplicate-results state through the Duplicates tab and action. Both an
+accessibility-tree read and a screenshot request then crashed
+`SkyComputerUseService`, while Aster remained running. An earlier reproduction,
+`SkyComputerUseService-2026-09-28-090040.ips`, records `Array.remove(at:)` followed
+by repeated `compactMap` frames in the tool process. TextEdit remained accessible
+through the same control tool immediately afterward.
+
+Commit `3dfa0c8` narrows the disabled state to the removal checkbox and adds
+file-specific keeper labels. It passed 88 storage-inspection checks, 246
+repository checks, the optimized build, strict signature verification and
+runtime selftest. An exact live retry still crashed the control tool when the
+duplicate results appeared. The change improves the review controls, but it is
+not claimed to fix the tool crash. No duplicate-results UI acceptance pass is
+claimed, including choosing a keeper or removing a reviewed duplicate through
+that screen. The automated keeper/removal-policy checks passed independently.
+
+The same tool-only crash also occurred after a reviewed Trash action from the
+working Storage list: the selected generated `Large fixture.bin` disappeared from
+its original location, then the tool crashed while reading the recovery result;
+Aster stayed running. Recovery via Finder was not yet verified at that point.
+Duplicate and recovery result groups now use explicit accessibility containment,
+a bounded semantic grouping change whose live result still needs verification.
+The fixture observer records future service outcomes and cannot reconstruct an
+earlier process's in-memory Trash receipt. Five new receipt checks verify scope
+filtering, keeper identity, returned Trash locations, and omission of private
+content; the combined storage-inspection and repository run passes 339 checks.

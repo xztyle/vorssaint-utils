@@ -549,6 +549,7 @@ if (( TEST )); then
         Sources/Vorssaint/Services/Display/BrightnessSupport.swift
         Sources/Vorssaint/Services/Display/LidDimmingSupport.swift
         Sources/Vorssaint/Support/CleanupFixturePolicy.swift
+        Sources/Vorssaint/Support/CleanupFixtureReceipt.swift
         Sources/Vorssaint/Core/StorageInspectionStrings.swift
         Sources/Vorssaint/Core/StorageInspectionPreferences.swift
         Sources/Vorssaint/Services/StorageInspection/StorageInspectionModels.swift
