@@ -82,8 +82,9 @@ struct StorageSecurityView: View {
     private var securityRows: some View {
         LazyVStack(alignment: .leading, spacing: 14) {
             ForEach(service.securityRows) { row in
-                GroupBox(row.label) {
+                GroupBox {
                     VStack(alignment: .leading, spacing: 6) {
+                        Text(row.label).font(.headline)
                         Text(row.url.path).font(.caption).textSelection(.enabled)
                         if let executable = row.executable { Text(executable).font(.caption.monospaced()).textSelection(.enabled) }
                         Text(signature(row.signature))
@@ -93,7 +94,7 @@ struct StorageSecurityView: View {
                         if !row.detail.isEmpty { Text(row.detail).font(.caption).textSelection(.enabled) }
                         Button(text[.reveal]) { NSWorkspace.shared.activateFileViewerSelecting([row.url]) }
                     }.frame(maxWidth: .infinity, alignment: .leading)
-                }
+                }.accessibilityElement(children: .contain)
             }
         }
     }
