@@ -550,6 +550,82 @@ enum NotchTests {
                "an open island keeps its full corner radius and shoulder")
     }
 
+    /// macOS rounds the camera housing it reports, so an edge of the real
+    /// notch can show past the island. A fit set by hand moves whatever
+    /// follows the cutout and nothing else, and stays on the Mac it was set on.
+    private static func cameraFitContracts(_ suite: TestSuite) {
+        let handWritten = NotchCameraFit(width: 2.4, height: 0.3)
+        let negative = NotchCameraFit(width: -2.6, height: -1.3)
+        suite.expect(handWritten.width == 2 && handWritten.height == 0.5
+                     && negative.width == -3 && negative.height == -1.5
+                     && NotchCameraFit(width: 40, height: -9).width == 10 && NotchCameraFit(width: 40, height: -9).height == -6,
+                     "a notch fit written by hand is brought back to whole-point widths and half-point heights within range")
+        let screen = CGRect(x: 0, y: 0, width: 1470, height: 956)
+        let reported = NotchGeometry(screen: screen, safeAreaTop: 32, cameraWidth: 179,
+                                     menuBarHeight: 33, compactSideRoom: 100)
+        let fitted = NotchGeometry(screen: screen, safeAreaTop: 32, cameraWidth: 179,
+                                   menuBarHeight: 33, compactSideRoom: 100,
+                                   cameraFit: NotchCameraFit(width: 2, height: 0.5))
+        suite.expect(reported.cameraWidth == 179 && reported.cameraHeight == 32,
+               "without a fit the island matches the housing macOS reports")
+        suite.expect(fitted.cameraWidth == 181 && fitted.cameraHeight == 32.5,
+               "a fit widens and lengthens the camera housing the island covers")
+        let strips = [fitted.restingSize(showsContent: false), fitted.restingSize(showsContent: true), fitted.collapsed,
+                      fitted.notice, fitted.noticeSize(wingWidth: 190), fitted.compactMusicGeometry.compactActivitySize,
+                      fitted.compactTimerGeometry(showsDownloads: true).compactActivitySize]
+        suite.expect(strips.allSatisfy { $0.height == 32.5 && $0.height == fitted.stripHeight },
+               "every strip beside the camera, the volume and brightness notice included, follows the fitted height")
+        suite.expect(fitted.restingSize(showsContent: false).width == 181
+               && fitted.noticeCameraGap == 181 && fitted.musicCameraGap == 181,
+               "the closed island and the gap between wings follow the fitted width")
+        suite.expect(fitted.notice.width == reported.notice.width + 2
+               && fitted.noticeWingWidth(preferred: 80) == reported.noticeWingWidth(preferred: 80),
+               "a notice keeps its wings beside a wider camera")
+        suite.expect(fitted.expandedWidth == reported.expandedWidth && fitted.contentBudget == reported.contentBudget,
+               "the open island keeps its chosen size")
+        let shorter = NotchGeometry(screen: screen, safeAreaTop: 32, cameraWidth: 179,
+                                    cameraFit: NotchCameraFit(width: -3, height: -1))
+        suite.expect(shorter.cameraWidth == 176 && shorter.notice.height == 31,
+               "a housing reported too large can be narrowed and shortened")
+
+        let plain = NotchGeometry(screen: screen, safeAreaTop: 0, cameraWidth: 0, menuBarHeight: 24)
+        let simulated = NotchGeometry(screen: screen, safeAreaTop: 0, cameraWidth: 0, menuBarHeight: 24,
+                                      cameraFit: NotchCameraFit(width: 10, height: 6))
+        suite.expect(simulated == plain, "a display without a camera keeps its simulated cutout")
+
+        let extreme = NotchCameraFit(width: 100, height: -100)
+        suite.expect(extreme.width == 10 && extreme.height == -6, "a fit stays within its ranges")
+        suite.expect(NotchCameraFit(width: .nan, height: .infinity) == .zero, "an unreadable fit means none")
+
+        let domain = "com.vorssaint.tests.notch-camera-fit"
+        let defaults = UserDefaults(suiteName: domain)!
+        defaults.removePersistentDomain(forName: domain)
+        defer { defaults.removePersistentDomain(forName: domain) }
+        suite.expect(Defaults.registeredDefaults[DefaultsKey.notchCameraFitWidth] as? Double == 0
+               && Defaults.registeredDefaults[DefaultsKey.notchCameraFitHeight] as? Double == 0
+               && NotchCameraFit.current(in: defaults) == .zero,
+               "the island follows the reported housing until someone fits it")
+        defaults.set(-3.0, forKey: DefaultsKey.notchCameraFitWidth)
+        defaults.set(1.5, forKey: DefaultsKey.notchCameraFitHeight)
+        suite.expect(NotchCameraFit.current(in: defaults) == NotchCameraFit(width: -3, height: 1.5),
+               "the stored fit is read back as set")
+
+        let keys = [DefaultsKey.notchCameraFitWidth, DefaultsKey.notchCameraFitHeight]
+        suite.expect(SettingsBackupSupport.exportKeys().isDisjoint(with: keys),
+               "a fit for one Mac's camera does not travel in backups")
+        let restored = SettingsBackupSupport.sanitizedSettings(from: [
+            SettingsBackupSupport.formatVersionKey: SettingsBackupSupport.formatVersion,
+            SettingsBackupSupport.settingsKey: [DefaultsKey.notchCameraFitWidth: 4.0,
+                                                DefaultsKey.notchCameraFitHeight: 1.0,
+                                                DefaultsKey.notchSize: "custom"],
+        ])
+        suite.expect(restored?[DefaultsKey.notchSize] as? String == "custom"
+               && keys.allSatisfy { restored?[$0] == nil },
+               "a backup from another Mac leaves this Mac's fit alone")
+        suite.expect(SettingsBackupSupport.keysToClear(whenImporting: [DefaultsKey.notchSize: "custom"]).isDisjoint(with: keys),
+               "restoring a backup keeps the fit already set here")
+    }
+
     private static func musicLabelContracts(_ suite: TestSuite) {
         let screen = CGRect(x: 0, y: 0, width: 1440, height: 900)
         for height: CGFloat in [16, 22, 24, 28, 30, 33, 37, 64] {
@@ -672,6 +748,7 @@ enum NotchTests {
         menuSpaceReuseContracts(suite)
         menuBarHeightContracts(suite)
         physicalStripContracts(suite)
+        cameraFitContracts(suite)
         musicLabelContracts(suite)
         NotchPanelTests.run { suite.expect($0, $1) }
         NotchHoverTests.run(suite)
@@ -1812,6 +1889,19 @@ enum NotchTests {
         suite.expect(NotchSupport.screenIndex(preference: .main, builtIn: [true, false, false],
                                        notched: [true, false, false], main: 2) == 2,
                "the main display choice follows the display with the menu bar, even beside a notched built-in screen")
+        suite.expect(NotchSupport.screenIndex(preference: .pointer, builtIn: [true, false],
+                                       notched: [true, false], main: 0, pointer: 1) == 1
+                     && NotchSupport.screenIndex(preference: .pointer, builtIn: [true, false],
+                                       notched: [true, false], main: 0, pointer: 0) == 0,
+               "the pointer choice uses the display it follows, notched or not")
+        suite.expect(NotchSupport.screenIndex(preference: .pointer, builtIn: [false, false],
+                                       notched: [false, false], main: 1) == 1
+                     && NotchSupport.screenIndex(preference: .pointer, builtIn: [false, false],
+                                       notched: [false, false], main: 1, pointer: 2) == 1,
+               "without a display to follow, the pointer choice keeps the main display")
+        suite.expect(NotchSupport.screenIndex(preference: .pointer, builtIn: [false],
+                                       notched: [false], main: 0, pointer: 0) == 0,
+               "the pointer choice still shows the island in closed-lid mode")
         suite.expect(NotchSupport.shouldReplace(.volume, with: .brightness), "continuous controls can replace each other")
         suite.expect(!NotchSupport.shouldReplace(.volume, with: .clipboard), "copy does not interrupt a volume adjustment")
         suite.expect(NotchSupport.shouldReplace(.battery, with: .capture), "a capture takes precedence over passive battery status")

@@ -99,7 +99,8 @@ struct NotchClipboardPastePress: Equatable {
 }
 
 enum NotchDisplay: String, CaseIterable {
-    case automatic, builtIn, main
+    /// `pointer` moves the closed island to the display the pointer is on.
+    case automatic, builtIn, main, pointer
 }
 
 enum NotchSize: String, CaseIterable {
@@ -112,6 +113,31 @@ enum NotchSize: String, CaseIterable {
 
     static func clamped(_ value: Double, to range: ClosedRange<Double>, fallback: Double) -> Double {
         value.isFinite ? min(range.upperBound, max(range.lowerBound, value)) : fallback
+    }
+}
+
+/// A correction to the camera housing macOS reports. The report is rounded
+/// to points while the cutout follows the panel's own pixels, so on some Macs
+/// and resolutions an edge of the real notch can show past the island.
+struct NotchCameraFit: Equatable {
+    static let widthRange = -10.0...10.0
+    static let heightRange = -6.0...6.0
+    static let zero = NotchCameraFit(width: 0, height: 0)
+
+    let width: CGFloat
+    let height: CGFloat
+
+    /// Whole points keep the island centred on the camera's pixels, and half
+    /// points are whole pixels on the notched panels; a value written by hand
+    /// is brought back to those steps.
+    init(width: Double, height: Double) {
+        self.width = NotchSize.clamped(width, to: Self.widthRange, fallback: 0).rounded()
+        self.height = (NotchSize.clamped(height, to: Self.heightRange, fallback: 0) * 2).rounded() / 2
+    }
+
+    static func current(in defaults: UserDefaults = .standard) -> NotchCameraFit {
+        NotchCameraFit(width: defaults.double(forKey: DefaultsKey.notchCameraFitWidth),
+                       height: defaults.double(forKey: DefaultsKey.notchCameraFitHeight))
     }
 }
 
@@ -811,6 +837,12 @@ enum NotchEvent: String, CaseIterable {
 }
 
 enum NotchSupport {
+    /// Whether a connected display has a camera housing, wherever the island
+    /// is: it can be off, withdrawn with the lid closed or on another display.
+    static var hasNotchedDisplay: Bool {
+        NSScreen.screens.contains { $0.safeAreaInsets.top > 0 }
+    }
+
     static let toolColumns = 5
     static let defaultHoverDelay = 0.25
     static let hoverDelayRange = 0.10...1.0
@@ -1073,9 +1105,10 @@ enum NotchSupport {
 
     /// A laptop with its lid closed has no built-in screen to show on, so the
     /// built-in choice hides the island there. A Mac without a built-in panel
-    /// never has one, so that choice keeps the main display.
+    /// never has one, so that choice keeps the main display. The pointer
+    /// choice takes the display it last followed the pointer to, if any.
     static func screenIndex(preference: NotchDisplay, builtIn: [Bool], notched: [Bool], main: Int,
-                            hasLid: Bool = true) -> Int? {
+                            pointer: Int? = nil, hasLid: Bool = true) -> Int? {
         guard !builtIn.isEmpty, builtIn.count == notched.count else { return nil }
         let fallback = builtIn.indices.contains(main) ? main : 0
         switch preference {
@@ -1084,6 +1117,7 @@ enum NotchSupport {
         case .automatic:
             return builtIn.indices.first { builtIn[$0] && notched[$0] }
                 ?? notched.firstIndex(of: true) ?? fallback
+        case .pointer: return pointer.flatMap { builtIn.indices.contains($0) ? $0 : nil } ?? fallback
         }
     }
 }
@@ -1149,15 +1183,18 @@ struct NotchGeometry: Equatable {
 
     init(screen: CGRect, safeAreaTop: CGFloat, cameraWidth: CGFloat, layout: NotchSize = .compact,
          menuBarHeight: CGFloat = 24, compactSideRoom: CGFloat? = nil,
-         customWidth: Double = NotchSize.defaultWidth, customHeight: Double = NotchSize.defaultHeight) {
+         customWidth: Double = NotchSize.defaultWidth, customHeight: Double = NotchSize.defaultHeight,
+         cameraFit: NotchCameraFit = .zero) {
         self.screen = screen
         self.layout = layout
         self.customWidth = NotchSize.clamped(customWidth, to: NotchSize.widthRange, fallback: NotchSize.defaultWidth)
         self.customHeight = NotchSize.clamped(customHeight, to: NotchSize.heightRange, fallback: NotchSize.defaultHeight)
         let barHeight = menuBarHeight.isFinite ? min(64, max(16, menuBarHeight)) : 24
         isNotched = safeAreaTop.isFinite && safeAreaTop > 0 && cameraWidth.isFinite && cameraWidth > 0
-        self.cameraWidth = min(isNotched ? cameraWidth : 180 * barHeight / 32, screen.width * 0.7)
-        cameraHeight = isNotched ? min(safeAreaTop, 64) : barHeight
+        // Only a physical camera has an outline to match; a simulated one follows the bar.
+        let fit = isNotched ? cameraFit : .zero
+        self.cameraWidth = min(isNotched ? max(0, cameraWidth + fit.width) : 180 * barHeight / 32, screen.width * 0.7)
+        cameraHeight = isNotched ? min(max(0, safeAreaTop + fit.height), 64) : barHeight
         self.menuBarHeight = max(cameraHeight, barHeight)
         self.compactSideRoom = compactSideRoom
     }
