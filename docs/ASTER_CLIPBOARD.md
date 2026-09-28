@@ -104,3 +104,27 @@ Research: Paste's [Mac guide](https://pasteapp.io/help/paste-on-mac),
 [keyboard reference](https://pasteapp.io/help/keyboard-shortcuts),
 [pinboard guide](https://pasteapp.io/help/organize-with-pinboards), and
 [official window reference](https://pasteapp.io/blog/mac-clipboard-shortcuts).
+
+## Actual drawer checks, 2026-09-28
+
+The rebuilt signed app passed its packaged selftest. On Mac16,5 / macOS 26.6.2,
+the isolated fixture recorded a full-width 2056 × 440 point drawer at (0,0),
+above the Dock (window level 21 versus 20). The screen was 2056 × 1329 points;
+the Dock's reserved 75-point area did not raise the drawer's bottom edge.
+
+The actual UI found and previewed generated entry 49,999 in a 50,000-entry
+library. Down followed by Space opened the expected Unicode text. Search,
+selection and Return copied the formatted fixture with RTF and plain-text
+representations to its private pasteboard and dismissed the drawer.
+Image copy had separately retained PNG and TIFF representations.
+
+The rich-text preview displayed its bold formatting. Edit a copy and Save
+created a distinct new entry while preserving the original. A new colored
+collection, Acceptance notes, was created; assigning the edited entry through
+its context menu displayed that one pinned entry in the collection.
+Fixture-only outside-activation dismissal was disabled so these checks could
+run while the owner used other apps. Normal dismissal behavior is unchanged.
+
+These are real UI checks with generated content, not proof of general-pasteboard
+capture, pasting into another app, cross-app dragging, permission behavior,
+multiple displays or Spaces. Those integration checks remain open.
