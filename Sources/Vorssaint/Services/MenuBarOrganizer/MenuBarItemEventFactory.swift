@@ -33,4 +33,19 @@ enum MenuBarItemEventFactory {
         }
         return source
     }
+
+    static func routingMatches(_ event: CGEvent, expected: CGEvent) -> Bool {
+        guard event.type == expected.type,
+              event.getIntegerValueField(.eventTargetUnixProcessID) == expected.getIntegerValueField(.eventTargetUnixProcessID)
+        else { return false }
+        let window = expected.getIntegerValueField(windowField)
+        if window > 0 {
+            guard event.getIntegerValueField(windowField) == window else { return false }
+            // WindowServer updates hit-test fields as a held icon crosses its
+            // neighbors. The explicit routing window still identifies the drag.
+            if event.type == .leftMouseDragged || event.type == .leftMouseUp { return true }
+        }
+        return [CGEventField.mouseEventWindowUnderMousePointer, .mouseEventWindowUnderMousePointerThatCanHandleThisEvent]
+            .allSatisfy { event.getIntegerValueField($0) == expected.getIntegerValueField($0) }
+    }
 }
