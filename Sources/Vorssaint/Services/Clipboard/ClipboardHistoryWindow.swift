@@ -156,13 +156,20 @@ extension ClipboardHistoryService {
             }
             return
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-            guard !app.isTerminated,
-                  NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier else {
-                NSSound.beep()
-                return
-            }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
+            self?.pasteWhenFocused(app, attemptsRemaining: 9)
+        }
+    }
+
+    private func pasteWhenFocused(_ app: NSRunningApplication, attemptsRemaining: Int) {
+        guard !app.isTerminated else { NSSound.beep(); return }
+        if NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier {
             Self.postPasteShortcut()
+            return
+        }
+        guard attemptsRemaining > 0 else { NSSound.beep(); return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
+            self?.pasteWhenFocused(app, attemptsRemaining: attemptsRemaining - 1)
         }
     }
 
