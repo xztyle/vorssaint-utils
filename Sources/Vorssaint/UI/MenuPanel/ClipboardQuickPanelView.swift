@@ -17,13 +17,18 @@ struct ClipboardQuickPanelView: View {
     @State private var renameDraft = ""
     @State private var previewIsEditing = false
     @State private var showsClearConfirmation = false
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var colorContrast
     private var text: ClipboardFeatureStrings { FeatureStrings.clipboard(l10n.language) }
     private var libraryText: ClipboardLibraryStrings { .init(language: l10n.language) }
 
     var body: some View {
         VStack(spacing: 0) {
-            toolbar
-            collections
+            VStack(spacing: 0) {
+                toolbar
+                collections
+            }
+            .background(HUDBackdrop())
             Divider()
             HStack(spacing: 0) {
                 timeline
@@ -35,10 +40,16 @@ struct ClipboardQuickPanelView: View {
                 }
             }
             Divider()
-            footer
+            footer.background(HUDBackdrop())
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.regularMaterial)
+        .background {
+            if reduceTransparency || colorContrast == .increased {
+                Color(nsColor: .windowBackgroundColor)
+            } else {
+                Rectangle().fill(.regularMaterial)
+            }
+        }
         .ignoresSafeArea()
         .onAppear { searchFocused = true }
         .onChange(of: searchFocused) { _, focused in

@@ -85,8 +85,15 @@ struct ClipboardHistoryCard: View {
             } else { unavailable }
         case .files:
             VStack(alignment: .leading, spacing: 10) {
-                if let path = entry.filePaths.first, FileManager.default.fileExists(atPath: path) {
-                    Image(nsImage: ClipboardImageStore.fileIcon(atPath: path)).resizable().scaledToFit().frame(height: compact ? 28 : 54)
+                if let path = entry.filePaths.first,
+                   ClipboardFileDragPayload.urls(paths: entry.filePaths) != nil {
+                    Image(nsImage: ClipboardImageStore.fileIcon(atPath: path))
+                        .resizable().scaledToFit().frame(width: compact ? 36 : 62, height: compact ? 36 : 62)
+                        .overlay {
+                            ClipboardFileDragSource(paths: entry.filePaths,
+                                onSelect: onSelect, onActivate: { history.copyQuickEntry(entry) })
+                        }
+                        .help(strings.dragFiles)
                 } else { unavailable }
                 Text(entry.fileNames.joined(separator: "\n")).font(.system(size: 13, weight: .medium)).lineLimit(compact ? 2 : 5)
                 if !compact { Text(entry.filePaths.first ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(2).truncationMode(.middle) }
@@ -151,10 +158,7 @@ struct ClipboardHistoryCard: View {
     }
 
     private func dragProvider() -> NSItemProvider {
-        let provider: NSItemProvider
-        if entry.kind == .files, let path = entry.filePaths.first {
-            provider = NSItemProvider(contentsOf: URL(fileURLWithPath: path)) ?? NSItemProvider()
-        } else { provider = NSItemProvider() }
+        let provider = NSItemProvider()
         provider.registerDataRepresentation(forTypeIdentifier: ClipboardCardPalette.dragType, visibility: .ownProcess) { completion in
             completion(Data(entry.id.uuidString.utf8), nil); return nil
         }
