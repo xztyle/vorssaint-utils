@@ -141,6 +141,18 @@ enum StorageInspectionTests {
         suite.expect(try String(contentsOf: retained, encoding: .utf8) == "do not overwrite", "fixture refusal preserves existing content")
         try CleanupFixturePolicy.marker(folder).write(to: folder.appendingPathComponent("fixture.prepared"))
         suite.expect(try !CleanupFixturePolicy.needsPreparation(folder), "verified fixture marker permits reuse without reseeding")
+        suite.expect(CleanupFixturePolicy.signedPreparedRoot(folder.path) == nil,
+                     "signed UI fixture stays under private temporary storage")
+        let signed = URL(fileURLWithPath: "/private/tmp", isDirectory: true)
+            .appendingPathComponent("aster-cleanup-signed-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: signed, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: signed) }
+        try CleanupFixturePolicy.marker(signed).write(to: signed.appendingPathComponent("fixture.prepared"))
+        suite.expect(CleanupFixturePolicy.signedPreparedRoot(signed.path)?.path == signed.path,
+                     "signed UI fixture accepts a prepared private temporary folder")
+        let alias = "/tmp/" + signed.lastPathComponent
+        suite.expect(CleanupFixturePolicy.signedPreparedRoot(alias)?.path == signed.path,
+                     "temporary-folder aliases resolve to the same prepared fixture")
     }
 
     private static func actualEngine(_ suite: TestSuite, root: URL) throws {

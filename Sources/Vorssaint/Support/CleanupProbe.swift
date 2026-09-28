@@ -17,14 +17,10 @@ enum CleanupProbe {
     }
 
     private static func signedBundleFixturePath() -> String? {
-        guard let path = Bundle.main.object(forInfoDictionaryKey: "AsterCleanupFixtureDirectory") as? String,
-              path.hasPrefix("/") else { return nil }
-        let url = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL.resolvingSymlinksInPath()
-        guard url.path.hasPrefix("/private/tmp/"),
-              (try? CleanupFixturePolicy.needsPreparation(url)) == false else {
+        guard let path = Bundle.main.object(forInfoDictionaryKey: "AsterCleanupFixtureDirectory") as? String else {
             return nil
         }
-        return url.path
+        return CleanupFixturePolicy.signedPreparedRoot(path)?.path
     }
 
     private static var window: NSWindow?
