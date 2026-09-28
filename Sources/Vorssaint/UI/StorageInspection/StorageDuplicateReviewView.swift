@@ -29,10 +29,13 @@ private struct StorageDuplicateGroupView: View {
             VStack(alignment: .leading) {
                 ForEach(group.files.prefix(shown)) { file in
                     HStack(alignment: .top) {
-                        StorageFileRow(file: file).disabled(group.keeperID == nil || group.keeperID == file.id)
+                        StorageFileRow(file: file, allowsSelection: group.keeperID != nil && group.keeperID != file.id)
                         Button { service.keep(file, group: group.id) } label: {
                             Label(StorageInspectionStrings.current[.keeper], systemImage: group.keeperID == file.id ? "checkmark.shield.fill" : "shield")
-                        }.disabled(service.busy)
+                        }
+                        .accessibilityLabel("\(text[.keeper]) · \(file.url.lastPathComponent)")
+                        .accessibilityHint(file.url.path)
+                        .disabled(service.busy)
                     }
                 }
                 if group.files.count > shown { Button(text[.more]) { shown += 50 } }

@@ -163,13 +163,14 @@ struct StorageInspectionView: View {
 struct StorageFileRow: View {
     let file: StorageFileSnapshot
     var onPreview: (() -> Void)?
+    var allowsSelection = true
     @ObservedObject private var service = StorageInspectionService.shared
     private var text: StorageInspectionStrings { .current }
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Toggle("", isOn: Binding(get: { service.selection.contains(file.id) }, set: { service.select(file, included: $0) }))
-                .labelsHidden().disabled(service.busy).accessibilityLabel(file.url.path)
+                .labelsHidden().disabled(service.busy || !allowsSelection).accessibilityLabel(file.url.path)
             VStack(alignment: .leading, spacing: 4) {
                 Text(file.url.lastPathComponent).font(.body.weight(.medium))
                 Text("\(text[.kind]): \(file.url.pathExtension.isEmpty ? text[.unknown] : file.url.pathExtension)").font(.caption2).foregroundStyle(.secondary)
