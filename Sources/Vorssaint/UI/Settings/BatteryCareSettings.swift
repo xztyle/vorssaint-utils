@@ -31,11 +31,7 @@ struct BatteryCareSettings: View {
             Label(text.reason(snapshot.reason), systemImage: "battery.75percent")
                 .font(.headline)
             if let sample = snapshot.sample {
-                HStack(spacing: 20) {
-                    Text(sample.percent.map { "\($0)%" } ?? "—").font(.largeTitle.monospacedDigit())
-                    Text(sample.temperature.map { String(format: "%.1f °C", locale: l10n.language.formattingLocale(), $0) } ?? "—")
-                    Text(sample.watts.map { String(format: "%+.1f W", locale: l10n.language.formattingLocale(), $0) } ?? "—")
-                }.accessibilityLabel(text[.actual])
+                measuredValues(sample)
                 HStack {
                     Image(systemName: sample.connected == true ? "powerplug.fill" : "battery.100percent")
                     Text(text[!sample.isFresh(at: Date()) ? .unavailable : sample.charging == true ? .charging : (sample.watts ?? 0) < -0.5 ? .discharge : .holding])
@@ -51,6 +47,30 @@ struct BatteryCareSettings: View {
             }
             Text(text[.persistentInfo]).font(.caption).foregroundStyle(.secondary)
         }
+    }
+
+    private func measuredValues(_ sample: BatterySample) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(text[.actual]).font(.caption).foregroundStyle(.secondary)
+            HStack(alignment: .top, spacing: 20) {
+                metric(l10n.s.batteryCharge, value: sample.percent.map { "\($0)%" } ?? "—", font: .largeTitle)
+                metric(l10n.s.monitorShowBatteryTemperature,
+                       value: sample.temperature.map {
+                           String(format: "%.1f °C", locale: l10n.language.formattingLocale(), $0)
+                       } ?? "—")
+                metric(l10n.s.powerSection, value: sample.watts.map {
+                    String(format: "%+.1f W", locale: l10n.language.formattingLocale(), $0)
+                } ?? "—")
+            }
+        }
+    }
+
+    private func metric(_ label: String, value: String, font: Font = .body) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).font(.caption).foregroundStyle(.secondary)
+            Text(value).font(font.monospacedDigit())
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private var policyCard: some View {
