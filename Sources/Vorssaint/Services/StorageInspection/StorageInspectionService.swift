@@ -105,7 +105,7 @@ final class StorageInspectionService: ObservableObject {
                     self.result.folders[path]?.files -= 1
                 }
             }
-            self.duplicates.groups.removeAll { $0.files.contains { moved.contains($0.id) } }
+            self.duplicates.groups = StorageInspectionPolicy.remainingGroups(self.duplicates.groups, moved: moved)
         }
     }
 

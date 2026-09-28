@@ -175,3 +175,13 @@ restored it to Applications instead. The restored generated marker matched its
 original SHA-256. The temporary app was then removed from Applications. This
 proves the reversible Trash path for a generated app, but Put Back for a normal
 visible app and the remaining user-app cleanup cases still need a live check.
+
+## Continuing a duplicate review after Trash
+
+When a group has three or more identical copies, moving one extra copy to Trash
+now keeps the remaining keeper and extra copies in the review. The group keeps
+its identity and keeper choice. It disappears only when one copy remains. If
+the keeper becomes unavailable, Aster clears that choice and requires a new
+explicit keeper before any further removal. Generated three-copy checks cover
+these cases; the focused storage suite passes 101 checks. The real three-copy
+UI flow still needs a live generated-file check.
