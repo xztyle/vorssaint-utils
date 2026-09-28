@@ -280,7 +280,10 @@ final class BatteryController {
                 if qualification != nil { _ = restoreHardware(disable: true) }
                 qualification = nil
                 BatteryPolicy.pauseOperation(&state)
-                if state.ownsHardware { enact(.init(command: .hold, reason: .sleeping)) }
+                let active = state.policy.enabled && !state.scheduledPause || state.operation != nil
+                if state.ownsHardware || active && canControl(discharge: false) {
+                    enact(.init(command: .hold, reason: .sleeping))
+                }
                 _ = save()
             } else { tick() }
         }
