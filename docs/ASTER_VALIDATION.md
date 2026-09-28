@@ -570,3 +570,25 @@ strict signature verification. Its executable SHA-256 is
 `69cae7edcbe80624e897f1a09794d35449fa45b73223a73d3be36ef8d98b09a8`.
 It has not replaced the installed app. The updated malware page still needs
 live UI verification with generated files.
+
+## Menu bar recovery retry guard — 2026-09-28
+
+The menu-bar branch `d56d262` closes a recovery gap: Retry no longer clears a
+pending original-layout recovery, and rules, reconciliation, manual moves and
+profile application cannot rearrange icons while recovery is needed. The
+original-layout restoration path remains available. The focused menu suite
+passed **409 checks**; its optimized bundle and packaged app selftest passed.
+A read-only inventory on this Mac succeeded with Accessibility granted, no
+competing manager and 11 items. It posted no menu-bar input.
+
+Detached integration `c0eed85` passed **80,709 checks** plus preference cleanup
+with zero failures. Its optimized signed bundle, packaged app and helper
+selftests passed. The metadata-free candidate at
+`/private/tmp/aster-integrated-menu-recovery-cz13Pn/Aster.app` passed deep,
+strict signature verification. Its executable SHA-256 is
+`149ec9543ca7fd7a684af0e92bdefcf543feb641c494c7245d88ce147e0801dc`.
+It has not replaced the installed app. The original menu-bar order is still
+different from the saved baseline; no real icon was moved or restored during
+this check. Live menu restoration and the screenshot swipe/drop checks remain
+open. The protected battery journal has not been independently read, so no
+production helper replacement or battery hardware write occurred.
