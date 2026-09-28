@@ -434,3 +434,23 @@ validation notes. A read-only probe on the owner's Mac found it unplugged at
 49%, 33.95°C and -5.20 W. It made no battery hardware writes. Live hold still
 requires attached power and the independent administrator read of the
 protected battery journal before service repair.
+
+## Opaque screenshot swipe gate — 2026-09-28
+
+The screen-capture branch `fdf4f36` keeps the bare screenshot card opaque as it
+follows a leftward pointer or two-finger swipe. A completed gesture eases the
+card beyond the left display edge before closing it. A short gesture returns
+it to place; pulling past the edge does not make it move rightward on release.
+The screenshot suite passed **834 checks**, and the branch release build and
+packaged selftest passed. The previous hover-only actions and native image drag
+remain in place.
+
+Detached integration `d6de547` includes this change and passed **80,691 checks**
+plus preference cleanup, with zero failures. Its optimized bundle and packaged
+selftest passed. The metadata-free signed candidate at
+`/private/tmp/aster-integrated-swipe-opaque-3OYbcA/Aster.app` passed deep,
+strict signature verification. Its executable SHA-256 is
+`5744d9e11cdc049c081568b2651d9c82fc38b04a1b35d4978edd0df39c9c302d`.
+It has not replaced the installed app. A separate signed generated-image swipe
+fixture is staged but not launched: the Mac was locked during this gate. The
+card's feel, hover controls and cross-app image drop still need live acceptance.
