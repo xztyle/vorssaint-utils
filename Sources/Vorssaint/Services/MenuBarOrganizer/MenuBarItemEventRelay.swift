@@ -12,6 +12,7 @@ final class MenuBarItemEventRelay {
     private var delivery: MenuBarEventDeliveryState?
     private var mouse: CGEvent?
     private var exitEvent: CGEvent?
+    private var press: MenuBarPressReleaseGuard?
     private var continuation: CheckedContinuation<Void, Error>?
     private var deadline: Task<Void, Never>?
     private let logger = Logger(subsystem: "io.github.xztyle.Aster", category: "MenuBarMove")
@@ -49,8 +50,9 @@ final class MenuBarItemEventRelay {
         taps = []
     }
 
-    func send(_ event: CGEvent) async throws {
+    func send(_ event: CGEvent, press: MenuBarPressReleaseGuard) async throws {
         try Task.checkCancellation()
+        guard press.isArmed else { throw MenuBarItemMoveError.verificationFailed }
         guard continuation == nil, taps.count == 2, let entry = CGEvent(source: nil),
               let exit = CGEvent(source: nil) else { throw MenuBarItemMoveError.eventCreationFailed }
         let tokens = (Int64.random(in: 1...Int64.max - 2))
@@ -59,7 +61,7 @@ final class MenuBarItemEventRelay {
         event.setIntegerValueField(.eventSourceUserData, value: tokens + 1)
         exit.setIntegerValueField(.eventSourceUserData, value: tokens + 2)
         delivery = MenuBarEventDeliveryState(entryToken: tokens, mouseToken: tokens + 1, exitToken: tokens + 2)
-        mouse = event; exitEvent = exit
+        mouse = event; exitEvent = exit; self.press = press
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 self.continuation = continuation
@@ -69,6 +71,7 @@ final class MenuBarItemEventRelay {
         } onCancel: {
             Task { @MainActor [weak self] in self?.finish(.failure(CancellationError())) }
         }
+        guard press.isArmed else { throw MenuBarItemMoveError.verificationFailed }
     }
 
     private func armDeadline() {
@@ -101,16 +104,27 @@ final class MenuBarItemEventRelay {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             fail("tap disabled"); return unchanged
         }
-        guard let mouse, continuation != nil else { return unchanged }
+        guard let mouse else { return unchanged }
+        let token = event.getIntegerValueField(.eventSourceUserData)
+        if token == delivery?.mouseToken, press?.isArmed == false {
+            fail("press released"); return nil
+        }
+        guard continuation != nil else { return unchanged }
         let matches = matchesWindow(event, expected: mouse)
-        switch delivery?.receive(token: event.getIntegerValueField(.eventSourceUserData), isSession: session, matchesWindow: matches) {
-        case .sendToSession: mouse.post(tap: .cgSessionEventTap); return nil
-        case .sendToTarget: mouse.postToPid(pid); return unchanged
+        switch delivery?.receive(token: token, isSession: session, matchesWindow: matches) {
+        case .sendToSession: postWhilePressed { mouse.post(tap: .cgSessionEventTap) }; return nil
+        case .sendToTarget: return postWhilePressed { mouse.postToPid(pid) } ? unchanged : nil
         case .sendExit: exitEvent?.postToPid(pid); return unchanged
         case .finish: finish(.success(())); return nil
         case .reject: fail("window changed"); return nil
         default: return unchanged
         }
+    }
+
+    @discardableResult
+    private func postWhilePressed(_ post: () -> Void) -> Bool {
+        guard press?.performIfArmed(post) == true else { fail("press released"); return false }
+        return true
     }
 
     private func matchesWindow(_ event: CGEvent, expected: CGEvent) -> Bool {

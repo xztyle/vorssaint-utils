@@ -49,9 +49,9 @@ final class MenuBarItemMover {
         defer { relay.close() }
         let release = try releaseGuard(up, pid: targetPID(item))
         defer { release.releaseIfArmed() }
-        try await relay.send(down)
+        try await relay.send(down, press: release)
         try await Task.sleep(for: .milliseconds(35))
-        try await relay.send(up)
+        try await relay.send(up, press: release)
         release.confirmRelease()
     }
 
@@ -118,20 +118,20 @@ final class MenuBarItemMover {
         let release = try releaseGuard(up, pid: targetPID)
         defer { release.releaseIfArmed() }
         CGWarpMouseCursorPosition(start)
-        try await relay.send(down)
+        try await relay.send(down, press: release)
         try await Task.sleep(for: .milliseconds(18))
-        try await postDragSteps(item: item, source: source, from: start, to: end, relay: relay)
-        try await relay.send(up)
+        try await postDragSteps(item: item, source: source, from: start, to: end, relay: relay, press: release)
+        try await relay.send(up, press: release)
         release.confirmRelease()
     }
 
     private func postDragSteps(item: ManagedMenuBarItem, source: CGEventSource, from start: CGPoint,
-                               to end: CGPoint, relay: MenuBarItemEventRelay) async throws {
+                               to end: CGPoint, relay: MenuBarItemEventRelay, press: MenuBarPressReleaseGuard) async throws {
         for step in 1...10 {
             let fraction = CGFloat(step) / 10
             let point = CGPoint(x: start.x + (end.x - start.x) * fraction,
                                 y: start.y + (end.y - start.y) * fraction)
-            try await relay.send(event(.leftMouseDragged, source: source, point: point, item: item, moving: true))
+            try await relay.send(event(.leftMouseDragged, source: source, point: point, item: item, moving: true), press: press)
             try await Task.sleep(for: .milliseconds(8))
         }
     }

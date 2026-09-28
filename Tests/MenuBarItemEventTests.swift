@@ -16,6 +16,7 @@ enum MenuBarItemEventTests {
         deliveryHandshake(suite)
         deliveryRejection(suite)
         releaseRecovery(suite)
+        releaseOrdering(suite)
     }
 
     static func routing(_ type: CGEventType, source: CGEventSource, suite: TestSuite) {
@@ -97,8 +98,33 @@ enum MenuBarItemEventTests {
         let interrupted = MenuBarPressReleaseGuard { releases += 1 }
         interrupted.releaseIfArmed(); interrupted.releaseIfArmed()
         suite.expect(releases == 1, "timeout and cancellation racing each other release the held button once")
+        var posted = 0
+        suite.expect(!interrupted.isArmed && !interrupted.performIfArmed { posted += 1 } && posted == 0,
+                     "a watchdog release prevents all later mouse delivery, even before a waiter resumes")
         let completed = MenuBarPressReleaseGuard { releases += 1 }
+        suite.expect(completed.performIfArmed { posted += 1 } && posted == 1, "a live press permits event delivery")
         completed.confirmRelease(); completed.releaseIfArmed()
-        suite.expect(releases == 1, "a confirmed normal release disarms the fallback")
+        suite.expect(releases == 1 && !completed.isArmed, "a confirmed normal release disarms the fallback")
+    }
+
+    static func releaseOrdering(_ suite: TestSuite) {
+        let started = DispatchSemaphore(value: 0)
+        let finished = DispatchSemaphore(value: 0)
+        var order: [String] = []
+        let guardItem = MenuBarPressReleaseGuard { order.append("release") }
+        guardItem.performIfArmed {
+            DispatchQueue.global().async {
+                started.signal()
+                guardItem.releaseIfArmed()
+                finished.signal()
+            }
+            _ = started.wait(timeout: .now() + 1)
+            suite.expect(finished.wait(timeout: .now()) == .timedOut,
+                         "the watchdog cannot release between the liveness check and a mouse post")
+            order.append("mouse")
+        }
+        suite.expect(finished.wait(timeout: .now() + 1) == .success && order == ["mouse", "release"],
+                     "an in-flight post completes before watchdog release; later posts are rejected")
+        suite.expect(!guardItem.performIfArmed { order.append("late drag") }, "a later drag cannot revive the released gesture")
     }
 }

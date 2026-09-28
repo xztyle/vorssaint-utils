@@ -11,6 +11,19 @@ final class MenuBarPressReleaseGuard: @unchecked Sendable {
 
     init(postRelease: @escaping () -> Void) { self.postRelease = postRelease }
 
+    var isArmed: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return armed
+    }
+
+    @discardableResult
+    func performIfArmed(_ action: () -> Void) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard armed else { return false }
+        action()
+        return true
+    }
+
     func schedule() {
         let work = DispatchWorkItem { [weak self] in self?.releaseIfArmed() }
         watchdog = work
