@@ -13,6 +13,9 @@ enum MenuBarItemEventTests {
         }
         click(source, suite)
         invalidTargets(source, suite)
+        deliveryHandshake(suite)
+        deliveryRejection(suite)
+        releaseRecovery(suite)
     }
 
     static func routing(_ type: CGEventType, source: CGEventSource, suite: TestSuite) {
@@ -54,5 +57,48 @@ enum MenuBarItemEventTests {
         }
         suite.expect(MenuBarItemEventFactory.make(.keyDown, source: source, point: .zero,
             windowID: 42, targetPID: 625, moving: true) == nil, "unexpected input types fail closed")
+    }
+
+    static func deliveryHandshake(_ suite: TestSuite) {
+        var state = MenuBarEventDeliveryState(entryToken: 1, mouseToken: 2, exitToken: 3)
+        suite.expect(state.receive(token: 99, isSession: false, matchesWindow: false) == .pass
+            && state.phase == .entry, "another application's input never starts a synthetic gesture")
+        suite.expect(state.receive(token: 1, isSession: true, matchesWindow: false) == .pass,
+                     "session input cannot impersonate a target-process entry")
+        suite.expect(state.receive(token: 1, isSession: false, matchesWindow: false) == .sendToSession,
+                     "the target acknowledges entry before the gesture enters the system stream")
+        suite.expect(state.receive(token: 2, isSession: false, matchesWindow: true) == .pass,
+                     "process-only delivery does not count as a completed move")
+        suite.expect(state.receive(token: 2, isSession: true, matchesWindow: true) == .sendToTarget,
+                     "the exact session event is relayed to its window host")
+        suite.expect(state.receive(token: 3, isSession: false, matchesWindow: false) == .pass,
+                     "an early exit cannot claim a gesture was delivered")
+        suite.expect(state.receive(token: 2, isSession: false, matchesWindow: true) == .sendExit,
+                     "host delivery queues a completion barrier behind the mouse event")
+        suite.expect(state.receive(token: 3, isSession: false, matchesWindow: false) == .finish
+            && state.phase == .complete, "only the host completion barrier finishes the delivery")
+        suite.expect(state.receive(token: 3, isSession: false, matchesWindow: false) == .pass,
+                     "duplicate acknowledgements cannot complete twice")
+    }
+
+    static func deliveryRejection(_ suite: TestSuite) {
+        for inSession in [false, true] {
+            var state = MenuBarEventDeliveryState(entryToken: 1, mouseToken: 2, exitToken: 3)
+            _ = state.receive(token: 1, isSession: false, matchesWindow: false)
+            suite.expect(state.receive(token: 2, isSession: inSession, matchesWindow: false) == .reject,
+                         "our event rebound to another window is dropped in either stream")
+            suite.expect(state.receive(token: 3, isSession: false, matchesWindow: true) == .pass
+                && state.phase == .failed, "a wrong-window failure cannot later report success")
+        }
+    }
+
+    static func releaseRecovery(_ suite: TestSuite) {
+        var releases = 0
+        let interrupted = MenuBarPressReleaseGuard { releases += 1 }
+        interrupted.releaseIfArmed(); interrupted.releaseIfArmed()
+        suite.expect(releases == 1, "timeout and cancellation racing each other release the held button once")
+        let completed = MenuBarPressReleaseGuard { releases += 1 }
+        completed.confirmRelease(); completed.releaseIfArmed()
+        suite.expect(releases == 1, "a confirmed normal release disarms the fallback")
     }
 }
