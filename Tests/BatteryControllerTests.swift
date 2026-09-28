@@ -9,6 +9,7 @@ enum BatteryControllerTests {
         journalFailure(suite)
         drift(suite)
         restart(suite)
+        sleepBeforeFirstTick(suite)
         qualification(suite)
         qualificationUnplug(suite)
         dischargeUnplug(suite)
@@ -91,6 +92,41 @@ enum BatteryControllerTests {
         store.failReads = true
         let corrupt = fixture(store, FakeBatteryTransport())
         suite.expect(corrupt.state.recoveryPending, "corrupt journal triggers recovery instead of lost ownership")
+    }
+
+    static func sleepBeforeFirstTick(_ suite: TestSuite) {
+        let store = MemoryBatteryStore()
+        store.state.policy.enabled = true
+        store.state.qualifiedFingerprint = "fixture"
+        store.state.chargeQualified = true
+        let transport = FakeBatteryTransport()
+        let controller = fixture(store, transport)
+        controller.probe()
+        controller.powerChange(sleep: true)
+        suite.expect(controller.snapshot.command == .hold && controller.state.ownsHardware,
+                     "sleep claims hold for an enabled limit before the first timer tick")
+        suite.expect(transport.values["CHTE"] == [1, 0, 0, 0] && store.state.ownsHardware,
+                     "sleep hold is verified and durably owned")
+        controller.powerChange(sleep: false)
+        suite.expect(controller.snapshot.command == .charge && transport.values["CHTE"] == [0, 0, 0, 0],
+                     "wake reevaluates the saved range and resumes charging below its lower bound")
+
+        let blockedStore = MemoryBatteryStore()
+        blockedStore.state = store.state
+        blockedStore.state.ownsHardware = false
+        let blockedTransport = FakeBatteryTransport()
+        let blocked = fixture(blockedStore, blockedTransport, competitors: { ["AlDente"] })
+        blocked.probe()
+        blocked.powerChange(sleep: true)
+        suite.expect(blockedTransport.writeCount == 0,
+                     "sleep cannot claim battery control while another battery app runs")
+
+        let inactiveTransport = FakeBatteryTransport()
+        let inactive = fixture(MemoryBatteryStore(), inactiveTransport)
+        inactive.probe()
+        inactive.powerChange(sleep: true)
+        suite.expect(inactiveTransport.writeCount == 0,
+                     "sleep leaves the battery alone when care is disabled")
     }
 
     static func qualification(_ suite: TestSuite) {

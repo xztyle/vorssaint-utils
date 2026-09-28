@@ -238,3 +238,14 @@ saved range. It does not prove the Mac's real battery power flow in hold.
 The latest read-only probe found the owner Mac unplugged at 49%, 33.95°C and
 -5.20 W. No SMC write occurred. Live hold and range tests require an attached
 adapter, a restored helper registration and the protected journal check.
+
+## Sleep before the first helper tick
+
+An enabled charge limit can be loaded after a helper restart before the first
+timer tick claims the hardware. The sleep callback now claims a verified hold
+in that gap, provided charge control was qualified and no competing battery app
+is running. Wake reevaluates the saved range. A disabled policy still makes no
+hardware write. Fake-transport checks cover each case; the focused battery
+suite passed 168 checks, and the optimized signed app build and packaged helper
+selftest passed. These checks do not establish live sleep or lid behavior on
+the owner Mac. The protected journal gate above remains in force.
