@@ -16,3 +16,9 @@ def generate_menu_bar_sources(write, declaration):
           + "extension MenuBarPointerRecoveryTests {\nfinal class Host: Fixture {\n"
           + declaration(mover, "    private func dragWithCursor(").replace("    private func", "    func", 1)
           + "}\n}\n")
+    relay = "Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarItemEventRelay.swift"
+    write("MenuBarTapLifecycle.swift", "import AppKit\n"
+          + "extension MenuBarTapLifecycleTests {\nfinal class Host: Fixture {\n"
+          + "".join(declaration(relay, prefix).replace("    private func", "    func", 1)
+                    for prefix in ["    func start()", "    private func install(", "    func close()"])
+          + "}\n}\n")

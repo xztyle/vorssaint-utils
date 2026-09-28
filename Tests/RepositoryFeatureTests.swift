@@ -1040,27 +1040,8 @@ enum RepositoryFeatureTests {
                + "found a bare yield in \(bareActivationYields.sorted()) "
                + "across \(repository.swiftPaths.count) scanned files")
 
-        // Dropping the last Swift reference does not deregister an event tap;
-        // every literal tap creation needs a matching invalidation or removal.
-        var tapOwnersWithoutInvalidate: [String] = []
-        var tapOwners = 0
-        for path in appSources {
-            let code = repository.lines(at: path)
-                .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
-                .joined(separator: "\n")
-            let taps = code.components(separatedBy: "CGEvent.tapCreate").count - 1
-            guard taps > 0 else { continue }
-            tapOwners += 1
-            let invalidations = code.components(separatedBy: "CFMachPortInvalidate").count - 1
-                + (code.components(separatedBy: "PointerTapRunLoop.remove(").count - 1)
-            if invalidations < taps {
-                let file = String(path.dropFirst(appPrefix.count))
-                tapOwnersWithoutInvalidate.append("\(file) (\(taps) taps, \(invalidations) invalidated)")
-            }
-        }
-        suite.expect(tapOwners > 0 && tapOwnersWithoutInvalidate.isEmpty,
-               "every event tap owner invalidates its port on teardown, across "
-               + "\(tapOwners) scanned owners: \(tapOwnersWithoutInvalidate)")
+        RepositoryTapTeardownTests.run(suite, sources: Dictionary(uniqueKeysWithValues:
+            appSources.map { ($0, repository.source(at: $0)) }))
 
         // MARK: Localization source contracts
 
