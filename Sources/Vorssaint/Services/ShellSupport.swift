@@ -136,7 +136,7 @@ enum Sudoers {
     /// Serializes native writes and read/reapply probes. Authorization runs
     /// separately with probes suspended, so a probe cannot resurrect a stale
     /// "1" after a restore cleared it and leave lid sleep off without a marker.
-    private static let sleepStateQueue = DispatchQueue(label: "com.vorssaint.utils.pmset-state")
+    private static let sleepStateQueue = DispatchQueue(label: "io.github.xztyle.Aster.pmset-state")
     // Authorization runs outside this queue so quitting never waits for a
     // password prompt. Probes must not reapply a stale state during that off.
     private static var sleepStateProbeSuspensions = 0

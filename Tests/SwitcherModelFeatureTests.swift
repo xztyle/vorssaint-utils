@@ -12,8 +12,141 @@ import ImageIO
 import VMStatisticsCompat
 
 enum SwitcherModelFeatureTests {
+    private static func scrollNavigationChecks(_ suite: TestSuite) {
+        func event(_ vertical: Int32, horizontal: Int32 = 0, continuous: Bool = false,
+                   phase: CGScrollPhase? = nil, momentum: Int64 = 0, scrollCount: Int64 = 0,
+                   timestamp: CGEventTimestamp = 1_000_000_000) -> CGEvent {
+            let event = CGEvent(scrollWheelEvent2Source: nil, units: continuous ? .pixel : .line,
+                                wheelCount: 2, wheel1: vertical, wheel2: horizontal, wheel3: 0)!
+            event.setIntegerValueField(.scrollWheelEventIsContinuous, value: continuous ? 1 : 0)
+            event.setIntegerValueField(.scrollWheelEventScrollPhase, value: Int64(phase?.rawValue ?? 0))
+            event.setIntegerValueField(.scrollWheelEventMomentumPhase, value: momentum)
+            event.setIntegerValueField(.scrollWheelEventScrollCount, value: scrollCount)
+            event.timestamp = timestamp
+            return event
+        }
+        var navigation = SwitcherScrollNavigation()
+        suite.expect(navigation.selectionDelta(for: event(-3)) == 1,
+                     "a wheel sample selects the next app regardless of acceleration")
+        suite.expect(navigation.selectionDelta(for: event(3)) == -1,
+                     "reverse scrolling selects the previous app")
+        suite.expect(navigation.selectionDelta(for: event(0)) == 0,
+                     "zero scrolling preserves the selection")
+        suite.expect(navigation.selectionDelta(for: event(1, horizontal: -3)) == 1,
+                     "horizontal scrolling uses the dominant axis")
+        let step = Int32(SwitcherScrollNavigation.gestureStep)
+        suite.expect(navigation.selectionDelta(for: event(-step / 2, continuous: true, phase: .began)) == 0,
+                     "a gesture below the threshold preserves the selection")
+        suite.expect(navigation.selectionDelta(for: event(-step / 2, continuous: true, phase: .changed)) == 1,
+                     "continuous scrolling accumulates to one step")
+        suite.expect(navigation.selectionDelta(for: event(-10 * step, continuous: true, momentum: 1)) == 0,
+                     "trackpad momentum does not change the selection")
+        suite.expect(navigation.selectionDelta(for: event(0, horizontal: step, continuous: true, phase: .began)) == -1,
+                     "a horizontal trackpad gesture changes the selection")
+        _ = navigation.selectionDelta(for: event(-step / 2, continuous: true, phase: .began))
+        suite.expect(navigation.selectionDelta(for: event(step / 2, continuous: true, phase: .changed)) == 0
+                     && navigation.selectionDelta(for: event(step / 2, continuous: true, phase: .changed)) == -1,
+                     "reversing direction resets accumulated movement")
+        _ = navigation.selectionDelta(for: event(-step / 2, continuous: true, phase: .began))
+        suite.expect(navigation.selectionDelta(for: event(-step / 2, continuous: true, phase: .began)) == 0,
+                     "a new gesture does not inherit the previous remainder")
+        for phase in [CGScrollPhase.ended, .cancelled] {
+            for terminalDelta in [Int32(0), -step] {
+                navigation = SwitcherScrollNavigation()
+                _ = navigation.selectionDelta(for: event(-step / 2, continuous: true, phase: .began))
+                suite.expect(navigation.selectionDelta(for: event(terminalDelta, continuous: true, phase: phase)) == 0,
+                             "terminal Core Graphics phase \(phase) with delta \(terminalDelta) preserves selection")
+                suite.expect(navigation.selectionDelta(for: event(-step / 2, continuous: true, phase: .changed)) == 0,
+                             "terminal Core Graphics phase \(phase) clears the previous remainder")
+                suite.expect(navigation.selectionDelta(for: event(-step / 2, continuous: true, phase: .changed)) == 1,
+                             "scrolling after Core Graphics phase \(phase) accumulates from zero")
+            }
+        }
+        _ = navigation.selectionDelta(for: event(-step / 2, continuous: true, phase: .began))
+        suite.expect(navigation.selectionDelta(for: event(-step / 2, continuous: true, phase: .changed,
+                                                        timestamp: 2_000_000_000)) == 0,
+                     "a pause resets the trackpad remainder")
+        suite.expect(navigation.selectionDelta(for: event(-10 * step, continuous: true, phase: .changed)) == 1,
+                     "a large trackpad sample does not skip multiple apps")
+        let synthetic = event(-10 * step, continuous: true)
+        synthetic.setIntegerValueField(.eventSourceUserData, value: ScrollWheelSupport.syntheticTag)
+        suite.expect(navigation.selectionDelta(for: synthetic) == 0,
+                     "a remaining smooth-scroll frame does not change the selection")
+
+        func wheel(line: Int64 = 0, fixed: Double, point: Int64 = 0, continuous: Bool = false,
+                   horizontal: Bool = false, timestamp: CGEventTimestamp = 1_000_000_000) -> CGEvent {
+            let sample = event(0, continuous: continuous, timestamp: timestamp)
+            sample.setIntegerValueField(horizontal ? .scrollWheelEventDeltaAxis2 : .scrollWheelEventDeltaAxis1,
+                                        value: line)
+            sample.setDoubleValueField(horizontal ? .scrollWheelEventFixedPtDeltaAxis2 : .scrollWheelEventFixedPtDeltaAxis1,
+                                       value: fixed)
+            sample.setIntegerValueField(horizontal ? .scrollWheelEventPointDeltaAxis2 : .scrollWheelEventPointDeltaAxis1,
+                                        value: point)
+            return sample
+        }
+        for continuous in [false, true] {
+            for horizontal in [false, true] {
+                for inverted in [false, true] {
+                    navigation = SwitcherScrollNavigation()
+                    let fractions = [-0.25, -0.5, -0.5, -0.75]
+                    let expected = [0, 0, inverted ? -1 : 1, inverted ? -1 : 1]
+                    for index in fractions.indices {
+                        let sample = wheel(fixed: fractions[index], continuous: continuous, horizontal: horizontal,
+                                           timestamp: 1_000_000_000 + UInt64(index) * 500_000_000)
+                        ScrollWheelSupport.applyDirection(to: sample, isContinuous: continuous,
+                            invertVertical: inverted, invertHorizontal: inverted, horizontalModifier: nil)
+                        suite.expect(navigation.selectionDelta(for: sample) == expected[index],
+                            "fractional wheel movement retains its remainder across pauses and inversion: continuous=\(continuous), horizontal=\(horizontal), inverted=\(inverted), sample=\(index)")
+                    }
+                }
+                navigation = SwitcherScrollNavigation()
+                suite.expect(navigation.selectionDelta(for: wheel(line: -1, fixed: 0, continuous: continuous,
+                                                                  horizontal: horizontal)) == 1,
+                             "a whole-line wheel notch advances once in either representation")
+                navigation = SwitcherScrollNavigation()
+                _ = navigation.selectionDelta(for: wheel(fixed: -0.75, continuous: continuous, horizontal: horizontal))
+                suite.expect(navigation.selectionDelta(for: wheel(fixed: 0.5, continuous: continuous, horizontal: horizontal)) == 0
+                    && navigation.selectionDelta(for: wheel(fixed: 0.5, continuous: continuous, horizontal: horizontal)) == -1,
+                    "reversing a fractional wheel resets the previous direction's remainder")
+            }
+        }
+        navigation = SwitcherScrollNavigation()
+        suite.expect(navigation.selectionDelta(for: wheel(fixed: 0, point: -5, continuous: true)) == 0
+            && navigation.selectionDelta(for: wheel(fixed: 0, point: -5, continuous: true,
+                                                    timestamp: 2_000_000_000)) == 1,
+            "a slow point-only continuous wheel notch advances once without the trackpad threshold")
+        navigation = SwitcherScrollNavigation()
+        _ = navigation.selectionDelta(for: wheel(fixed: -0.75))
+        suite.expect(navigation.selectionDelta(for: event(-step / 2, continuous: true, phase: .began)) == 0
+            && navigation.selectionDelta(for: wheel(fixed: -0.25)) == 0,
+            "switching between wheel lines and trackpad points clears the other device's remainder")
+        navigation = SwitcherScrollNavigation()
+        _ = navigation.selectionDelta(for: event(-step / 2, continuous: true, phase: .began, scrollCount: 1))
+        _ = navigation.selectionDelta(for: event(0, continuous: true, phase: .ended, scrollCount: 1))
+        suite.expect(navigation.selectionDelta(for: event(-step / 2, continuous: true, scrollCount: 1)) == 0,
+                     "a phaseless trackpad transition is not treated as a mouse notch")
+
+        func code(_ path: String) -> String {
+            ((try? String(contentsOfFile: path, encoding: .utf8)) ?? "")
+                .components(separatedBy: "\n")
+                .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+                .joined(separator: "\n")
+        }
+        let switcher = code("Sources/Vorssaint/Services/Switcher/AppSwitcher.swift")
+        suite.expect(switcher.contains("CGEventType.scrollWheel.rawValue") && switcher.contains("case .scrollWheel:"),
+                     "the switcher subscribes to and handles scroll-wheel events")
+        for path in ["Sources/Vorssaint/Services/SmoothScrollService.swift",
+                     "Sources/Vorssaint/Services/MouseButtons/MouseButtonShortcutService.swift"] {
+            suite.expect(code(path).contains("AppSwitcher.shared.scrollNavigationActive"),
+                         "\(path) yields scrolling to the open switcher")
+        }
+        suite.expect(!code("Sources/Vorssaint/Services/ScrollInverter.swift").contains("AppSwitcher.shared.scrollNavigationActive"),
+                     "scroll direction still transforms wheel events before they reach the open switcher")
+    }
+
     static func run(_ suite: TestSuite) {
         ScrollingTitleMotionTests.run(suite)
+        scrollNavigationChecks(suite)
         func expectEqual(_ actual: String, _ expected: String, _ label: String,
                          file: StaticString = #filePath, line: UInt = #line) {
             suite.expect(actual == expected, "\(label): got \(actual), expected \(expected)",
@@ -1906,13 +2039,13 @@ enum SwitcherModelFeatureTests {
                "an app the person switched to while the panel was open keeps activation")
         suite.expect(!StatusItemAnchorSupport.shouldReturnActivation(to: 501, ownPID: 900, frontmostPID: 900,
                                                                      ownWindowIsKey: true, closeReason: .escape),
-               "a Vorssaint window that took focus from the panel keeps Vorssaint active")
+               "a Aster window that took focus from the panel keeps Aster active")
         suite.expect(!StatusItemAnchorSupport.shouldReturnActivation(to: nil, ownPID: 900, frontmostPID: 900,
                                                                      ownWindowIsKey: false, closeReason: .escape),
-               "a panel opened while Vorssaint was already in front has nothing to hand back")
+               "a panel opened while Aster was already in front has nothing to hand back")
         suite.expect(!StatusItemAnchorSupport.shouldReturnActivation(to: 900, ownPID: 900, frontmostPID: 900,
                                                                      ownWindowIsKey: false, closeReason: .escape),
-               "Vorssaint never hands activation back to itself")
+               "Aster never hands activation back to itself")
         suite.expect(!StatusItemAnchorSupport.shouldReturnActivation(to: 501, ownPID: 900, frontmostPID: nil,
                                                                      ownWindowIsKey: false, closeReason: .escape),
                "no known frontmost app means nothing is taken from anyone")
@@ -1926,7 +2059,7 @@ enum SwitcherModelFeatureTests {
         }
         suite.expect(!StatusItemAnchorSupport.shouldReturnActivation(to: 501, ownPID: 900, frontmostPID: 900,
                                                                      ownWindowIsKey: false, closeReason: nil),
-               "a close Vorssaint did not ask for leaves activation alone")
+               "a close Aster did not ask for leaves activation alone")
 
         let showing: Set<UInt64> = [3, 7]
         suite.expect(StatusItemAnchorSupport.handbackWouldSwitchDesktop(windowSpaces: [[1], [2]],
@@ -1954,7 +2087,7 @@ enum SwitcherModelFeatureTests {
                "another app becoming active while the panel is open replaces the remembered app")
         suite.expect(StatusItemAnchorSupport.panelActivationSource(after: .appActivated(900), current: 501,
                                                                    isOwnApp: ownApp) == 501,
-               "Vorssaint taking activation back from the panel keeps the remembered app")
+               "Aster taking activation back from the panel keeps the remembered app")
         suite.expect(StatusItemAnchorSupport.panelActivationSource(after: .appActivated(777), current: nil,
                                                                    isOwnApp: ownApp) == 777,
                "an app activated after the remembered one was dropped becomes the one to return to")
@@ -2218,14 +2351,14 @@ enum SwitcherModelFeatureTests {
             statusDefaults.removePersistentDomain(forName: statusPlacementSuite)
             suite.expect(StatusItemPlacementSupport.placementGeneration(in: statusDefaults) == 0,
                    "initial placement generation is 0")
-            suite.expect(StatusItemPlacementSupport.mainAutosaveName(in: statusDefaults) == "VorssaintMenuBarItem",
+            suite.expect(StatusItemPlacementSupport.mainAutosaveName(in: statusDefaults) == "AsterMenuBarItem",
                    "generation 0 uses base autosave name")
 
             // The coordinate macOS saves for the icon is what puts it back in
             // the same spot on the next launch. 3.3.3 deleted the one written
             // by the older recovery on every launch, which moved the icon to
             // where a first-time item goes and, on a full bar, out of sight.
-            let legacyKey = "NSStatusItem Preferred Position VorssaintMenuBarItem"
+            let legacyKey = "NSStatusItem Preferred Position AsterMenuBarItem"
             statusDefaults.set(64.0, forKey: legacyKey)
             StatusItemPlacementSupport.clearRememberedVisibility(in: statusDefaults)
             suite.expect(statusDefaults.double(forKey: legacyKey) == 64.0,
@@ -2238,29 +2371,29 @@ enum SwitcherModelFeatureTests {
 
             StatusItemPlacementSupport.bumpPlacementGeneration(in: statusDefaults)
             let gen1Name = StatusItemPlacementSupport.mainAutosaveName(in: statusDefaults)
-            suite.expect(gen1Name == "VorssaintMenuBarItem.1",
+            suite.expect(gen1Name == "AsterMenuBarItem.1",
                    "bumped generation produces numbered autosave name")
-            suite.expect(statusDefaults.object(forKey: "NSStatusItem Preferred Position VorssaintMenuBarItem.1") == nil,
+            suite.expect(statusDefaults.object(forKey: "NSStatusItem Preferred Position AsterMenuBarItem.1") == nil,
                    "a reset lets macOS place the full item without a machine-specific position")
-            suite.expect(statusDefaults.object(forKey: "NSStatusItem Preferred Position VorssaintMenuBarItem") == nil,
+            suite.expect(statusDefaults.object(forKey: "NSStatusItem Preferred Position AsterMenuBarItem") == nil,
                    "bumping drops the previous identity's preferred position")
 
             // Recovery keeps the spot the person arranged and only drops the
             // hidden state macOS remembered: an item that starts over with no
             // saved position is born against the notch, the first place a
             // crowded bar hides.
-            let gen1Position = "NSStatusItem Preferred Position VorssaintMenuBarItem.1"
+            let gen1Position = "NSStatusItem Preferred Position AsterMenuBarItem.1"
             statusDefaults.set(280.0, forKey: gen1Position)
-            statusDefaults.set(false, forKey: "NSStatusItem Visible VorssaintMenuBarItem.1")
-            statusDefaults.set(false, forKey: "NSStatusItem VisibleCC VorssaintMenuBarItem.1")
+            statusDefaults.set(false, forKey: "NSStatusItem Visible AsterMenuBarItem.1")
+            statusDefaults.set(false, forKey: "NSStatusItem VisibleCC AsterMenuBarItem.1")
             StatusItemPlacementSupport.clearRememberedVisibility(in: statusDefaults)
             suite.expect(statusDefaults.double(forKey: gen1Position) == 280.0,
                    "clearing the remembered visibility keeps the arranged position")
             suite.expect(StatusItemPlacementSupport.placementGeneration(in: statusDefaults) == 1
                     && StatusItemPlacementSupport.mainAutosaveName(in: statusDefaults) == gen1Name,
                    "recovery leaves the item's identity alone, so reopening cannot churn it")
-            suite.expect(statusDefaults.object(forKey: "NSStatusItem Visible VorssaintMenuBarItem.1") == nil
-                    && statusDefaults.object(forKey: "NSStatusItem VisibleCC VorssaintMenuBarItem.1") == nil,
+            suite.expect(statusDefaults.object(forKey: "NSStatusItem Visible AsterMenuBarItem.1") == nil
+                    && statusDefaults.object(forKey: "NSStatusItem VisibleCC AsterMenuBarItem.1") == nil,
                    "clearing the remembered visibility drops both spellings macOS has used")
 
             // Giving the spot up is what an explicit recovery escalates to,
@@ -2270,28 +2403,28 @@ enum SwitcherModelFeatureTests {
                    "only the identity reset gives up a saved position")
             // Leave orphan keys for older generations the way a long-running
             // install accumulates them, then confirm a bump sweeps them.
-            statusDefaults.set(11.0, forKey: "NSStatusItem Preferred Position VorssaintMenuBarItem")
-            statusDefaults.set(false, forKey: "NSStatusItem Visible VorssaintMenuBarItem")
-            statusDefaults.set(false, forKey: "NSStatusItem VisibleCC VorssaintMenuBarItem.1")
-            let metricPosition = "NSStatusItem Preferred Position VorssaintMetric.cpu"
+            statusDefaults.set(11.0, forKey: "NSStatusItem Preferred Position AsterMenuBarItem")
+            statusDefaults.set(false, forKey: "NSStatusItem Visible AsterMenuBarItem")
+            statusDefaults.set(false, forKey: "NSStatusItem VisibleCC AsterMenuBarItem.1")
+            let metricPosition = "NSStatusItem Preferred Position AsterMetric.cpu"
             statusDefaults.set(42.0, forKey: metricPosition)
             StatusItemPlacementSupport.bumpPlacementGeneration(in: statusDefaults)
             suite.expect(statusDefaults.object(forKey: gen1Position) == nil
-                    && statusDefaults.object(forKey: "NSStatusItem Preferred Position VorssaintMenuBarItem") == nil
-                    && statusDefaults.object(forKey: "NSStatusItem Visible VorssaintMenuBarItem") == nil
-                    && statusDefaults.object(forKey: "NSStatusItem VisibleCC VorssaintMenuBarItem.1") == nil
+                    && statusDefaults.object(forKey: "NSStatusItem Preferred Position AsterMenuBarItem") == nil
+                    && statusDefaults.object(forKey: "NSStatusItem Visible AsterMenuBarItem") == nil
+                    && statusDefaults.object(forKey: "NSStatusItem VisibleCC AsterMenuBarItem.1") == nil
                     && StatusItemPlacementSupport.mainAutosaveName(in: statusDefaults)
-                        == "VorssaintMenuBarItem.2"
-                    && statusDefaults.object(forKey: "NSStatusItem Preferred Position VorssaintMenuBarItem.2") == nil,
+                        == "AsterMenuBarItem.2"
+                    && statusDefaults.object(forKey: "NSStatusItem Preferred Position AsterMenuBarItem.2") == nil,
                    "the identity reset gives the saved position up and sweeps orphaned identities")
             suite.expect(statusDefaults.double(forKey: metricPosition) == 42.0,
                    "recovering the main item leaves metric-item positions alone")
             statusDefaults.set(StatusItemPlacementSupport.maxPlacementGeneration,
                                forKey: DefaultsKey.statusItemPlacementGeneration)
-            statusDefaults.set(false, forKey: "NSStatusItem Visible VorssaintMenuBarItem.9999")
+            statusDefaults.set(false, forKey: "NSStatusItem Visible AsterMenuBarItem.9999")
             StatusItemPlacementSupport.bumpPlacementGeneration(in: statusDefaults)
-            suite.expect(StatusItemPlacementSupport.mainAutosaveName(in: statusDefaults) == "VorssaintMenuBarItem.1"
-                    && statusDefaults.object(forKey: "NSStatusItem Visible VorssaintMenuBarItem.9999") == nil
+            suite.expect(StatusItemPlacementSupport.mainAutosaveName(in: statusDefaults) == "AsterMenuBarItem.1"
+                    && statusDefaults.object(forKey: "NSStatusItem Visible AsterMenuBarItem.9999") == nil
                     && statusDefaults.double(forKey: metricPosition) == 42.0,
                    "generation wrap clears old main-item state without touching metric placements")
             suite.expect(StatusItemAnchorSupport.isSettlingStatusFrame(CGRect(x: 0, y: 0, width: 36, height: 0)),
@@ -2371,13 +2504,13 @@ enum SwitcherModelFeatureTests {
             return [["bundle": ["_0": bundleID]], entry]
         }
         let trackedApplications: [Any] = tracked("com.lowtechguys.Clop", allowed: true)
-            + tracked("com.vorssaint.utils", allowed: false)
-            + tracked("com.vorssaint.utils.dev", allowed: true)
+            + tracked("io.github.xztyle.Aster", allowed: false)
+            + tracked("io.github.xztyle.Aster.dev", allowed: true)
             + tracked("com.example.legacy", allowed: nil)
-        suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "com.vorssaint.utils",
+        suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "io.github.xztyle.Aster",
                                                        trackedApplications: trackedApplications) == .disallowed,
                "an app switched off under Allow in the Menu Bar reads as disallowed")
-        suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "com.vorssaint.utils.dev",
+        suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "io.github.xztyle.Aster.dev",
                                                        trackedApplications: trackedApplications) == .allowed,
                "a sibling bundle id with its own entry does not bleed over")
         suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "com.example.legacy",
@@ -2386,7 +2519,7 @@ enum SwitcherModelFeatureTests {
         suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "com.example.absent",
                                                        trackedApplications: trackedApplications) == .unknown,
                "an app Control Center has never tracked is unknown")
-        suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "com.vorssaint.utils",
+        suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "io.github.xztyle.Aster",
                                                        trackedApplications: ["garbage", 3]) == .unknown,
                "a malformed store is unknown rather than a crash or a verdict")
         // The on-disk shape: an outer plist whose trackedApplications value is
@@ -2399,10 +2532,10 @@ enum SwitcherModelFeatureTests {
                                                 format: .binary, options: 0)
         }
         suite.expect(outerData.map {
-                MenuBarAllowanceSupport.allowance(forBundleID: "com.vorssaint.utils", groupContainerPlist: $0)
+                MenuBarAllowanceSupport.allowance(forBundleID: "io.github.xztyle.Aster", groupContainerPlist: $0)
             } == .disallowed,
                "the nested Control Center store decodes down to the per-app verdict")
-        suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "com.vorssaint.utils",
+        suite.expect(MenuBarAllowanceSupport.allowance(forBundleID: "io.github.xztyle.Aster",
                                                        groupContainerPlist: Data([0x00, 0x01])) == .unknown,
                "an unreadable store is unknown")
         let verifyIconCode = stripCommentLines((statusAnchorAppDelegateSource
@@ -3554,8 +3687,8 @@ enum SwitcherModelFeatureTests {
                "a click after hiding lets the Dock bring the app back")
         suite.expect(DockClickSupport.repeatDecision(lastAction: .hide, elapsed: 0.1) == .swallow,
                "an accidental double-click never hides and immediately reopens the app")
-        suite.expect(DockClickSupport.isOwnBundleIdentifier("com.vorssaint.utils")
-                && DockClickSupport.isOwnBundleIdentifier("com.vorssaint.utils.dev")
+        suite.expect(DockClickSupport.isOwnBundleIdentifier("io.github.xztyle.Aster")
+                && DockClickSupport.isOwnBundleIdentifier("io.github.xztyle.Aster.dev")
                 && !DockClickSupport.isOwnBundleIdentifier("com.example.editor")
                 && !DockClickSupport.isOwnBundleIdentifier(nil),
                "Dock clicks never target either build of this app")
@@ -5659,7 +5792,7 @@ enum SwitcherModelFeatureTests {
                "App Switcher leaves unrelated middle-mouse-up events alone")
         let searchRecords = [
             SwitcherSearchRecord(id: "alpha", title: "Inbox", appName: "Alpha"),
-            SwitcherSearchRecord(id: "beta", title: "Vorssaint Roadmap", appName: "Beta"),
+            SwitcherSearchRecord(id: "beta", title: "Aster Roadmap", appName: "Beta"),
             SwitcherSearchRecord(id: "gamma", title: "Café notes", appName: "Gamma"),
         ]
         suite.expect(SwitcherSupport.filteredSearchIDs(records: searchRecords, query: "") == ["alpha", "beta", "gamma"],

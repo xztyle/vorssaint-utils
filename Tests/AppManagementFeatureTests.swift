@@ -405,7 +405,7 @@ enum AppManagementFeatureTests {
         suite.expect(CleanerSupport.isProtectedBundleID("com.apple.Music")
                && CleanerSupport.isProtectedBundleID("com.apple")
                && CleanerSupport.isProtectedBundleID("group.com.apple.notes")
-               && CleanerSupport.isProtectedBundleID("com.vorssaint.utils"),
+               && CleanerSupport.isProtectedBundleID("io.github.xztyle.Aster"),
                "system domains and this app can never be junk owners")
         suite.expect(!CleanerSupport.isProtectedBundleID("com.vendor.editor"),
                "third party identifiers are eligible for the leftover check")
@@ -418,7 +418,7 @@ enum AppManagementFeatureTests {
                && UninstallerSupport.verifiedBundleID("") == nil
                && UninstallerSupport.verifiedBundleID("plain-name") == nil
                && UninstallerSupport.verifiedBundleID("com.vendor../escape") == nil
-               && UninstallerSupport.verifiedBundleID("com.vorssaint.utils") == nil
+               && UninstallerSupport.verifiedBundleID("io.github.xztyle.Aster") == nil
                && UninstallerSupport.verifiedBundleID("com.apple.system") == nil,
                "malformed, protected and current app identifiers never enter uninstall paths")
         let uninstallAppURL = URL(fileURLWithPath: "/Applications/Editor.app")
@@ -1083,7 +1083,7 @@ enum AppManagementFeatureTests {
             exceptions: ["com.example.unrelated"]
         ), "AutoQuit does not protect a generated guest app without its host exception")
         let outerApp = FileManager.default.temporaryDirectory
-            .appendingPathComponent("VorssaintAutoQuitTests-\(UUID().uuidString)")
+            .appendingPathComponent("AsterAutoQuitTests-\(UUID().uuidString)")
             .appendingPathComponent("Container.app")
         let nestedApp = outerApp.appendingPathComponent("Contents/MacOS/WindowHost.app")
         try? FileManager.default.createDirectory(at: nestedApp.appendingPathComponent("Contents"),

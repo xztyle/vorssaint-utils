@@ -469,7 +469,7 @@ enum MenuPanelRecoveryTests {
         do {
             let host = setup(); NSApp.currentEvent = event(age: 1); close(host)
             expect(!host.popover.isShown && host.handbackReasons == [nil],
-                   "a close Vorssaint did not ask for carries no reason to hand activation back")
+                   "a close Aster did not ask for carries no reason to hand activation back")
         }
         do {
             let host = setup()

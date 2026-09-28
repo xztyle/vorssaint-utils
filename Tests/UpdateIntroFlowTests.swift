@@ -8,6 +8,7 @@ import AppKit
 enum UpdateIntroFlowTests {
     enum AppInfo {
         static var version = "3.4.0"
+        static var showsPublisherIntroductions = true
         static var isBeta: Bool { version.contains("beta") }
     }
     enum UserDefaults { static var standard: Foundation.UserDefaults! }
@@ -67,6 +68,7 @@ enum UpdateIntroFlowTests {
         func reset(_ version: String) -> Host {
             UserDefaults.standard.removePersistentDomain(forName: domain)
             AppInfo.version = version
+            AppInfo.showsPublisherIntroductions = true
             DispatchQueue.main = DispatchQueue.Queue()
             return Host()
         }
@@ -153,5 +155,10 @@ enum UpdateIntroFlowTests {
         quittingReview.isTerminating = true
         close(quittingReview.updateHighlightsWindow, in: quittingReview)
         suite.expect(quittingReview.shown == ["tour"], "quitting during review never opens another window")
+        let fork = reset("3.4.0")
+        AppInfo.showsPublisherIntroductions = false
+        suite.expect(!fork.showSupportUpdateIntroIfNeeded() && fork.shown.isEmpty,
+                     "a personal fork does not show the upstream publisher invitation")
+        AppInfo.showsPublisherIntroductions = true
     }
 }

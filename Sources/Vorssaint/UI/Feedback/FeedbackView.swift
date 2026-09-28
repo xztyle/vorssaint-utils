@@ -32,7 +32,15 @@ struct FeedbackView: View {
         VStack(spacing: 0) {
             header
             Divider()
-            if wasSent {
+            if !AppInfo.supportsHostedFeedback {
+                VStack(spacing: 16) {
+                    Text(AppInfo.copyright)
+                        .foregroundStyle(.secondary)
+                    Link(l10n.s.viewOnGitHub,
+                         destination: AppInfo.repositoryURL.appendingPathComponent("issues"))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if wasSent {
                 sentView
             } else {
                 form
@@ -167,7 +175,7 @@ struct FeedbackView: View {
 
     private var diagnosticsPreview: some View {
         Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 5) {
-            diagnosticRow("Vorssaint", "\(diagnostics.appVersion) (\(diagnostics.appBuild))")
+            diagnosticRow("Aster", "\(diagnostics.appVersion) (\(diagnostics.appBuild))")
             diagnosticRow("macOS", diagnostics.macOS)
             if let model = diagnostics.macModel { diagnosticRow("Mac", model) }
             diagnosticRow(l10n.s.languageLabel, diagnostics.language)

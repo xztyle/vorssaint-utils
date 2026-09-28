@@ -135,7 +135,7 @@ final class SystemMonitor: ObservableObject {
 
     @Published private(set) var snapshot = SystemSnapshot()
 
-    private let queue = DispatchQueue(label: "com.vorssaint.utils.system-monitor", qos: .utility)
+    private let queue = DispatchQueue(label: "io.github.xztyle.Aster.system-monitor", qos: .utility)
     private var timer: Timer?
     private var intervalSeconds = 2
     private var panelClients = 0

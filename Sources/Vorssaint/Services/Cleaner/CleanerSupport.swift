@@ -51,14 +51,13 @@ enum CleanerSupport {
         "org.swift",
     ]
 
-    /// Bundle identifiers that must never be treated as junk owners, no
-    /// matter what the installed-apps oracle says: the operating system's
-    /// own domains (in any wrapping, including team prefixed group names
-    /// and systemgroup entries), this very app, and shared infrastructure.
+    /// Protect system domains, Aster, upstream and shared infrastructure,
+    /// including wrapped group names, regardless of installed-app discovery.
     static func isProtectedBundleID(_ id: String) -> Bool {
         let lowered = id.lowercased()
         let wrapped = "." + lowered + "."
         if wrapped.contains(".com.apple.") || wrapped.contains(".com.vorssaint.")
+            || wrapped.contains(".io.github.xztyle.aster.")
             || wrapped.contains(".developer.apple.") || wrapped.contains(".is.workflow.") {
             return true
         }

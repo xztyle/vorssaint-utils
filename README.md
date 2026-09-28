@@ -1,3 +1,18 @@
+# Aster
+
+Personal Mac utility suite maintained in **xztyle/vorssaint-utils**, based on
+[Vorssaint](https://github.com/vorssaint/vorssaint-utils). Aster has its own name,
+icon, bundle ID and local signing certificate. It is not an official Vorssaint build.
+
+The battery, clipboard, menu bar, capture and cleanup replacement work is in progress.
+See [the product contract](docs/ASTER_PRODUCT.md) and [maintenance](docs/ASTER_MAINTENANCE.md).
+Build with `./build.sh`; install with `./build.sh --install`. The executable is
+`build/Aster`. This fork updates from reviewed source, not upstream app binaries.
+
+---
+
+The following is the inherited upstream feature documentation and attribution:
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/logo-dark.svg">

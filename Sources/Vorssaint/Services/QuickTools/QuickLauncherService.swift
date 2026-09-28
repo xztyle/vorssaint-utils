@@ -338,7 +338,7 @@ final class QuickLauncherService: ObservableObject {
                                          styleMask: [.borderless, .nonactivatingPanel],
                                          backing: .buffered,
                                          defer: false)
-        panel.title = "Vorssaint"
+        panel.title = "Aster"
         panel.isReleasedWhenClosed = false
         // Item drag-to-reorder needs the mouse drag for itself; a background-
         // movable window would win the gesture and drag the whole panel.

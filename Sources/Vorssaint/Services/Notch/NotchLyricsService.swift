@@ -190,7 +190,7 @@ private final class NotchLyricsDownload: NSObject, URLSessionDataDelegate {
         configuration.urlCredentialStorage = nil
         configuration.httpCookieStorage = nil
         configuration.httpShouldSetCookies = false
-        configuration.httpAdditionalHeaders = ["User-Agent": "Vorssaint", "Accept": "application/json"]
+        configuration.httpAdditionalHeaders = ["User-Agent": "Aster", "Accept": "application/json"]
         let delegate = NotchLyricsDownload(completion: completion)
         let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
         session.dataTask(with: url).resume()

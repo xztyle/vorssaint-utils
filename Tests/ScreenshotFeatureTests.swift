@@ -43,7 +43,7 @@ enum ScreenshotFeatureTests {
         let protectedScreenshotWindows: Set<CGWindowID> = [12, 99]
         suite.expect(Defaults.registeredDefaults[DefaultsKey.screenshotHideVorssaintWindows]
                 as? Bool == true,
-               "screenshots hide Vorssaint windows by default")
+               "screenshots hide Aster windows by default")
         suite.expect(SettingsBackupSupport.exportKeys().contains(
             DefaultsKey.screenshotHideVorssaintWindows),
                "the screenshot window visibility preference travels in backups")
@@ -72,7 +72,7 @@ enum ScreenshotFeatureTests {
                 contentWindowIDs: contentWindows,
                 honoursVisibilityPreference: true)
         ) == workflowWindows,
-        "showing Vorssaint windows leaves an editor and a pin in the capture")
+        "showing Aster windows leaves an editor and a pin in the capture")
         suite.expect(ScreenshotCapturePolicy.canPickWindow(
             13,
             isOwnWindow: true,
@@ -81,19 +81,19 @@ enum ScreenshotFeatureTests {
                 workflowWindowIDs: workflowWindows,
                 contentWindowIDs: contentWindows,
                 honoursVisibilityPreference: true)
-        ), "a pinned capture can be picked while Vorssaint windows are shown")
+        ), "a pinned capture can be picked while Aster windows are shown")
         suite.expect(ScreenshotCapturePolicy.excludedWindowIDs(
             hideVorssaintWindows: true,
             ownWindowIDs: ownScreenshotWindows,
             protectedWindowIDs: protectedScreenshotWindows
         ) == ownScreenshotWindows,
-        "screenshot hiding Vorssaint excludes every own window")
+        "screenshot hiding Aster excludes every own window")
         suite.expect(ScreenshotCapturePolicy.excludedWindowIDs(
             hideVorssaintWindows: false,
             ownWindowIDs: ownScreenshotWindows,
             protectedWindowIDs: protectedScreenshotWindows
         ) == [12],
-        "screenshot keeps protected windows excluded while Vorssaint is visible")
+        "screenshot keeps protected windows excluded while Aster is visible")
         suite.expect(ScreenshotCapturePolicy.canPickWindow(
             7,
             isOwnWindow: false,
@@ -105,13 +105,13 @@ enum ScreenshotFeatureTests {
             isOwnWindow: true,
             hideVorssaintWindows: true,
             protectedWindowIDs: protectedScreenshotWindows
-        ), "screenshot cannot pick a Vorssaint window while hiding them")
+        ), "screenshot cannot pick a Aster window while hiding them")
         suite.expect(ScreenshotCapturePolicy.canPickWindow(
             11,
             isOwnWindow: true,
             hideVorssaintWindows: false,
             protectedWindowIDs: protectedScreenshotWindows
-        ), "screenshot can pick an ordinary Vorssaint window when visible")
+        ), "screenshot can pick an ordinary Aster window when visible")
         suite.expect(!ScreenshotCapturePolicy.canPickWindow(
             12,
             isOwnWindow: true,
@@ -830,7 +830,7 @@ enum ScreenshotFeatureTests {
                 && !textPolicy.sharesSource(with: recorderPolicy)
                 && !textPolicy.sharesSource(with: liveScreenshotPolicy),
                "only freeze, pointer and window policy decide whether a mode needs its own photograph")
-        // With "Hide Vorssaint windows" off, freeze on and the pointer off,
+        // With "Hide Aster windows" off, freeze on and the pointer off,
         // every tool wants the same pixels except for the editors and pins
         // recording keeps out, so switching to or from recording has to
         // re-photograph and re-list the pickable windows (issue #780).
@@ -845,7 +845,7 @@ enum ScreenshotFeatureTests {
                 && shownWindowPolicies[.screenshot]?.keepsContentWindowsOut == false
                 && shownWindowPolicies[.text]?.keepsContentWindowsOut == false
                 && shownWindowPolicies[.color]?.keepsContentWindowsOut == false,
-               "only recording keeps editors and pins out while Vorssaint windows are shown")
+               "only recording keeps editors and pins out while Aster windows are shown")
         suite.expect(shownWindowPolicies[.recording].map { recording in
             [ScreenCaptureTool.screenshot, .text, .color].allSatisfy { tool in
                 guard let other = shownWindowPolicies[tool] else { return false }
@@ -867,7 +867,7 @@ enum ScreenshotFeatureTests {
                 screenshotHideVorssaintWindows: true)
         }
         suite.expect(hiddenWindowPolicies.allSatisfy(\.keepsContentWindowsOut),
-               "hiding Vorssaint windows keeps editors and pins out of every tool")
+               "hiding Aster windows keeps editors and pins out of every tool")
         suite.expect(ScreenshotSupport.captureGuideIsVisible(pointerOnDisplay: true,
                                                        selectionInProgress: false,
                                                        capturePending: false)
@@ -1756,11 +1756,11 @@ enum ScreenshotFeatureTests {
                "backdrop style and presets register empty")
 
         // Watermark: the mark of your own that rides along every capture.
-        let textMark = ScreenshotSupport.WatermarkStyle(kind: .text, text: "  Vorssaint  ",
+        let textMark = ScreenshotSupport.WatermarkStyle(kind: .text, text: "  Aster  ",
                                                         color: "blue", anchor: .topLeading,
                                                         size: 0.5, opacity: 0.3, rotation: 30)
         let markRoundTrip = ScreenshotSupport.WatermarkStyle.decoded(textMark.encoded())
-        suite.expect(markRoundTrip == textMark.sanitized() && markRoundTrip.text == "Vorssaint"
+        suite.expect(markRoundTrip == textMark.sanitized() && markRoundTrip.text == "Aster"
                 && markRoundTrip.anchor == .topLeading && markRoundTrip.rotation == 30,
                "a watermark style round-trips through JSON, trimmed")
         suite.expect(ScreenshotSupport.WatermarkStyle.decoded(nil).kind == .none
@@ -2436,7 +2436,7 @@ enum ScreenshotFeatureTests {
             developerOverride: "https://test.example/")
         suite.expect(testShareEndpoint.absoluteString == "https://test.example"
                 && ScreenshotSharingSupport.endpoint(
-                    bundleIdentifier: "com.vorssaint.utils",
+                    bundleIdentifier: "io.github.xztyle.Aster",
                     developerOverride: "https://test.example").absoluteString
                     == ScreenshotSharingSupport.productionEndpoint.absoluteString
                 && ScreenshotSharingSupport.endpoint(
@@ -2756,9 +2756,9 @@ enum ScreenshotFeatureTests {
 
         // Muting every microphone, not just the one the Mac is set to: an app
         // pointed at a device of its own has to go silent too.
-        suite.expect(MicMuteSupport.isOwnDevice(name: "Vorssaint Mixer")
-                && MicMuteSupport.isOwnDevice(name: "Vorssaint Island Levels")
-                && MicMuteSupport.isOwnDevice(name: "Vorssaint Recorder")
+        suite.expect(MicMuteSupport.isOwnDevice(name: "Aster Mixer")
+                && MicMuteSupport.isOwnDevice(name: "Aster Island Levels")
+                && MicMuteSupport.isOwnDevice(name: "Aster Recorder")
                 && !MicMuteSupport.isOwnDevice(name: "MacBook Air Microphone"),
                "the mute skips the app's own aggregate devices and no other")
         suite.expect(!MicMuteSupport.shouldSaveVolume(nil)

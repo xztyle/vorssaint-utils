@@ -56,9 +56,9 @@ final class StatusItemController {
     /// so bind() only touches it once the feature is actually available,
     /// rather than for every launch regardless of whether anyone uses it.
     private var clipboardBindingsInstalled = false
-    private static let mainAutosaveName = "VorssaintMenuBarItem"
-    private static let metricAutosavePrefix = "VorssaintMetric"
-    private static let clipboardPreviewAutosaveName = "VorssaintClipboardPreview"
+    private static let mainAutosaveName = "AsterMenuBarItem"
+    private static let metricAutosavePrefix = "AsterMetric"
+    private static let clipboardPreviewAutosaveName = "AsterClipboardPreview"
     private static let maxPlacementGeneration = 10_000
     private static let emptyStatusImage = NSImage()
 

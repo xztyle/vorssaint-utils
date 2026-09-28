@@ -611,7 +611,7 @@ enum WallpaperThumbnailCache {
     private static var generation = UUID()
 
     private static let prefetchQueue = DispatchQueue(
-        label: "com.vorssaint.utils.wallpaper-thumbs",
+        label: "io.github.xztyle.Aster.wallpaper-thumbs",
         qos: .utility,
         attributes: .concurrent
     )

@@ -5,10 +5,16 @@ import Foundation
 
 /// Static identity of the app, shared by UI, notifications and tooling.
 enum AppInfo {
-    static let name = "Vorssaint"
-    static let copyright = "© 2026 Vorssaint"
-    static let websiteURL = URL(string: "https://vorssaint.com")!
-    static let repositoryURL = URL(string: "https://github.com/vorssaint/vorssaint-utils")!
+    static let name = "Aster"
+    // This personal fork is built from source. Never install upstream binaries.
+    static let supportsManagedUpdates = false
+    static let supportsHostedSharing = false
+    static let supportsHostedFeedback = false
+    static let showsPublisherIntroductions = false
+    static let copyright = "© 2026 Aster contributors · Based on Vorssaint"
+    static let websiteURL = URL(string: "https://github.com/xztyle/vorssaint-utils")!
+    static let repositoryURL = URL(string: "https://github.com/xztyle/vorssaint-utils")!
+    static let upstreamRepositoryURL = URL(string: "https://github.com/vorssaint/vorssaint-utils")!
     static let coffeeURL = URL(string: "https://buymeacoffee.com/vorssaint")!
     static let discordURL = URL(string: "https://discord.gg/M6BwWH4BJp")!
     static let socialURL = URL(string: "https://x.com/vorssaint")!
@@ -19,7 +25,7 @@ enum AppInfo {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
     }
 
-    /// True for the local "Vorssaint (Developer)" build (bundle id ends in `.dev`).
+    /// True for the local "Aster (Developer)" build (bundle id ends in `.dev`).
     /// It is never published and never auto-updates; all work is tested here first.
     static var isDeveloperBuild: Bool {
         (Bundle.main.bundleIdentifier ?? "").hasSuffix(".dev")
