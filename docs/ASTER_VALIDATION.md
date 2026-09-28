@@ -94,10 +94,14 @@ the regression, optimized build, packaged selftest and next GUI launch passed.
 The live manager still left nine of ten items unresolved after standard AX geometry
 and cache fixes. A passive diagnostic launched through LaunchServices confirmed
 the GUI has Accessibility permission but receives blank WindowServer titles. The
-resolver wrongly rejects specific Control Center AX identifiers in that case;
-some third-party apps expose one unnamed AX icon. An evidence-backed fix is in
-progress. Turning the manager off removed its controls and cleared the completed
-restoration baseline; no user icon was deliberately moved.
+resolver wrongly rejected specific Control Center AX identifiers in that case;
+some third-party apps expose one unnamed AX icon. Fix `c9e5940` passed 215 menu
+checks, 215 test-harness checks, an optimized build and selftest. A second passive
+GUI diagnostic resolved all ten icons, protected Clock and Control Center, and
+left every icon frame unchanged. The GUI process was launched by LaunchServices
+with parent PID 1. Actual movement and restoration are still unverified. Turning
+the manager off removed its controls and cleared the completed restoration
+baseline; no user icon was deliberately moved.
 
 All browser research and browser acceptance checks use the Codex in-app browser.
 The owner's personal browser is excluded from the workflow.
@@ -153,8 +157,11 @@ A detached `work/integration` checkout combines the five feature branches for
 early integration testing without changing main. Shared defaults, feature labels,
 backup settings and entry points were reconciled; both menu restoration and
 battery restoration remain ahead of uninstall. Its initial 3,403 scoped checks
-found two failures: an expected feature count and translated punctuation. Both
-are corrected; the combined optimized build and follow-up checks are in progress.
+found two failures: an expected feature count and translated punctuation. A full
+run then found one unswept test preference namespace. All were corrected. The
+latest combined full suite passed **70,530 checks** and preference cleanup. The
+initial combined optimized build and packaged selftest also passed; packaging
+the latest menu fix into the combined candidate is in progress.
 
 Each feature needs its reviewed implementation, relevant automated tests, optimized
 build and selftest, actual-Mac interaction evidence and recorded unresolved limits.
