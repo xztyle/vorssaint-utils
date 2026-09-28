@@ -230,9 +230,11 @@ def main():
     uninstall = "Sources/Vorssaint/Services/Uninstall/AppUninstaller.swift"
     bar = "Sources/Vorssaint/Services/CommandBar/CommandBarService.swift"
     write("QuickPaste.swift", "import Foundation\n"
-          + "extension ClipboardFeatureTests.QuickPasteHost {\n"
+          + "extension ClipboardQuickPasteTests.Host {\n"
           + declaration("Sources/Vorssaint/Services/Clipboard/ClipboardHistoryWindow.swift",
                         "    func pasteIntoPreviousApp(").replace("private func", "func", 1)
+          + declaration("Sources/Vorssaint/Services/Clipboard/ClipboardHistoryWindow.swift",
+                        "    private func pasteWhenFocused(")
           + "}\n")
     write("CommandBarCopyAnswer.swift", "import Foundation\n"
           + "extension CommandBarFeatureTests.CopyAnswerHost {\n"

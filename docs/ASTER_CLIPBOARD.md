@@ -143,3 +143,16 @@ two generated file URLs in order and refusal of a group with a missing file.
 The optimized app build passed. The changed glass surfaces and the native drag
 gesture still need the root agent's actual Mac UI check; a pasteboard payload
 test does not prove an external app accepts the drop.
+
+## Paste focus timing
+
+After selecting a history item, the drawer now gives the previous app up to
+0.8 seconds to regain focus instead of checking only once after 0.12 seconds.
+It sends Command-V only when that exact app is foreground. If focus never
+returns or the app closes, it sends no paste keystroke and gives feedback.
+The existing Accessibility permission gate remains in place.
+
+The production paste methods run against test doubles for immediate focus,
+slower activation, missing focus, a terminated app and missing permission.
+The clipboard suite passed 693 checks. The optimized bundle and packaged
+selftest passed. A real paste into another app is still a separate Mac UI gate.
