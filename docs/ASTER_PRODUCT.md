@@ -58,9 +58,10 @@ hardware/permission-dependent behavior remains unverified.
   border, frame, backing, padding, caption, toolbar or shadow. Its size follows
   the image rather than a fixed card size.
 - Reveal capture actions on hover, without changing the screenshot pixels.
-- A leftward swipe moves the actual preview with the pointer, then smoothly
-  carries the whole card past the source display's left edge on release. A short
-  or cancelled swipe returns it to its starting position. A successful drop
+- A leftward mouse drag or two-finger trackpad swipe moves the actual preview
+  with the gesture, then smoothly carries the whole card past the source
+  display's left edge on release. A short or cancelled swipe returns it to its
+  starting position. A successful drop
   into another app takes precedence and must transfer the edited image as native
   image data or a file, including into image-capable text fields.
 - Predictable preview lifetime, multiple captures, keyboard actions and cancellation.
