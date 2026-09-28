@@ -650,3 +650,19 @@ also passed. This adds test evidence only, not a production-source change. The
 last full combined source gate remains the **80,713-check** pass above.
 Actual icon movement, Undo and original-layout restoration are still required
 on this Mac before the menu feature can be accepted.
+
+## One main branch — 2026-09-28
+
+All five feature heads were merged into `main`, including their latest fixes.
+Work continues on `main`; the separate feature branches are retired. The
+combined source passed **80,716 checks** and preference cleanup with zero
+failures. The optimized signed bundle, packaged app and battery-helper selftests
+passed. A metadata-free copy at
+`/private/tmp/aster-main-consolidated-Yqqdlf/Aster.app` passed deep, strict
+signature verification; its executable SHA-256 is
+`1a0a159b207d97867bdc8a7364a52a8687a8110c06cbbcdd8fa526235e64ba73`.
+This verifies the merged code, not the remaining Mac-only acceptance
+checks: battery protected-state and charge behavior, menu-bar restoration,
+screenshot swipe and cross-app drop, and clipboard quick paste. The installed
+app remains an older signed build until those safety and interaction checks
+permit replacement.

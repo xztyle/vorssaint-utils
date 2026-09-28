@@ -359,4 +359,3 @@ enum GlobalShortcutRole: CaseIterable, Identifiable {
             .map(\.element)
     }
 }
-
