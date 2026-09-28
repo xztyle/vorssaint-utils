@@ -297,6 +297,7 @@ final class FeatureRuntime: ObservableObject {
         },
         .cameraPreview: { CameraPreviewService.shared.syncWithPreferences() },
         .wallpaper: { WallpaperService.shared.syncWithPreferences() },
+        .menuBarOrganizer: { Task { @MainActor in MenuBarOrganizerService.shared.syncWithPreferences() } },
         .radialMenu: { RadialMenuService.shared.syncWithPreferences() },
         .notch: { NotchService.shared.syncWithPreferences() },
         .notchGestures: {
@@ -376,6 +377,8 @@ extension AppFeature {
     /// or when the feature depends on no hardware at all.
     var hardwareUnsupportedReason: String? {
         switch self {
+        case .menuBarOrganizer:
+            return isSupportedOnCurrentSystem ? nil : FeatureStrings.menuBarOrganizer(L10n.shared.language).unsupportedSystem
         case .fanControl:
             return FanControlHardware.hasControllableFan
                 ? nil : FeatureStrings.fanControl(L10n.shared.language).noFans

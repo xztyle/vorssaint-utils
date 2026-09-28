@@ -386,7 +386,7 @@ enum FeatureCatalogTests {
 
         // MARK: Features hub catalog
 
-        suite.expect(AppFeature.allCases.count == 73, "feature catalog has 73 features")
+        suite.expect(AppFeature.allCases.count == 74, "feature catalog has 74 features")
         suite.expect(Set(AppFeature.allCases.map(\.rawValue)).count == AppFeature.allCases.count,
                "feature ids are unique")
         suite.expect(AppFeature.allCases.map(\.rawValue) == [
@@ -396,7 +396,7 @@ enum FeatureCatalogTests {
             "clipboardHistory", "pastePlain", "finderCutPaste", "finderRename", "shelf", "urlCleaner",
             "diskImageInstaller",
             "mixer", "soundOutputSwitcher", "audioPriority", "micMute", "musicBlock",
-            "keepAwake", "brightness", "extraBrightness", "bluetoothSleep",
+            "keepAwake", "brightness", "extraBrightness", "bluetoothSleep", "menuBarOrganizer",
             "quickLauncher", "quickToggles", "colorPicker", "screenOCR", "cleaningMode", "mediaTools",
             "cleaner", "uninstaller", "homebrew", "appUpdates", "screenshot", "cameraPreview",
             "radialMenu", "scratchpad", "commandBar", "screenRecorder", "wallpaper", "killProcess", "portManager", "notch", "notchCalendar", "notchNotifications", "notchGestures", "notchTimer", "notchAccessories", "notchLyrics", "notchQueue", "notchLiveEqualizer", "notchDownloads", "notchAgents",
@@ -560,6 +560,7 @@ enum FeatureCatalogTests {
                "install all makes features available without switching on their behavior")
 
         suite.expect(AppFeature.availabilityDefaults.count == AppFeature.allCases.count
+                && (AppFeature.availabilityDefaults[AppFeature.menuBarOrganizer.availabilityKey] as? Bool) == false
                 && (AppFeature.availabilityDefaults[AppFeature.fanControl.availabilityKey] as? Bool) == false
                 && (AppFeature.availabilityDefaults[AppFeature.diskImageInstaller.availabilityKey] as? Bool) == false
                 && (AppFeature.availabilityDefaults[AppFeature.focusFollowsMouse.availabilityKey] as? Bool) == false
@@ -568,7 +569,7 @@ enum FeatureCatalogTests {
                 && (AppFeature.availabilityDefaults[AppFeature.wallpaper.availabilityKey] as? Bool) == false
                 && (AppFeature.availabilityDefaults[AppFeature.audioPriority.availabilityKey] as? Bool) == false
                 && AppFeature.allCases.filter {
-                    $0 != .focusFollowsMouse && $0 != .fanControl && $0 != .diskImageInstaller
+                    $0 != .focusFollowsMouse && $0 != .menuBarOrganizer && $0 != .fanControl && $0 != .diskImageInstaller
                         && $0 != .killProcess && $0 != .scrollHorizontal && $0 != .portManager && $0 != .wallpaper
                         && $0 != .audioPriority
                 }.allSatisfy {

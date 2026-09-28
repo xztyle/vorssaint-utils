@@ -3,6 +3,10 @@
 
 import AppKit
 
+if CommandLine.arguments.contains("--menu-bar-inventory") {
+    MenuBarInventoryProbe.runAndExit()
+}
+
 SuperKeyMappingGuard.runIfRequestedAndExit()
 Defaults.register()
 MouseAccelerationGuard.runIfRequestedAndExit()

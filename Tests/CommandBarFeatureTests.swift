@@ -1980,10 +1980,25 @@ enum CommandBarInputSourceContract {
 /// The delegate's real termination callback runs in real default and modal
 /// run-loop modes, with inert replies and input sources. No app quits or layout changes.
 enum CommandBarTerminationContract {
+    final class MenuBarOrganizerService {
+        static let shared = MenuBarOrganizerService()
+        var isRunning = false
+        var restorations = 0
+        var restoring = false
+        func restoreBeforeQuit(completion: @escaping () -> Void) {
+            guard !restoring else { return }
+            restoring = true
+            Task { @MainActor in
+                restorations += 1; isRunning = false; restoring = false; completion()
+            }
+        }
+    }
     final class Application {
-        enum TerminateReply { case terminateNow, terminateLater }
+        enum TerminateReply { case terminateNow, terminateLater, terminateCancel }
         var replies: [Bool] = []
         var sourceAtReply: [String] = []
+        var onTerminate: (() -> Void)?
+        func terminate(_ sender: Any?) { onTerminate?() }
         func reply(toApplicationShouldTerminate accepted: Bool) {
             sourceAtReply.append(CommandBarInputSourceContract.Sources.current)
             replies.append(accepted)
@@ -2018,6 +2033,16 @@ enum CommandBarTerminationContract {
             CommandBarInputSourceContract.Sources.selected = []
             CommandBarInputSourceContract.Sources.acceptsSelection = true
         }
+        let (organizerHost, organizerApp) = reset(borrowed: true)
+        MenuBarOrganizerService.shared.isRunning = true
+        organizerApp.onTerminate = { _ = organizerHost.applicationShouldTerminate(organizerApp) }
+        suite.expect(organizerHost.applicationShouldTerminate(organizerApp) == .terminateCancel,
+                     "async menu restoration avoids AppKit's nested termination modal loop")
+        suite.expect(organizerHost.applicationShouldTerminate(organizerApp) == .terminateCancel,
+                     "repeated quit does not start a modal loop during menu restoration")
+        awaitReply(organizerApp)
+        suite.expect(MenuBarOrganizerService.shared.restorations == 1 && organizerApp.replies == [true],
+                     "one menu restoration re-enters normal input-source restoration and quit")
         let (idle, idleApp) = reset(borrowed: false)
         suite.expect(idle.applicationShouldTerminate(idleApp) == .terminateNow
                      && idleApp.replies.isEmpty,

@@ -7,7 +7,7 @@ import Foundation
 /// The Settings pages. Lives here (without SwiftUI) so the visibility rules
 /// below and the unit tests can reason about pages without pulling UI in.
 enum SettingsPage: Hashable {
-    case general, features, energy, monitor
+    case general, features, energy, monitor, menuBarOrganizer
     case mouse, switcher, dock, keyDebounce, superKey, cutPaste, autoQuit, quitProtection, cleaner, uninstaller, urlCleaner, homebrew, appUpdates, media, clipboard, windowLayout, shelf, quickTools, textSnippets, screenshot, radialMenu, commandBar, killProcess, portManager, notch
     case shortcuts, advanced, about, releaseNotes, support
 }
@@ -338,6 +338,7 @@ extension AppFeature {
         case .wallpaper:
             return FeatureSettingsDestination(.quickTools, sectionAnchor: .wallpaper)
         case .notch, .notchCalendar, .notchNotifications, .notchGestures, .notchTimer, .notchAccessories, .notchLyrics, .notchQueue, .notchLiveEqualizer, .notchDownloads, .notchAgents: return FeatureSettingsDestination(.notch)
+        case .menuBarOrganizer: return FeatureSettingsDestination(.menuBarOrganizer)
         case .radialMenu: return FeatureSettingsDestination(.radialMenu)
         case .scratchpad:
             return FeatureSettingsDestination(.quickTools, sectionAnchor: .scratchpad)
@@ -392,6 +393,7 @@ enum FeatureVisibilitySupport {
         case .textSnippets: return [.textSnippets]
         case .screenshot: return [.screenshot, .screenRecorder, .screenOCR, .colorPicker]
         case .notch: return [.notch, .notchCalendar, .notchNotifications, .notchGestures, .notchTimer, .notchAccessories, .notchLyrics, .notchQueue, .notchLiveEqualizer, .notchDownloads, .notchAgents]
+        case .menuBarOrganizer: return [.menuBarOrganizer]
         case .radialMenu: return [.radialMenu]
         case .commandBar: return [.commandBar]
         case .general, .features, .shortcuts, .advanced, .about, .releaseNotes, .support:
