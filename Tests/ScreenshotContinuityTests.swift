@@ -65,10 +65,18 @@ enum ScreenshotContinuityTests {
                      && !gesture.canBegin(dx: 20, dy: 0, sourceScreen: screen,
                                           otherScreens: [], y: 120),
                      "vertical and rightward drags remain native image transfers")
-        suite.expect(gesture.shouldDismiss(dx: -122, width: 320, cancelled: false)
-                     && !gesture.shouldDismiss(dx: -80, width: 320, cancelled: false)
-                     && !gesture.shouldDismiss(dx: -122, width: 320, cancelled: true),
+        suite.expect(gesture.shouldDismiss(dx: -122, dy: 1, width: 320,
+                                           startX: 230, screenMinX: 0, cancelled: false)
+                     && !gesture.shouldDismiss(dx: -80, dy: 1, width: 320,
+                                               startX: 230, screenMinX: 0, cancelled: false)
+                     && !gesture.shouldDismiss(dx: -122, dy: 1, width: 320,
+                                               startX: 230, screenMinX: 0, cancelled: true),
                      "a full swipe exits; a short or cancelled swipe springs back")
+        suite.expect(gesture.shouldDismiss(dx: -25, dy: 0, width: 320,
+                                           startX: 45, screenMinX: 0, cancelled: false)
+                     && !gesture.shouldDismiss(dx: -25, dy: 30, width: 320,
+                                               startX: 45, screenMinX: 0, cancelled: false),
+                     "a swipe near the screen edge needs less travel but stays horizontal")
         suite.expect(gesture.exitX(screenMinX: screen.minX, width: 320) < screen.minX - 320,
                      "the exit animation carries the whole card beyond the screen edge")
         let leftDisplay = CGRect(x: -1280, y: 0, width: 1280, height: 800)

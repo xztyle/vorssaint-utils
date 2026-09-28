@@ -180,8 +180,11 @@ struct ScreenshotPreviewDragSurface: NSViewRepresentable {
             if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
             escapeMonitor = nil
             let dx = lastPoint.x - startPoint.x
+            let dy = lastPoint.y - startPoint.y
             let dismisses = ScreenshotPreviewSwipeGesture.shouldDismiss(
-                dx: dx, width: window.frame.width, cancelled: cancelled)
+                dx: dx, dy: dy, width: window.frame.width,
+                startX: startPoint.x, screenMinX: sourceScreen.minX,
+                cancelled: cancelled)
             let targetX = dismisses
                 ? ScreenshotPreviewSwipeGesture.exitX(screenMinX: sourceScreen.minX,
                                                        width: window.frame.width)

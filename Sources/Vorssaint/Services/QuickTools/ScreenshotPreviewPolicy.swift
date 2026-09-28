@@ -78,8 +78,11 @@ enum ScreenshotPreviewSwipeGesture {
         return !otherScreens.contains { $0.contains(acrossEdge) }
     }
 
-    static func shouldDismiss(dx: CGFloat, width: CGFloat, cancelled: Bool) -> Bool {
-        !cancelled && dx <= -min(120, max(70, width * 0.38))
+    static func shouldDismiss(dx: CGFloat, dy: CGFloat, width: CGFloat,
+                              startX: CGFloat, screenMinX: CGFloat, cancelled: Bool) -> Bool {
+        let available = max(0, startX - screenMinX)
+        let distance = min(min(120, max(70, width * 0.38)), max(12, available * 0.55))
+        return !cancelled && dx <= -distance && abs(dx) >= abs(dy) * 1.25
     }
 
     static func exitX(screenMinX: CGFloat, width: CGFloat) -> CGFloat {
