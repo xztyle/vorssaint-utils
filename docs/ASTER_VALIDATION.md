@@ -592,3 +592,22 @@ different from the saved baseline; no real icon was moved or restored during
 this check. Live menu restoration and the screenshot swipe/drop checks remain
 open. The protected battery journal has not been independently read, so no
 production helper replacement or battery hardware write occurred.
+
+## Screenshot drag fallback — 2026-09-28
+
+The screen-capture branch `ecd9967` keeps PNG and TIFF image representations
+available for native dragging when its temporary PNG file cannot be written.
+It advertises a file URL when that file is available. A blocked temporary
+location verifies the image-only path. The focused screenshot suite passed
+**835 checks**; the optimized branch bundle, packaged app selftest and deep,
+strict signature verification passed.
+
+Detached integration `64b28e8` passed **80,710 checks** plus preference cleanup
+with zero failures. Its optimized signed bundle, packaged app and helper
+selftests passed. The metadata-free candidate at
+`/private/tmp/aster-integrated-drag-fallback-TnRuo8/Aster.app` passed deep,
+strict signature verification. Its executable SHA-256 is
+`cc32f00d46c021761a725bb58aa80823a512dda8c6a62a8c0feaf98bb0ba86a7`.
+It has not replaced the installed app. Live cross-app drag and opaque left
+swipe still need acceptance; the generated-only opaque fixture's launch
+approval is pending. Battery helper and menu-bar input remain untouched.
