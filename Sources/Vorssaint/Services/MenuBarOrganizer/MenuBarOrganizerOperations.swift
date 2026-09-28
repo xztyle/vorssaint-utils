@@ -17,6 +17,7 @@ extension MenuBarOrganizerService {
 
     func moveItem(_ identity: MenuBarItemIdentity, before target: MenuBarItemIdentity?,
                   to section: MenuBarOrganizerSection, restoring: Bool = false) async -> Bool {
+        guard restoring || !recoveryNeeded else { operationMessage = extra.restoreFailed; return false }
         guard (restoring ? restoreAllowed : entryAllowed), target != identity else { return false }
         revealInMenuBar(.alwaysHidden)
         await provider.invalidateIdentityCache()
@@ -75,6 +76,7 @@ extension MenuBarOrganizerService {
     }
 
     func applyLayout(_ layout: MenuBarLayout, restoring: Bool = false) async -> Bool {
+        guard restoring || !recoveryNeeded else { operationMessage = extra.restoreFailed; return false }
         guard layout.isValid, !isBusy else { return false }
         isBusy = true
         let previous = (hiddenSectionShown, alwaysHiddenSectionShown)

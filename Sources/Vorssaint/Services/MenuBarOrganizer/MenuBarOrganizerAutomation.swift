@@ -119,7 +119,7 @@ extension MenuBarOrganizerService {
 
     func evaluateAutomation() async {
         guard entryAllowed, !isBusy, operationTask == nil, editingCount == 0,
-              !automationPaused, !MenuBarItemMover.hasAnyOpenMenu else { return }
+              !automationPaused, !recoveryNeeded, !MenuBarItemMover.hasAnyOpenMenu else { return }
         if await finishPendingActivation() { return }
         let facts = ruleFacts()
         consumedRules = consumedRules.filter { id in
@@ -196,7 +196,8 @@ extension MenuBarOrganizerService {
 
     func reconcile() async {
         guard entryAllowed, needsReconciliation, !desiredLayout.entries.isEmpty,
-              !automationPaused, editingCount == 0, !MenuBarItemMover.hasAnyOpenMenu else { return }
+              !automationPaused, !recoveryNeeded, editingCount == 0,
+              !MenuBarItemMover.hasAnyOpenMenu else { return }
         guard adoptNewItems() else { return }
         if MenuBarLayoutPolicy.isSatisfied(desiredLayout, items: items) {
             needsReconciliation = false

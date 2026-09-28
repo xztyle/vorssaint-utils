@@ -137,6 +137,7 @@ final class MenuBarOrganizerService: ObservableObject {
     }
 
     func retryStart() {
+        guard !recoveryNeeded else { operationMessage = extra.restoreFailed; return }
         automationPaused = false
         reconciliationFailures = 0
         needsReconciliation = true
