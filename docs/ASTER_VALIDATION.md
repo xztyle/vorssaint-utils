@@ -38,8 +38,9 @@ values, with control disabled until explicit service setup and qualification.
 
 ## Battery care
 
-The feature branch is `bd51e78`. The latest integration battery suite passed
-162 checks; its optimized build and selftest passed. The signed app and helper
+The battery feature branch includes later safety updates described below. The
+latest integration battery suite passed 163 checks; its optimized build and
+selftest passed. The signed app and helper
 retain the same local signing identity and authenticated request boundary.
 
 The owner approved the background service. After temporarily allowing native
@@ -415,3 +416,21 @@ strict signature verification. Its executable SHA-256 is
 `e32d59fe96158e495969438e3483a9757c2af6494c0b038e223862a7837eba48`.
 It has not replaced the installed app. Actual automatic paste into another app
 remains a live Mac check; the Mac was locked during this gate.
+
+## Battery hold safety gate — 2026-09-28
+
+The battery branch `bb87a6d` adds a fake-hardware regression for the saved hold
+command. It verifies that hold leaves adapter power enabled and charging
+inhibited. After deliberate discharge, it verifies that adapter power is
+restored before the charge-inhibit command. The battery suite passed **163
+checks**. This supports the intended protection from repeated small battery
+cycles; it is not a live measurement of battery power flow.
+
+Detached integration `a7a068c` merged the test and battery validation notes.
+Its full suite passed **80,691 checks** and preference cleanup with zero
+failures. Production Swift source did not change from the signed candidate at
+`90f3a8a`; the only new files in the integrated gate are the battery test and
+validation notes. A read-only probe on the owner's Mac found it unplugged at
+49%, 33.95°C and -5.20 W. It made no battery hardware writes. Live hold still
+requires attached power and the independent administrator read of the
+protected battery journal before service repair.
