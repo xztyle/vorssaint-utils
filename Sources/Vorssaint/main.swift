@@ -4,6 +4,8 @@
 import AppKit
 
 ClipboardLibraryProbe.runIfRequested()
+MenuBarAXDiagnosticProbe.runIfRequested()
+
 if CommandLine.arguments.contains("--menu-bar-inventory") {
     MenuBarInventoryProbe.runAndExit()
 }

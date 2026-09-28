@@ -45,12 +45,34 @@ struct MenuBarItemSourceIdentity: Equatable {
     let name: String
     let axIdentifier: String?
     let axTitle: String?
+    let axDescription: String?
+    let isOnlyStatusItem: Bool
+
+    init(pid: pid_t, bundleIdentifier: String, name: String, axIdentifier: String?, axTitle: String?,
+         axDescription: String? = nil, isOnlyStatusItem: Bool = false) {
+        self.pid = pid; self.bundleIdentifier = bundleIdentifier; self.name = name
+        self.axIdentifier = axIdentifier; self.axTitle = axTitle
+        self.axDescription = axDescription; self.isOnlyStatusItem = isOnlyStatusItem
+    }
+
+    private var textIdentity: String? {
+        [axIdentifier, axTitle].compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty }
+    }
+
+    var usesSingleItemIdentity: Bool {
+        textIdentity == nil && isOnlyStatusItem && bundleIdentifier != MenuBarOrganizerSupport.controlCenterBundleIdentifier
+    }
+
+    var canReuseWithoutAXRescan: Bool { !usesSingleItemIdentity }
 
     var stableTitle: String? {
-        let identifier = axIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if !identifier.isEmpty { return identifier }
-        let title = axTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return title.isEmpty ? nil : title
+        textIdentity ?? (usesSingleItemIdentity ? "@aster.single-status-item" : nil)
+    }
+
+    var displayTitle: String? {
+        [axTitle, axDescription, usesSingleItemIdentity ? name : nil, axIdentifier]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.first { !$0.isEmpty }
     }
 }
 
@@ -173,8 +195,7 @@ enum MenuBarOrganizerSupport {
     private static func seed(_ record: MenuBarOrganizerWindowRecord,
                              source: MenuBarItemSourceIdentity?) -> IdentitySeed {
         let hosted = record.ownerBundleIdentifier == controlCenterBundleIdentifier
-        let onlyHost = hosted && source?.bundleIdentifier == controlCenterBundleIdentifier
-            && isGenericControlCenterHostedTitle(record.title)
+        let onlyHost = source.map { !sourceIdentityAllowed(recordTitle: record.title, source: $0) } ?? false
         let resolved = onlyHost ? nil : source
         let state: MenuBarItemIdentityState = hosted && (resolved == nil || resolved?.stableTitle == nil)
             ? .provisional : .stable
@@ -240,6 +261,15 @@ enum MenuBarOrganizerSupport {
                                 options: [.regularExpression, .caseInsensitive]) != nil
     }
 
+    static func sourceIdentityAllowed(recordTitle: String, source: MenuBarItemSourceIdentity) -> Bool {
+        guard source.bundleIdentifier == controlCenterBundleIdentifier,
+              isGenericControlCenterHostedTitle(recordTitle) else { return true }
+        // Screen Recording can redact WindowServer names. A specific identifier
+        // from Control Center's own AX child is still authoritative for that item.
+        guard let identifier = source.axIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines) else { return false }
+        return identifier.hasPrefix("com.apple.menuextra.") && identifier.count > "com.apple.menuextra.".count
+    }
+
     /// Synthetic events must go to the process that owns the window under the
     /// pointer. On macOS 26 that is commonly Control Center, not the app that
     /// logically created the status item.
@@ -257,6 +287,8 @@ enum MenuBarOrganizerSupport {
         if bundleIdentifier == controlCenterBundleIdentifier {
             return normalized.contains("clock")
                 || normalized.contains("siri")
+                || normalized.hasSuffix(".controlcenter")
+                || normalized == "controlcenter"
                 || isGenericControlCenterHostedTitle(title)
         }
         return bundleIdentifier == systemUIServerBundleIdentifier

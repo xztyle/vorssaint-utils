@@ -59,8 +59,8 @@ final class MenuBarWindowProvider {
         let source = resolved.source
         guard record.ownerPID != currentPID, source?.pid != currentPID else { return nil }
         let bundle = source?.bundleIdentifier ?? record.ownerBundleIdentifier
-        let title = source?.stableTitle ?? record.title
-        let protected = MenuBarOrganizerSupport.isSystemImmovable(bundleIdentifier: bundle, title: title)
+        let title = source?.displayTitle ?? record.title
+        let protected = MenuBarOrganizerSupport.isSystemImmovable(bundleIdentifier: bundle, title: source?.stableTitle ?? record.title)
         let icon = source.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.bundleURL }
             .map { NSWorkspace.shared.icon(forFile: $0.path) }
         return ManagedMenuBarItem(id: resolved.id, windowID: record.windowID,

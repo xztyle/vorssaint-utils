@@ -6,6 +6,10 @@ enum MenuBarOrganizerTests {
     static func run(_ suite: TestSuite) {
         windowNumbers(suite)
         accessibilityFrames(suite)
+        diagnosticPrivacy(suite)
+        redactedHostTitles(suite)
+        singleItemIdentity(suite)
+        sourceAmbiguity(suite)
         identities(suite)
         layouts(suite)
         newItems(suite)
@@ -42,6 +46,75 @@ enum MenuBarOrganizerTests {
         size.width = -.infinity
         suite.expect(MenuBarOrganizerSupport.accessibilityFrame(frame: nil, position: point,
                      size: AXValueCreate(.cgSize, &size)) == nil, "invalid geometry cannot match a real item")
+    }
+
+    static func diagnosticPrivacy(_ suite: TestSuite) {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("AsterMenuAXTest-" + UUID().uuidString + ".json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let record = MenuBarOrganizerWindowRecord(windowID: 3, ownerPID: 2, ownerName: "private-owner-label",
+            ownerBundleIdentifier: "test.host", title: "private-status-title", frame: CGRect(x: 10, y: 0, width: 20, height: 30),
+            layer: 25, alpha: 1, isOnScreen: true)
+        let trace = MenuBarAXDiagnosticTrace(destination: url, records: [record])
+        trace.applications = [["bundle": "test.app", "title": MenuBarAXDiagnosticTrace.textPresence("private-AX-title")]]
+        trace.finish(matches: [:])
+        guard let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .utf8) else {
+            suite.expect(false, "opt-in menu diagnostics must serialize successfully"); return
+        }
+        suite.expect(!text.contains("private-"), "diagnostics report only text presence, never status titles or owner labels")
+        suite.expect(text.contains("test.app") && text.contains("records"), "diagnostics retain source bundles and menu geometry")
+        trace.applications = []
+        trace.finish(matches: [:])
+        suite.expect((try? Data(contentsOf: url)) == data, "diagnostic output never overwrites an existing file")
+        var point = CGPoint(x: CGFloat.nan, y: 0)
+        suite.expect(MenuBarAXDiagnosticTrace.geometry(AXValueCreate(.cgPoint, &point)).isEmpty,
+                     "invalid geometry cannot invalidate the JSON report")
+    }
+
+    static func redactedHostTitles(_ suite: TestSuite) {
+        let record = MenuBarOrganizerWindowRecord(windowID: 23, ownerPID: 625, ownerName: "Control Center",
+            ownerBundleIdentifier: "com.apple.controlcenter", title: "", frame: CGRect(x: 1716, y: 0, width: 42, height: 39),
+            layer: 25, alpha: 1, isOnScreen: true)
+        for name in ["battery", "clock", "wifi", "controlcenter"] {
+            let source = MenuBarItemSourceIdentity(pid: 625, bundleIdentifier: "com.apple.controlcenter", name: "Control Center",
+                axIdentifier: "com.apple.menuextra." + name, axTitle: nil, axDescription: "Localized label")
+            suite.expect(MenuBarOrganizerSupport.sourceIdentityAllowed(recordTitle: "", source: source), "specific native AX identity survives a redacted WindowServer title")
+            let result = MenuBarOrganizerSupport.identities(for: [record], sources: [23: source])[23]
+            suite.expect(result?.state == .stable && result?.source == source, "identity seeding preserves the native AX match")
+            suite.expect(MenuBarOrganizerSupport.isSystemImmovable(bundleIdentifier: source.bundleIdentifier, title: source.stableTitle ?? "") == ["clock", "controlcenter"].contains(name), "native clock/control protection follows AX identifier, independent of display language")
+        }
+        for identifier in [nil, "", "Item-0", "unknown-proxy"] as [String?] {
+            let source = MenuBarItemSourceIdentity(pid: 625, bundleIdentifier: "com.apple.controlcenter", name: "Control Center",
+                axIdentifier: identifier, axTitle: nil, axDescription: "A description", isOnlyStatusItem: true)
+            suite.expect(!MenuBarOrganizerSupport.sourceIdentityAllowed(recordTitle: "", source: source), "unnamed or unknown Control Center proxies are never promoted by a description or singleton flag")
+        }
+    }
+
+    static func singleItemIdentity(_ suite: TestSuite) {
+        let first = MenuBarItemSourceIdentity(pid: 100, bundleIdentifier: "test.app", name: "Example", axIdentifier: nil,
+            axTitle: "", axDescription: "Ready", isOnlyStatusItem: true)
+        let changed = MenuBarItemSourceIdentity(pid: 101, bundleIdentifier: "test.app", name: "Example", axIdentifier: nil,
+            axTitle: "", axDescription: "Busy", isOnlyStatusItem: true)
+        suite.expect(first.stableTitle == changed.stableTitle && first.displayTitle == "Ready" && changed.displayTitle == "Busy", "dynamic description is a display label, not a persistent singleton identity")
+        suite.expect(!first.canReuseWithoutAXRescan, "single-item identity must be rechecked on every inventory snapshot")
+        let multiple = MenuBarItemSourceIdentity(pid: 100, bundleIdentifier: "test.app", name: "Example", axIdentifier: nil,
+            axTitle: "", axDescription: "Ready", isOnlyStatusItem: false)
+        let cached = [CGWindowID(1): first].filter { $0.value.canReuseWithoutAXRescan }
+        suite.expect(cached.isEmpty && multiple.stableTitle == nil, "one-to-two child transition invalidates the cached singleton and fails closed")
+        let identifier = MenuBarItemSourceIdentity(pid: 100, bundleIdentifier: "test.app", name: "Example", axIdentifier: "fixed-id",
+            axTitle: "Title", axDescription: "Changing label", isOnlyStatusItem: true)
+        suite.expect(identifier.stableTitle == "fixed-id", "explicit AX identifier remains the strongest identity")
+    }
+
+    static func sourceAmbiguity(_ suite: TestSuite) {
+        let source = MenuBarItemSourceIdentity(pid: 1, bundleIdentifier: "test.app", name: "Example", axIdentifier: "stable", axTitle: nil)
+        let first = MenuBarSourceCandidate(windowID: 1, source: source, score: 0, sourceSlot: "one")
+        let competingSource = MenuBarSourceCandidate(windowID: 1, source: source, score: 0.4, sourceSlot: "two")
+        suite.expect(MenuBarSourceMatchPolicy.matches([first, competingSource]).isEmpty, "two plausible sources for one window remain unresolved")
+        let alias = MenuBarSourceCandidate(windowID: 2, source: source, score: 0.4, sourceSlot: "one")
+        suite.expect(MenuBarSourceMatchPolicy.matches([first, alias]).isEmpty, "one AX source aliased by two equally plausible windows is never assigned by dictionary order")
+        suite.expect(MenuBarSourceMatchPolicy.matches([first, competingSource, alias]).isEmpty, "rejecting one ambiguous window cannot free its competing source to match a worse window")
+        let distant = MenuBarSourceCandidate(windowID: 2, source: source, score: 4, sourceSlot: "one")
+        suite.expect(MenuBarSourceMatchPolicy.matches([distant, first])[1] == source, "a unique geometrically better match resolves consistently")
     }
 
     static func item(_ name: String, x: CGFloat, section: MenuBarOrganizerSection = .visible,
@@ -129,7 +202,7 @@ enum MenuBarOrganizerTests {
     }
 
     static func persistence(_ suite: TestSuite) {
-        let domain = "test.aster.menu-bar.\(UUID().uuidString)"
+        let domain = "com.vorssaint.tests.aster-menu-bar.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: domain)!
         defer { defaults.removePersistentDomain(forName: domain) }
         let store = MenuBarLayoutStore(defaults: defaults)
