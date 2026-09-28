@@ -85,6 +85,7 @@ struct ScreenshotPreviewDragSurface: NSViewRepresentable {
     let transfer: () -> ScreenshotDragTransfer?
     let edit: () -> Void
     let dragging: (Bool) -> Void
+    var swipe: ((Bool) -> Void)? = nil
     var dismiss: (() -> Void)? = nil
 
     func makeNSView(context: Context) -> Surface { Surface() }
@@ -93,6 +94,7 @@ struct ScreenshotPreviewDragSurface: NSViewRepresentable {
         view.transfer = transfer
         view.edit = edit
         view.dragging = dragging
+        view.swipe = swipe
         view.dismiss = dismiss
     }
 
@@ -101,48 +103,108 @@ struct ScreenshotPreviewDragSurface: NSViewRepresentable {
         var transfer: (() -> ScreenshotDragTransfer?)?
         var edit: (() -> Void)?
         var dragging: ((Bool) -> Void)?
+        var swipe: ((Bool) -> Void)?
         var dismiss: (() -> Void)?
         private var down: NSEvent?
         private var started = false
+        private var swiping = false
         private var cancelled = false
         private var escapeMonitor: Any?
         private var sourceScreen: CGRect = .zero
         private var otherScreens: [CGRect] = []
         private var startPoint: CGPoint = .zero
+        private var lastPoint: CGPoint = .zero
+        private var swipeOrigin: CGPoint = .zero
 
         deinit { if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) } }
 
         override func mouseDown(with event: NSEvent) {
             down = event
             started = false
+            swiping = false
             cancelled = false
             startPoint = window?.convertPoint(toScreen: event.locationInWindow) ?? .zero
+            lastPoint = startPoint
             sourceScreen = window?.screen?.frame ?? .zero
             otherScreens = NSScreen.screens.filter { $0.frame != sourceScreen }.map(\.frame)
         }
         override func mouseUp(with event: NSEvent) {
-            if !started { edit?() }
+            lastPoint = window?.convertPoint(toScreen: event.locationInWindow) ?? lastPoint
+            if swiping { finishSwipe(cancelled: cancelled) }
+            else if !started { edit?() }
             down = nil
         }
         override func cancelOperation(_ sender: Any?) {
             cancelled = true
+            if swiping { finishSwipe(cancelled: true); return }
             super.cancelOperation(sender)
         }
         override func mouseDragged(with event: NSEvent) {
-            guard !started, let down, let image,
-                  hypot(event.locationInWindow.x - down.locationInWindow.x,
-                        event.locationInWindow.y - down.locationInWindow.y) > 4,
-                  let writer = transfer?()?.pasteboardItem() else { return }
+            let point = window?.convertPoint(toScreen: event.locationInWindow) ?? .zero
+            lastPoint = point
+            if swiping { updateSwipe(to: point); return }
+            guard !started, let down else { return }
+            let dx = point.x - startPoint.x
+            let dy = point.y - startPoint.y
+            guard hypot(dx, dy) > 7 else { return }
+            if ScreenshotPreviewSwipeGesture.canBegin(dx: dx, dy: dy,
+                sourceScreen: sourceScreen, otherScreens: otherScreens,
+                y: point.y), let window {
+                started = true
+                swiping = true
+                swipeOrigin = window.frame.origin
+                swipe?(true)
+                monitorEscape(forSwipe: true)
+                updateSwipe(to: point)
+                return
+            }
+            guard let image, let writer = transfer?()?.pasteboardItem() else { return }
             started = true
             dragging?(true)
             let item = NSDraggingItem(pasteboardWriter: writer)
             item.setDraggingFrame(bounds, contents: NSImage(cgImage: image, size: bounds.size))
-            escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                if event.keyCode == 53 { self?.cancelled = true }
-                return event
-            }
+            monitorEscape(forSwipe: false)
             let session = beginDraggingSession(with: [item], event: down, source: self)
             session.animatesToStartingPositionsOnCancelOrFail = true
+        }
+        private func updateSwipe(to point: CGPoint) {
+            guard let window else { return }
+            let dx = min(0, point.x - startPoint.x)
+            window.setFrameOrigin(CGPoint(x: swipeOrigin.x + dx, y: swipeOrigin.y))
+            window.alphaValue = max(0.65, 1 + dx / max(window.frame.width, 1) * 0.35)
+        }
+
+        private func finishSwipe(cancelled: Bool) {
+            guard swiping, let window else { return }
+            swiping = false
+            if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
+            escapeMonitor = nil
+            let dx = lastPoint.x - startPoint.x
+            let dismisses = ScreenshotPreviewSwipeGesture.shouldDismiss(
+                dx: dx, width: window.frame.width, cancelled: cancelled)
+            let targetX = dismisses
+                ? ScreenshotPreviewSwipeGesture.exitX(screenMinX: sourceScreen.minX,
+                                                       width: window.frame.width)
+                : swipeOrigin.x
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+                    ? 0 : (dismisses ? 0.18 : 0.22)
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                window.animator().setFrameOrigin(CGPoint(x: targetX, y: swipeOrigin.y))
+                window.animator().alphaValue = dismisses ? 0 : 1
+            }, completionHandler: { [weak self] in
+                if dismisses { self?.dismiss?() }
+                else { self?.swipe?(false) }
+            })
+        }
+
+        private func monitorEscape(forSwipe: Bool) {
+            escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard event.keyCode == 53 else { return event }
+                self?.cancelled = true
+                if forSwipe { self?.finishSwipe(cancelled: true); return nil }
+                return event
+            }
         }
         func draggingSession(_ session: NSDraggingSession,
                              sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation { .copy }
@@ -152,16 +214,6 @@ struct ScreenshotPreviewDragSurface: NSViewRepresentable {
             if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
             escapeMonitor = nil
             dragging?(false)
-            // AppKit can consume Escape inside its drag loop before a local
-            // key monitor sees it. A cancelled drag ends while mouse 1 is down;
-            // an intentional drop ends after its release.
-            let mouseStillDown = NSEvent.pressedMouseButtons & 1 != 0
-            if ScreenshotPreviewDismissGesture.shouldDismiss(
-                start: startPoint, end: point, sourceScreen: sourceScreen,
-                otherScreens: otherScreens, accepted: !operation.isEmpty,
-                cancelled: cancelled || mouseStillDown) {
-                dismiss?()
-            }
         }
     }
 }

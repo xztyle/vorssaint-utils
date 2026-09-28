@@ -56,27 +56,24 @@ enum ScreenshotContinuityTests {
 
     private static func dismissGesture(_ suite: TestSuite) {
         let screen = CGRect(x: 0, y: 0, width: 1440, height: 900)
-        let start = CGPoint(x: 230, y: 120)
-        let edge = CGPoint(x: 3, y: 122)
-        let gesture = ScreenshotPreviewDismissGesture.self
-        suite.expect(gesture.shouldDismiss(start: start, end: edge, sourceScreen: screen,
-                                           otherScreens: [], accepted: false, cancelled: false),
-                     "a dominant left drag to the source screen edge closes an unaccepted preview")
-        suite.expect(!gesture.shouldDismiss(start: start, end: edge, sourceScreen: screen,
-                                            otherScreens: [], accepted: true, cancelled: false)
-                     && !gesture.shouldDismiss(start: start, end: edge, sourceScreen: screen,
-                                               otherScreens: [], accepted: false, cancelled: true),
-                     "accepted external drops and cancelled drags always keep the preview")
-        suite.expect(!gesture.shouldDismiss(start: start, end: CGPoint(x: 4, y: 500),
-                                            sourceScreen: screen, otherScreens: [],
-                                            accepted: false, cancelled: false)
-                     && !gesture.shouldDismiss(start: start, end: CGPoint(x: 40, y: 120),
-                                               sourceScreen: screen, otherScreens: [],
-                                               accepted: false, cancelled: false),
-                     "vertical or short drags do not dismiss")
+        let gesture = ScreenshotPreviewSwipeGesture.self
+        suite.expect(gesture.canBegin(dx: -8, dy: 1, sourceScreen: screen,
+                                      otherScreens: [], y: 120),
+                     "a horizontal left drag moves the card itself")
+        suite.expect(!gesture.canBegin(dx: -8, dy: 12, sourceScreen: screen,
+                                       otherScreens: [], y: 120)
+                     && !gesture.canBegin(dx: 20, dy: 0, sourceScreen: screen,
+                                          otherScreens: [], y: 120),
+                     "vertical and rightward drags remain native image transfers")
+        suite.expect(gesture.shouldDismiss(dx: -122, width: 320, cancelled: false)
+                     && !gesture.shouldDismiss(dx: -80, width: 320, cancelled: false)
+                     && !gesture.shouldDismiss(dx: -122, width: 320, cancelled: true),
+                     "a full swipe exits; a short or cancelled swipe springs back")
+        suite.expect(gesture.exitX(screenMinX: screen.minX, width: 320) < screen.minX - 320,
+                     "the exit animation carries the whole card beyond the screen edge")
         let leftDisplay = CGRect(x: -1280, y: 0, width: 1280, height: 800)
-        suite.expect(!gesture.shouldDismiss(start: start, end: edge, sourceScreen: screen,
-                                            otherScreens: [leftDisplay], accepted: false, cancelled: false),
+        suite.expect(!gesture.canBegin(dx: -8, dy: 0, sourceScreen: screen,
+                                       otherScreens: [leftDisplay], y: 120),
                      "a display to the left remains a valid drag destination")
     }
 

@@ -67,17 +67,22 @@ extension ScreenshotPreviewPolicy {
     }
 }
 
-/// A native drop always wins. Only an unaccepted, deliberate left-edge gesture
-/// dismisses; a connected display on the left remains an ordinary drag route.
-enum ScreenshotPreviewDismissGesture {
-    static func shouldDismiss(start: CGPoint, end: CGPoint, sourceScreen: CGRect,
-                              otherScreens: [CGRect], accepted: Bool, cancelled: Bool) -> Bool {
-        guard !accepted, !cancelled, sourceScreen.width > 0, sourceScreen.height > 0,
-              end.x <= sourceScreen.minX + 8, end.x >= sourceScreen.minX - 8,
-              end.y >= sourceScreen.minY, end.y <= sourceScreen.maxY else { return false }
-        let dx = end.x - start.x, dy = end.y - start.y
-        guard dx <= -48, abs(dx) >= abs(dy) * 1.5 else { return false }
-        let acrossEdge = CGPoint(x: sourceScreen.minX - 1, y: end.y)
+/// A leftward gesture moves the actual card. Other directions start a native
+/// image drag, and a display on the left remains available as a drop target.
+enum ScreenshotPreviewSwipeGesture {
+    static func canBegin(dx: CGFloat, dy: CGFloat, sourceScreen: CGRect,
+                         otherScreens: [CGRect], y: CGFloat) -> Bool {
+        guard dx <= -7, abs(dx) >= abs(dy) * 1.25,
+              sourceScreen.width > 0, sourceScreen.height > 0 else { return false }
+        let acrossEdge = CGPoint(x: sourceScreen.minX - 1, y: y)
         return !otherScreens.contains { $0.contains(acrossEdge) }
+    }
+
+    static func shouldDismiss(dx: CGFloat, width: CGFloat, cancelled: Bool) -> Bool {
+        !cancelled && dx <= -min(120, max(70, width * 0.38))
+    }
+
+    static func exitX(screenMinX: CGFloat, width: CGFloat) -> CGFloat {
+        screenMinX - width - 12
     }
 }
