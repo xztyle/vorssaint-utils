@@ -103,10 +103,13 @@ enum ClipboardLibraryArchive {
     }
 
     static func merge(_ incoming: ClipboardLibrarySnapshot, into existing: ClipboardLibrarySnapshot) -> ClipboardLibrarySnapshot {
-        var byID = Dictionary(uniqueKeysWithValues: existing.entries.map { ($0.id, $0) })
-        for entry in incoming.entries where byID[entry.id] == nil { byID[entry.id] = entry }
+        let existingIDs = Set(existing.entries.map(\.id))
+        let ordered = existing.entries + incoming.entries.filter { !existingIDs.contains($0.id) }
         // Existing UUID wins deliberately. New records never replace a newer local edit.
-        var entries = byID.values.sorted { $0.copiedAt > $1.copiedAt }
+        var entries = ordered.enumerated().sorted { left, right in
+            left.element.copiedAt == right.element.copiedAt
+                ? left.offset < right.offset : left.element.copiedAt > right.element.copiedAt
+        }.map(\.element)
         var collections = existing.collections
         for collection in incoming.collections {
             if let index = collections.firstIndex(where: { $0.id == collection.id }) {

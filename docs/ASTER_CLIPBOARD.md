@@ -166,3 +166,15 @@ transaction as content changes. A reopened database retains the new order,
 including when older copies acquire an equal timestamp. The focused clipboard
 suite passes 695 checks. This is a storage check; actual drawer navigation and
 paste into another app still need live acceptance.
+
+## Backup merge order
+
+The merge path previously rebuilt entries from a dictionary. When multiple
+copies shared a timestamp, that lost their saved card order. It now keeps the
+current library order first, appends only new backup entries in their saved
+order, and sorts by copy time with that order as the tie breaker. A disposable
+merge with four equal-time entries and one newer entry verifies both existing
+edit precedence and the order after reopening the database. The focused
+clipboard suite passed 698 checks, and the optimized signed build passed.
+This is backup storage evidence; the live drawer and cross-app paste gates
+above remain open.
