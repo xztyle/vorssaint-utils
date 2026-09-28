@@ -771,6 +771,9 @@ enum DefaultsKey {
     static let notchOutlineEnabled = "notchOutlineEnabled"
     static let notchCustomWidth = "notchCustomWidth"
     static let notchCustomHeight = "notchCustomHeight"
+    // Fits the island to one Mac's camera housing; never backed up.
+    static let notchCameraFitWidth = "notchCameraFitWidth"
+    static let notchCameraFitHeight = "notchCameraFitHeight"
     static let notchHapticFeedback = "notchHapticFeedback"
     static let notchShelf = "notchShelf"
     static let notchDragReveal = "notchDragReveal"

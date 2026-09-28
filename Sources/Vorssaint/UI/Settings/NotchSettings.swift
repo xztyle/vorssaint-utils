@@ -57,6 +57,8 @@ struct NotchSettings: View {
     @AppStorage(DefaultsKey.notchOutlineEnabled) private var outlineEnabled = false
     @AppStorage(DefaultsKey.notchCustomWidth) private var customWidth = NotchSize.defaultWidth
     @AppStorage(DefaultsKey.notchCustomHeight) private var customHeight = NotchSize.defaultHeight
+    @AppStorage(DefaultsKey.notchCameraFitWidth) private var cameraFitWidth = 0.0
+    @AppStorage(DefaultsKey.notchCameraFitHeight) private var cameraFitHeight = 0.0
     @AppStorage(DefaultsKey.notchHapticFeedback) private var hapticFeedback = true
     @AppStorage(DefaultsKey.notchShelf) private var shelfWindow = true
     @AppStorage(DefaultsKey.notchDragReveal) private var dragReveal = true
@@ -79,7 +81,7 @@ struct NotchSettings: View {
 
     private var configuration: [String] {
         [String(enabled), String(calendarEnabled), String(calendarCountdown), String(calendarTimeLeft), String(notificationsEnabled), String(dismissNativeNotifications), String(gesturesEnabled), String(lyricsEnabled), String(lyricsOnline), String(queueEnabled), String(liveEqualizer), String(showPlayingMusic), String(includeOtherPlayers), idle, hiddenControls, controlOrder, size,
-         String(timerEnabled), String(timerSoundEnabled), String(cameraEnabled), String(accessoriesEnabled), String(outlineEnabled), String(customWidth), String(customHeight), String(hapticFeedback), String(shelfWindow), String(dragReveal), String(captureControls), String(quickPanel), String(appPanel), String(hoverExpand), String(hideUntilHover), String(hideInFullscreen), String(coversMenus), display, String(hover), hidden, order, String(volume),
+         String(timerEnabled), String(timerSoundEnabled), String(cameraEnabled), String(accessoriesEnabled), String(outlineEnabled), String(customWidth), String(customHeight), String(cameraFitWidth), String(cameraFitHeight), String(hapticFeedback), String(shelfWindow), String(dragReveal), String(captureControls), String(quickPanel), String(appPanel), String(hoverExpand), String(hideUntilHover), String(hideInFullscreen), String(coversMenus), display, String(hover), hidden, order, String(volume),
          String(brightness), String(keyboardLight), String(microphone), String(battery), String(clipboard), String(clipboardWindow), String(capture), String(trackChange), captureAction, String(showInCaptures), String(returnHome), homeModule, String(opensActivity), String(scratchpad), String(agentsEnabled)]
     }
 
@@ -177,6 +179,17 @@ struct NotchSettings: View {
             }
             SettingsCard {
                 switchRow("capsule", text.showOutline, isOn: $outlineEnabled)
+            }
+            // Only a physical camera has an outline to match.
+            if NotchSupport.hasNotchedDisplay {
+                SettingsCard(title: text.cameraFit) {
+                    Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
+                        // Whole points keep the island centred on the camera's pixels.
+                        fitSlider(text.width, value: $cameraFitWidth, range: NotchCameraFit.widthRange, step: 1)
+                        fitSlider(text.height, value: $cameraFitHeight, range: NotchCameraFit.heightRange, step: 0.5)
+                    }
+                    Text(text.cameraFitHint).font(.caption).foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -485,12 +498,14 @@ struct NotchSettings: View {
             }
             SettingsCard(title: text.display) {
                 switchRow("arrow.up.left.and.arrow.down.right", text.hideInFullscreen, isOn: $hideInFullscreen)
-                HStack(spacing: 8) {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                     // A mode this version no longer offers is treated as automatic, as the island does.
                     choice(text.automatic, symbol: "display.2",
                            selected: (NotchDisplay(rawValue: display) ?? .automatic) == .automatic) { display = NotchDisplay.automatic.rawValue }
                     choice(text.builtIn, symbol: "laptopcomputer", selected: display == NotchDisplay.builtIn.rawValue) { display = NotchDisplay.builtIn.rawValue }
                     choice(text.mainDisplay, symbol: "display", selected: display == NotchDisplay.main.rawValue) { display = NotchDisplay.main.rawValue }
+                    choice(text.followPointer, symbol: "cursorarrow.motionlines",
+                           selected: display == NotchDisplay.pointer.rawValue) { display = NotchDisplay.pointer.rawValue }
                 }
             }
             SettingsCard(title: editor.destinations) {
@@ -670,6 +685,21 @@ struct NotchSettings: View {
             Slider(value: bounded, in: range, step: 10) { Text(title) }.labelsHidden()
             Text(Int(bounded.wrappedValue), format: .number)
                 .monospacedDigit().foregroundStyle(.secondary).frame(width: 38)
+        }
+    }
+
+    /// A correction around zero, signed so the untouched value reads as none.
+    private func fitSlider(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double) -> some View {
+        let bounded = Binding(get: { NotchSize.clamped(value.wrappedValue, to: range, fallback: 0) },
+                              set: { value.wrappedValue = NotchSize.clamped($0, to: range, fallback: 0) })
+        let formatted = bounded.wrappedValue.formatted(.number.sign(strategy: .always(includingZero: false))
+            .precision(.fractionLength(0...1)).locale(Locale(identifier: l10n.language.rawValue)))
+        return GridRow {
+            Text(title).fixedSize().accessibilityHidden(true)
+            // The Custom size card has sliders with the same names.
+            Slider(value: bounded, in: range, step: step) { Text("\(text.cameraFit), \(title)") }.labelsHidden()
+                .accessibilityValue(formatted)
+            Text(formatted).monospacedDigit().foregroundStyle(.secondary).frame(width: 38)
         }
     }
     private var orderedShortcuts: [NotchControlItem] {

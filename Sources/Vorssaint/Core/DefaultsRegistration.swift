@@ -230,6 +230,8 @@ extension Defaults {
         DefaultsKey.notchOutlineEnabled: false,
         DefaultsKey.notchCustomWidth: NotchSize.defaultWidth,
         DefaultsKey.notchCustomHeight: NotchSize.defaultHeight,
+        DefaultsKey.notchCameraFitWidth: 0.0,
+        DefaultsKey.notchCameraFitHeight: 0.0,
         DefaultsKey.notchHapticFeedback: true,
         DefaultsKey.notchShelf: true,
         DefaultsKey.notchDragReveal: true,
