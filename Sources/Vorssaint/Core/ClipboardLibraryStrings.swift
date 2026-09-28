@@ -31,6 +31,24 @@ struct ClipboardLibraryStrings {
     var plainText: String { Self.plainTextValues[language]! }
     var editCopy: String { Self.editCopyValues[language]! }
     var copyFallback: String { Self.copyFallbackValues[language]! }
+    var dragFiles: String { Self.dragFilesValues[language]! }
+    private static let dragFilesValues: [AppLanguage: String] = [
+        .enUS: "Drag all files",
+        .es: "Arrastrar todos los archivos",
+        .ptBR: "Arrastar todos os arquivos",
+        .tr: "Tüm dosyaları sürükle",
+        .ru: "Перетащить все файлы",
+        .sk: "Presunúť všetky súbory",
+        .de: "Alle Dateien ziehen",
+        .fr: "Faire glisser tous les fichiers",
+        .it: "Trascina tutti i file",
+        .ja: "すべてのファイルをドラッグ",
+        .ko: "모든 파일 드래그",
+        .zhHans: "拖动所有文件",
+        .zhTW: "拖移所有檔案",
+        .zhHK: "拖移所有檔案",
+        .uk: "Перетягнути всі файли",
+    ]
     private static let collectionsValues: [AppLanguage: String] = [
         .enUS: "Collections",
         .es: "Colecciones",

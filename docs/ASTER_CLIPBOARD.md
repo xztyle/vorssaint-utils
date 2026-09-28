@@ -22,9 +22,16 @@ through its expand action; normal history opens always use the drawer.
   to Search. Escape closes the preview, clears selection/query, then closes the drawer.
 - Drag a card onto a collection, or use its context menu. Collection menus rename,
   recolor, move and remove boards. Removing a board preserves its clips in history.
+- Drag a file card's file icon into another app to transfer every file in that
+  clip. If any referenced file is unavailable, the group is not dragged.
 - Search accepts ordinary substring terms plus `type:text`, `type:image`,
   `type:files`, `app:safari`, `after:2026-01-01`, and `before:2026-12-31`.
   Image text is indexed after local OCR completes. No network preview is fetched.
+
+With Liquid Glass enabled on macOS 26, the drawer uses glass for its navigation
+and action bars. Content cards stay solid for readable previews. Reduce
+Transparency and Increase Contrast use solid surfaces; Reduce Motion removes
+the drawer slide.
 
 ## Storage and privacy
 
@@ -128,3 +135,11 @@ run while the owner used other apps. Normal dismissal behavior is unchanged.
 These are real UI checks with generated content, not proof of general-pasteboard
 capture, pasting into another app, cross-app dragging, permission behavior,
 multiple displays or Spaces. Those integration checks remain open.
+
+## Follow-up implementation checks, 2026-09-28
+
+The clipboard suite passed 691 checks, including a native pasteboard write of
+two generated file URLs in order and refusal of a group with a missing file.
+The optimized app build passed. The changed glass surfaces and the native drag
+gesture still need the root agent's actual Mac UI check; a pasteboard payload
+test does not prove an external app accepts the drop.
