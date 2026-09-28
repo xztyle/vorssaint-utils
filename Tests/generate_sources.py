@@ -682,6 +682,28 @@ def main():
           + "var expandedFeatures: [FeatureGroup: Set<AppFeature>] { get { state.features } nonmutating set { state.features = newValue } }\n"
           + declaration("Sources/Vorssaint/UI/Settings/ShortcutsSettings.swift", "    private func expansionBinding(").replace("private func", "func", 1)
           + "}\n}\n")
+    write("SettingsSectionFocus.swift", (ROOT / "Sources/Vorssaint/UI/Settings/SettingsSectionFocus.swift").read_text())
+    hub_path = "Sources/Vorssaint/UI/Settings/FeatureHubSettings.swift"
+    write("FeatureHubNavigation.swift", "import SwiftUI\n"
+          + "extension FeatureHubNavigationContract {\nfinal class Host: Fixture {\n"
+          + "".join(declaration(hub_path, prefix).replace("private func", "func", 1) for prefix in [
+              "    private func revealPendingFeatureTarget(", "    private func reveal(",
+              "    private func clearHighlight()"])
+          + "}\n}\n")
+    hub_descriptions = next((path for path in [
+        "Sources/Vorssaint/UI/Settings/FeatureHubLabels.swift",
+        "Sources/Vorssaint/UI/Settings/FeatureHubDescriptions.swift",
+    ] if (ROOT / path).exists()), hub_path)
+    write("FeatureHubLayout.swift", "import SwiftUI\n"
+          + declaration(hub_path, "private extension FeatureGroup {")
+          + declaration(hub_descriptions, "extension AppFeature {")
+          + declaration(hub_descriptions, "extension AppPermission {")
+          + "extension FeatureHubLayoutTests {\n"
+          + declaration("Sources/Vorssaint/UI/Settings/SettingsCard.swift", "struct SettingsCard<")
+          + "".join(declaration(hub_path, prefix) for prefix in [
+              "struct FeatureHubSettings: View {", "private struct InstalledShareBar: View {",
+              "private struct PresetCard: View {", "private struct FeatureHubRow: View {"])
+          + "}\n")
     settings_card = "Sources/Vorssaint/UI/Settings/SettingsCard.swift"
     text_inset = next(line for line in (ROOT / settings_card).read_text().splitlines()
                       if line.startswith("let settingsRowTextInset:"))

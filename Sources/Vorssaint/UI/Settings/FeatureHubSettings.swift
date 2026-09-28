@@ -65,7 +65,10 @@ struct FeatureHubSettings: View {
                     summaryCard
                     dynamicIslandCard
                     presetsCard
-                    LazyVStack(spacing: 20) {
+                    // Seven bounded cards need stable heights when search jumps
+                    // to a distant feature. Nested lazy estimates can keep the
+                    // Settings layout resolving the same offscreen rows.
+                    VStack(spacing: 20) {
                         ForEach(FeatureGroup.allCases.filter { $0 != .dynamicIsland }, id: \.self) { group in
                             groupCard(group)
                         }
@@ -102,11 +105,9 @@ struct FeatureHubSettings: View {
         }
     }
 
-    /// Consumes a pending Feature Hub target: switches off the Permissions
-    /// tab if needed and scrolls the requested row into view. Retried once
-    /// after the first run-loop turn, the same allowance
-    /// `SettingsSectionFocusModifier` gives a freshly installed Form to
-    /// register its row identities.
+    /// Expand before the next layout, then jump once to the stable row.
+    /// Search may target a distant card; overlapping animated jumps make the
+    /// scroll position depend on measurements from an earlier layout.
     private func revealPendingFeatureTarget(using proxy: ScrollViewProxy) {
         guard let request = router.pendingFeatureTarget else { return }
         router.consumeFeatureTarget(id: request.id)
@@ -119,31 +120,20 @@ struct FeatureHubSettings: View {
         }
         DispatchQueue.main.async {
             guard self.revealID == request.id else { return }
-            proxy.scrollTo(request.feature.group, anchor: .top)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            self.reveal(request.feature, using: proxy)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                 guard self.revealID == request.id else { return }
-                reveal(request.feature, using: proxy)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                    guard self.revealID == request.id else { return }
-                    reveal(request.feature, using: proxy)
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                    guard self.revealID == request.id else { return }
-                    clearHighlight()
-                }
+                self.clearHighlight()
             }
         }
     }
 
     private func reveal(_ feature: AppFeature, using proxy: ScrollViewProxy) {
-        if reduceMotion {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
             proxy.scrollTo(feature, anchor: .center)
             highlightedFeature = feature
-        } else {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                proxy.scrollTo(feature, anchor: .center)
-                highlightedFeature = feature
-            }
         }
     }
 
@@ -270,7 +260,7 @@ struct FeatureHubSettings: View {
         .id(FeatureGroup.dynamicIsland)
     }
 
-    /// Groups start open; LazyVStack builds distant groups as they enter view.
+    /// Groups start open with stable row positions for search navigation.
     /// Closing a group removes its feature rows until the user reopens it.
     private func groupCard(_ group: FeatureGroup) -> some View {
         let members = AppFeature.features(in: group)

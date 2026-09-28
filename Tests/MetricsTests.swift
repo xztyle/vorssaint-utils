@@ -83,6 +83,7 @@ struct MetricsTests {
                 UtilitiesFeatureTests.run(suite)
                 PortManagerRefreshTests.run(suite)
             }),
+            ("feature-hub-layout", { FeatureHubLayoutTests.run(suite) }),
             ("settings", {
                 SettingsFeatureTests.run(suite)
                 SettingsWindowTests.run { suite.expect($0, $1) }
