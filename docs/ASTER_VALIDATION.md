@@ -551,3 +551,22 @@ strict signature verification. Its executable SHA-256 is
 `7d0ae5326c39b14ced478a00598f320b13581f4cd84f869a8b3d1fac61a6cd15`.
 It has not replaced the installed app. Real cross-app paste and drawer
 behavior remain open on the owner Mac.
+
+## Cleanup malware-result scope — 2026-09-28
+
+The cleanup branch `d89e60c` clears an old malware report when the selected
+folder changes, a folder or malware scan starts, or a scanned file is moved to
+Trash. This keeps a previous finding or clean result from appearing to describe
+a different set of files. Commit `64e25e4` also checks for an installed local
+ClamAV engine when the malware page first opens and refreshes its status after
+a successful Homebrew installation. The focused storage-inspection suite passed
+**101 checks**; the optimized branch build and app selftest passed.
+
+Detached integration `2cd0511` passed **80,709 checks** plus preference cleanup
+with zero failures. Its optimized signed bundle, packaged helper selftests and
+app selftest passed. The metadata-free candidate at
+`/private/tmp/aster-integrated-malware-scope-MVSxnA/Aster.app` passed deep,
+strict signature verification. Its executable SHA-256 is
+`69cae7edcbe80624e897f1a09794d35449fa45b73223a73d3be36ef8d98b09a8`.
+It has not replaced the installed app. The updated malware page still needs
+live UI verification with generated files.
