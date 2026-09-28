@@ -197,3 +197,15 @@ non-restored/unknown key states. All tests use an injected transport and verify
 zero hardware writes. Scoped battery/repository checks pass 408 checks total
 (162 battery, 246 repository). The primary agent owns the app rebuild and any
 live execution after the required journal evidence is obtained.
+
+The later `launchd.log` entry at 15:12:11 shows the current repeated failure
+before the helper starts: `copy_bundle_path` cannot resolve the registered BTM
+UUID, then reports `Invalid or missing Program/ProgramArguments` and exit 78.
+The installed plist's `BundleProgram` matches an existing executable, and that
+file passes `codesign --verify --strict`; the observation points to service
+resolution or saved registration, not a missing file on disk. It does not prove
+that local signing is accepted for a fresh daemon registration. [Apple DTS](https://developer.apple.com/forums/thread/799910)
+notes that exit 78 commonly reflects a broken launchd plist or executable
+path, while [its upgrade discussion](https://developer.apple.com/forums/thread/795022)
+describes saved signing constraints as another cause after helper replacement.
+The protected journal gate remains in force before any unregister or install.
