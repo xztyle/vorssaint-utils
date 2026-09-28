@@ -283,6 +283,41 @@ It has not replaced the installed app. All feature heads are pushed: battery
 `558b5dd`, clipboard `7c77372`, menu `b7a54cb`, capture `f78c1d2`, cleanup
 `aa51c35`. Actual-Mac replacement acceptance remains incomplete.
 
+The current screen-capture branch `040e233` adds continuous left-swipe motion
+to the bare corner image. Mouse dragging moves the card directly; a two-finger
+trackpad swipe uses AppKit's gesture progress and release animation. A short or
+cancelled gesture returns the card. The 834 screenshot checks, optimized build
+and packaged selftest pass. The image-only preview was observed in a generated
+fixture, but the Mac locked before live swipe feel and cross-app drop could be
+verified. The new trackpad behavior has not yet been launched in a fixture or
+installed app.
+
+A generated-only app was selected in the installed Aster uninstaller, moved to
+Trash, and restored with matching bytes through Finder's manual Move Here flow.
+Finder's Put Back was disabled for this dot-prefixed test app. A visible-name
+generated app is now signed and staged under `/private/tmp` for that test; it
+has not been placed in Applications. No personal app was removed.
+
+Current detached integration `e51800e` combines current main and all five
+feature branches. Its optimized release build, metadata-free deep signature
+check and packaged selftest pass; the verified bundle is staged at
+`/private/tmp/aster-integrated-trackpad-g7dldatp/Aster.app`, not installed.
+The combined screenshot suite passes 834 checks. The last full combined run,
+before the trackpad addition and feature-count correction, reported 15 failures
+in 70,968 checks: one stale feature count, one notch-rail visibility check and
+13 switcher-scroll visibility checks. The feature-count correction passes its
+1,105-check suite. The other 14 failures also reproduced on unchanged main
+while the screenshot fixture was open. A clean full rerun after closing the
+fixture is required; no current full-suite pass is claimed. The protected
+battery journal still needs its independent administrator read before the
+production app or helper is replaced.
+
+The full combined run after the trackpad change completed **70,970 checks**.
+Only those same 14 layout checks failed; all other suites, including the 834
+screenshot checks, passed, and preference cleanup passed. A distinct signed
+generated-image trackpad fixture is staged for the live gesture check but has
+not been launched while the Mac is locked.
+
 Replacement acceptance has not passed. Main retains the baseline and evidence
 docs; feature merges await their actual-Mac gates. Each feature needs its reviewed
 implementation, relevant tests, optimized build/selftest, actual behavior evidence
