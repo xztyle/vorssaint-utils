@@ -373,6 +373,7 @@ if (( TEST )); then
         Sources/Vorssaint/Core/MenuBarOrganizerStrings.swift
         Sources/Vorssaint/Core/MenuBarProductStrings.swift
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarOrganizerSupport.swift
+        Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarItemEventFactory.swift
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarAXDiagnosticTrace.swift
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarSourceMatchPolicy.swift
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarLayoutModels.swift
