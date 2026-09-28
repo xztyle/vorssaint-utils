@@ -377,3 +377,22 @@ fixture was not launched. Actual swipe motion, hover controls and cross-app
 image drop still need a live check. The protected battery journal also remains
 unreadable without administrator access. No production bundle or helper has
 been replaced; replacement acceptance and Setapp cancellation remain pending.
+
+## Battery service update gate — 2026-09-28
+
+The battery branch `b71c717` now versions its embedded service configuration
+with the helper executable. A configuration-only change can no longer be missed
+by the app's replacement check. The battery suite passed 162 checks. Its
+optimized bundle and packaged selftest passed, and independent inspection
+confirmed that both helper version fields match their executable-plus-plist
+hashes. Changing a temporary plist changes the computed version.
+
+Detached integration `f56b20a` includes that build change. The Swift source is
+unchanged from the 80,687-check green gate above. Its optimized bundle, packaged
+selftest and deep, strict signature check passed at
+`/private/tmp/aster-integrated-service-version-5pa2vaz9/Aster.app`.
+Its executable SHA-256 is
+`64174bf05272d8efca8021442dd56455f63b8aa96272576a7e0408235596cc31`.
+It has not been installed. The currently installed helper remains spawn-failed
+with EX_CONFIG, and the protected battery journal still requires an administrator
+read before registration repair or app replacement.
