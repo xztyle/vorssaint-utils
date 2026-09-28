@@ -311,6 +311,9 @@ extension ClipboardHistoryService {
 
     func installDismissMonitors(for panel: NSPanel) {
         removeDismissMonitors()
+        // Keep the disposable acceptance surface available while the owner
+        // works in another app. Production retains normal outside dismissal.
+        guard ClipboardLibraryProbe.root == nil else { return }
         let mouseEvents: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
         localClickMonitor = NSEvent.addLocalMonitorForEvents(matching: mouseEvents) { [weak self, weak panel] event in
             guard let self, let panel, panel.isVisible, panel.attachedSheet == nil else { return event }
