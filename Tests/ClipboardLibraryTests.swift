@@ -13,6 +13,7 @@ enum ClipboardLibraryTests {
         defer { try? FileManager.default.removeItem(at: root) }
         do {
             try durableSearchAndBackup(suite, root: root)
+            try sameTimeOrderSurvivesRestart(suite, root: root)
             try legacyMigration(suite, root: root)
             try transactionFailure(suite, root: root)
             try representationBackup(suite, root: root)
@@ -59,6 +60,33 @@ enum ClipboardLibraryTests {
             _ = try ClipboardLibraryArchive.safeAsset("../escape", in: root)
             suite.expect(false, "asset traversal must be rejected")
         } catch { suite.expect(true, "asset traversal rejected") }
+    }
+
+    private static func sameTimeOrderSurvivesRestart(_ suite: TestSuite, root: URL) throws {
+        let directory = root.appendingPathComponent("same-time-order")
+        let store = try ClipboardLibraryStore(root: directory)
+        let copiedAt = Date(timeIntervalSince1970: 100)
+        let first = ClipboardHistoryEntry(text: "first", copiedAt: copiedAt)
+        let second = ClipboardHistoryEntry(text: "second", copiedAt: copiedAt)
+        try store.save(.init(entries: [first, second], collections: []))
+        let reordered = ClipboardLibrarySnapshot(entries: [second, first], collections: [])
+        try store.save(reordered)
+        let reopened = try ClipboardLibraryStore(root: directory)
+        suite.expect(try reopened.load() == reordered,
+                     "equal-time clipboard cards retain their changed order after restart")
+
+        let mixedDirectory = root.appendingPathComponent("mixed-time-order")
+        let mixed = try ClipboardLibraryStore(root: mixedDirectory)
+        var older = ClipboardHistoryEntry(text: "older", copiedAt: Date(timeIntervalSince1970: 50))
+        let newer = ClipboardHistoryEntry(text: "newer", copiedAt: copiedAt)
+        try mixed.save(.init(entries: [older, newer], collections: []))
+        let loaded = try ClipboardLibraryStore(root: mixedDirectory)
+        _ = try loaded.load()
+        older.copiedAt = copiedAt
+        let tied = ClipboardLibrarySnapshot(entries: [newer, older], collections: [])
+        try loaded.save(tied)
+        suite.expect(try ClipboardLibraryStore(root: mixedDirectory).load() == tied,
+                     "a new timestamp tie keeps its order after reopening older stored positions")
     }
 
     private static func legacyMigration(_ suite: TestSuite, root: URL) throws {
