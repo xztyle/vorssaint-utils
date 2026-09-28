@@ -46,6 +46,7 @@ enum SettingsBackupSupport {
     /// Preferences stored without a registered default (absence means "use
     /// the built-in behavior"), still part of how the user set the app up.
     static let unregisteredPreferenceKeys: Set<String> = [
+        DefaultsKey.batteryCarePolicy,
         DefaultsKey.autoQuitEnabled,
         DefaultsKey.shelfEnabled,
         DefaultsKey.finderCutPasteEnabled,
@@ -98,6 +99,7 @@ enum SettingsBackupSupport {
     /// out by construction (they are not preference keys), listed here only
     /// when they would otherwise slip in through the registered set.
     static let machineStateKeys: Set<String> = [
+        DefaultsKey.batteryCareHelperVersion,
         DefaultsKey.dockPreviewRestoreAutohide,
         // A Bluetooth restore owed by one sleeping Mac means nothing on another.
         DefaultsKey.bluetoothSleepRestorePending,
@@ -395,6 +397,8 @@ enum SettingsBackupSupport {
     /// code that trusts its own settings.
     static func valueLooksRight(_ key: String, _ value: Any) -> Bool {
         switch key {
+        case DefaultsKey.batteryCarePolicy:
+            return BatteryCarePreferences.decode(value as? String) != nil
         case DefaultsKey.notchQuickAccessSide, DefaultsKey.notchQuickAccessSecond, DefaultsKey.notchQuickAccessThird:
             return value is String
         default: break

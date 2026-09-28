@@ -8,6 +8,8 @@ import IOKit.ps
 /// One power reading. Every field is optional: a Mac mini has no battery, a
 /// desktop may expose no SMC power key, so the UI shows only what is real.
 struct PowerReading {
+    var sampledAt = Date()
+    var batteryTemperature: Double?
     var systemWatts: Double?       // total the Mac is consuming (SMC PSTR)
     var adapterWatts: Double?      // real-time draw from the adapter (SMC PDTR)
     var adapterMaxWatts: Double?   // the charger's rated wattage
@@ -76,6 +78,8 @@ final class PowerSampler {
         }
 
         if let props = batteryProperties() {
+            let battery = BatterySensor.decode(props, at: reading.sampledAt)
+            reading.batteryTemperature = battery.temperature
             reading.hasBattery = true
             reading.externalConnected = (props["ExternalConnected"] as? Bool) ?? false
             reading.isCharging = (props["IsCharging"] as? Bool) ?? false
@@ -84,12 +88,7 @@ final class PowerSampler {
                 externalConnected: reading.externalConnected,
                 isCharging: reading.isCharging)
 
-            let voltageMv = (props["Voltage"] as? Int) ?? 0
-            let amperageMa = (props["Amperage"] as? Int) ?? (props["InstantAmperage"] as? Int) ?? 0
-            if voltageMv > 0, amperageMa != 0 {
-                // Power = V x I, signed by the amperage (negative while discharging).
-                reading.batteryWatts = (Double(voltageMv) / 1000.0) * (Double(amperageMa) / 1000.0)
-            }
+            reading.batteryWatts = battery.watts
 
             if let adapter = props["AdapterDetails"] as? [String: Any],
                let rated = adapter["Watts"] as? Int, rated > 0 {

@@ -1446,7 +1446,7 @@ enum RepositoryFeatureTests {
         suite.expect(selfUninstallSource.contains("guard restoreSleepBeforeRemoval() else")
                 && selfUninstallSource.contains("guard detachFromSystem() else")
                 && selfUninstallSource.contains("restoreSleepBeforeRemoval() -> Bool")
-                && selfUninstallSource.contains("guard detachFanControl() else")
+                && selfUninstallSource.contains("guard BatteryCareService.detachForRemoval(), detachFanControl() else")
                 && selfUninstallSource.contains("FanControlService.restoreAndUnregisterForRemoval()")
                 && selfUninstallSource.contains("adminPromptRecover")
                 && selfUninstallSource.contains("verification.status == 0"),

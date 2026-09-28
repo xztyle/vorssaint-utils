@@ -10,6 +10,7 @@ enum SelfUninstallContract {
     static var suspensionAllowed = true
     static var sleepRestoreAllowed = true
     static var detachAllowed = true
+    static var batteryDetachAllowed = true
     static var ruleRemovalAllowed = true
     static var tccResetAllowed = true
     static var fanHelperWasRegistered = true
@@ -67,6 +68,9 @@ enum SelfUninstallContract {
         let s = Text()
         let language = "en"
     }
+    enum BatteryCareService {
+        static func detachForRemoval() -> Bool { batteryDetachAllowed }
+    }
     enum FanControlService {
         static var hasRegisteredHelperForRemoval: Bool {
             events.append("fan registration")
@@ -88,11 +92,20 @@ enum SelfUninstallContract {
             suspensionAllowed = true
             sleepRestoreAllowed = true
             detachAllowed = true
+            batteryDetachAllowed = true
             ruleRemovalAllowed = allowRule
             tccResetAllowed = true
             fanHelperWasRegistered = true
             fanRegistrationRestored = true
         }
+
+        reset(allowRule: true)
+        batteryDetachAllowed = false
+        var blocked: Bool?
+        Host.clearPermissions { blocked = $0 }
+        DispatchQueue.main.flush()
+        suite.expect(blocked == false && !events.contains("tccutil") && !events.contains("login"),
+                     "battery recovery blocks permission and login removal")
 
         reset(allowRule: true)
         suspensionAllowed = false
