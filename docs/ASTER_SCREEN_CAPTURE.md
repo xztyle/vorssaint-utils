@@ -50,6 +50,8 @@ AppKit, verifies a new image attachment, and writes a received PNG and JSON rece
 with acceptance, dimensions, hash and advertised types. It reads only the drag
 pasteboard; the receiver's general copy, cut and paste commands are disabled.
 Fixture windows share a level so named controls can select each preview or editor.
+The fixture Window menu provides Command-0 for the receiver and Command-1 through
+Command-3 for each capture (its open editor takes priority over its preview).
 `ui-geometry.json` records visible window and receiver-input bounds in AppKit screen
 points whenever a window moves, resizes or changes focus/visibility. Root owns GUI
 interaction; a worker may launch this generated-only mode with explicit approval.

@@ -136,6 +136,9 @@ final class ScreenshotEditorController: NSObject, NSWindowDelegate {
     private func handleKey(_ event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let key = Int(event.keyCode)
+        if fixtureDirectory != nil,
+           flags.intersection([.command, .option, .shift, .control]) == .command,
+           [kVK_ANSI_0, kVK_ANSI_1, kVK_ANSI_2, kVK_ANSI_3].contains(key) { return false }
 
         let orderRaw = preferences.string(forKey: DefaultsKey.screenshotToolOrder)
         let bindingsRaw = preferences.string(forKey: DefaultsKey.screenshotToolShortcuts)

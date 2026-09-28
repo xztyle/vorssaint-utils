@@ -36,6 +36,7 @@ final class ScreenshotFixtureReceiver: NSObject {
         window = panel
         panel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        installWindowMenu()
         observeGeometry()
         recordGeometry()
     }
@@ -78,6 +79,7 @@ final class ScreenshotFixtureReceiver: NSObject {
     @objc private func showPreview(_ sender: NSButton) {
         guard let raw = sender.identifier?.rawValue, let id = UUID(uuidString: raw),
               let item = workspace.items.first(where: { $0.id == id }) else { return }
+        NSApp.activate(ignoringOtherApps: true)
         item.preview?.bringForward(takingFocus: true)
         recordGeometry()
     }
@@ -85,6 +87,48 @@ final class ScreenshotFixtureReceiver: NSObject {
     @objc private func editCapture(_ sender: NSButton) {
         guard let raw = sender.identifier?.rawValue, let id = UUID(uuidString: raw) else { return }
         workspace.openEditor(id: id)
+        recordGeometry()
+    }
+
+    private func installWindowMenu() {
+        let bar = NSMenu()
+        let application = NSMenu()
+        let quit = NSMenuItem(title: "Quit Capture Fixture", action: #selector(NSApplication.terminate(_:)),
+                             keyEquivalent: "q")
+        quit.target = NSApp
+        application.addItem(quit)
+        let appItem = NSMenuItem()
+        appItem.submenu = application
+        bar.addItem(appItem)
+        let windows = NSMenu(title: "Window")
+        windows.autoenablesItems = false
+        addWindowCommand("Controls and Drop Receiver", key: "0", id: nil, menu: windows)
+        for (index, item) in workspace.items.enumerated() {
+            addWindowCommand("Capture \(index + 1) · \(item.id.uuidString.prefix(8))",
+                             key: String(index + 1), id: item.id, menu: windows)
+        }
+        let windowItem = NSMenuItem(title: "Window", action: nil, keyEquivalent: "")
+        windowItem.submenu = windows
+        bar.addItem(windowItem)
+        NSApp.mainMenu = bar
+        NSApp.windowsMenu = windows
+    }
+
+    private func addWindowCommand(_ title: String, key: String, id: UUID?, menu: NSMenu) {
+        let item = NSMenuItem(title: title, action: #selector(selectWindow(_:)), keyEquivalent: key)
+        item.keyEquivalentModifierMask = .command
+        item.target = self
+        item.representedObject = id
+        menu.addItem(item)
+    }
+
+    @objc private func selectWindow(_ sender: NSMenuItem) {
+        NSApp.activate(ignoringOtherApps: true)
+        if let id = sender.representedObject as? UUID,
+           let item = workspace.items.first(where: { $0.id == id }) {
+            if let editor = item.editor { editor.bringForward() }
+            else { item.preview?.bringForward(takingFocus: true) }
+        } else { window?.makeKeyAndOrderFront(nil) }
         recordGeometry()
     }
 
