@@ -632,3 +632,21 @@ strict signature verification. Its executable SHA-256 is
 It has not replaced the installed app. The panel placement remains unverified
 visually on the owner's Mac, and the battery, menu-bar and screenshot live gates
 above remain open.
+
+## Recorded menu-bar recovery order — 2026-09-28
+
+A fresh read-only inventory from the signed combined candidate succeeded with
+Accessibility granted, no competing manager and eleven icons. The original
+baseline has ten entries. The current relative order differs in several places:
+Battery is now left of ChatGPT, Docker follows Text Input, and Siri is left of
+Control Center. Aster's own icon is an additional item. No icon input was
+posted by this inventory.
+
+The menu-bar branch `031beb8` adds that observed order as a planner regression.
+The model restores the saved relative order without dragging protected Control
+Center or Clock, and leaves the newer Aster icon alone. The focused branch and
+combined menu suites each passed **412 checks**; the branch's optimized build
+also passed. This adds test evidence only, not a production-source change. The
+last full combined source gate remains the **80,713-check** pass above.
+Actual icon movement, Undo and original-layout restoration are still required
+on this Mac before the menu feature can be accepted.
