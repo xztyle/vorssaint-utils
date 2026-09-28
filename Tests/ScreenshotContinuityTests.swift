@@ -36,11 +36,48 @@ enum ScreenshotContinuityTests {
         }, "six previews use separate rows and columns without overlapping")
         suite.expect(SettingsBackupSupport.exportKeys().contains("screenshotPreviewLifetime"),
                      "preview lifetime participates in settings backup")
+        let wide = ScreenshotPreviewPolicy.imageSize(CGSize(width: 1600, height: 400))
+        let thin = ScreenshotPreviewPolicy.floatingSize(image: CGSize(width: 30, height: 300))
+        suite.expect(wide == CGSize(width: 320, height: 80)
+                     && thin.width >= 116 && thin.height >= 44,
+                     "the floating preview preserves image shape and keeps hover controls reachable")
+        suite.expect(!ScreenshotPreviewPolicy.showsActions(hovered: false, menuTracking: false, dragging: false)
+                     && ScreenshotPreviewPolicy.showsActions(hovered: true, menuTracking: false, dragging: false)
+                     && ScreenshotPreviewPolicy.showsActions(hovered: false, menuTracking: true, dragging: false)
+                     && !ScreenshotPreviewPolicy.showsActions(hovered: true, menuTracking: false, dragging: true),
+                     "floating controls appear only during hover or menu use and hide during drag")
+        dismissGesture(suite)
         for language in AppLanguage.allCases {
             let labels = FeatureStrings.screenshotPreview(language)
             suite.expect(!labels.lifetime.isEmpty && !labels.keepOpen.isEmpty && !labels.caption.isEmpty,
                          "preview lifetime is translated for \(language.rawValue)")
         }
+    }
+
+    private static func dismissGesture(_ suite: TestSuite) {
+        let screen = CGRect(x: 0, y: 0, width: 1440, height: 900)
+        let start = CGPoint(x: 230, y: 120)
+        let edge = CGPoint(x: 3, y: 122)
+        let gesture = ScreenshotPreviewDismissGesture.self
+        suite.expect(gesture.shouldDismiss(start: start, end: edge, sourceScreen: screen,
+                                           otherScreens: [], accepted: false, cancelled: false),
+                     "a dominant left drag to the source screen edge closes an unaccepted preview")
+        suite.expect(!gesture.shouldDismiss(start: start, end: edge, sourceScreen: screen,
+                                            otherScreens: [], accepted: true, cancelled: false)
+                     && !gesture.shouldDismiss(start: start, end: edge, sourceScreen: screen,
+                                               otherScreens: [], accepted: false, cancelled: true),
+                     "accepted external drops and cancelled drags always keep the preview")
+        suite.expect(!gesture.shouldDismiss(start: start, end: CGPoint(x: 4, y: 500),
+                                            sourceScreen: screen, otherScreens: [],
+                                            accepted: false, cancelled: false)
+                     && !gesture.shouldDismiss(start: start, end: CGPoint(x: 40, y: 120),
+                                               sourceScreen: screen, otherScreens: [],
+                                               accepted: false, cancelled: false),
+                     "vertical or short drags do not dismiss")
+        let leftDisplay = CGRect(x: -1280, y: 0, width: 1280, height: 800)
+        suite.expect(!gesture.shouldDismiss(start: start, end: edge, sourceScreen: screen,
+                                            otherScreens: [leftDisplay], accepted: false, cancelled: false),
+                     "a display to the left remains a valid drag destination")
     }
 
     private static func transfer(_ suite: TestSuite) {

@@ -45,3 +45,39 @@ enum ScreenshotPreviewPolicy {
         return result
     }
 }
+
+/// The floating preview has no shell. Its only permanent pixels are the image.
+extension ScreenshotPreviewPolicy {
+    static func imageSize(_ image: CGSize) -> CGSize {
+        guard image.width > 0, image.height > 0, image.width.isFinite, image.height.isFinite else {
+            return CGSize(width: 1, height: 1)
+        }
+        let factor = min(320 / image.width, 210 / image.height, 1)
+        return CGSize(width: image.width * factor, height: image.height * factor)
+    }
+
+    static func floatingSize(image: CGSize) -> CGSize {
+        let size = imageSize(image)
+        // Transparent hit space keeps hover controls usable for a very thin crop.
+        return CGSize(width: max(116, size.width), height: max(44, size.height))
+    }
+
+    static func showsActions(hovered: Bool, menuTracking: Bool, dragging: Bool) -> Bool {
+        !dragging && (hovered || menuTracking)
+    }
+}
+
+/// A native drop always wins. Only an unaccepted, deliberate left-edge gesture
+/// dismisses; a connected display on the left remains an ordinary drag route.
+enum ScreenshotPreviewDismissGesture {
+    static func shouldDismiss(start: CGPoint, end: CGPoint, sourceScreen: CGRect,
+                              otherScreens: [CGRect], accepted: Bool, cancelled: Bool) -> Bool {
+        guard !accepted, !cancelled, sourceScreen.width > 0, sourceScreen.height > 0,
+              end.x <= sourceScreen.minX + 8, end.x >= sourceScreen.minX - 8,
+              end.y >= sourceScreen.minY, end.y <= sourceScreen.maxY else { return false }
+        let dx = end.x - start.x, dy = end.y - start.y
+        guard dx <= -48, abs(dx) >= abs(dy) * 1.5 else { return false }
+        let acrossEdge = CGPoint(x: sourceScreen.minX - 1, y: end.y)
+        return !otherScreens.contains { $0.contains(acrossEdge) }
+    }
+}

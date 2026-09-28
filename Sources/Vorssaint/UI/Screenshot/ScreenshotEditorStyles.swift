@@ -149,11 +149,7 @@ extension ScreenshotEditorView {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(.regularMaterial, in: Capsule(style: .continuous))
-        .overlay(
-            Capsule(style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-        )
+        .background(HUDBackdrop(cornerRadius: 18, contrast: .high))
         .shadow(color: .black.opacity(0.16), radius: 12, y: 3)
     }
 
@@ -235,14 +231,14 @@ extension ScreenshotEditorView {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(.regularMaterial, in: Capsule(style: .continuous))
+        .background(HUDBackdrop(cornerRadius: 18, contrast: .high))
         .shadow(color: .black.opacity(0.16), radius: 12, y: 3)
     }
 
     func colorDot(_ colorID: ScreenshotSupport.ColorID) -> some View {
         let selected = model.color == colorID
         return Button {
-            withAnimation(.spring(response: 0.22, dampingFraction: 0.7)) {
+            withAnimation(reduceMotion ? nil : .spring(response: 0.22, dampingFraction: 0.7)) {
                 model.color = colorID
             }
         } label: {

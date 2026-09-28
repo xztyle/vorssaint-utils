@@ -7,9 +7,11 @@ import AppKit
 /// global hotkeys, or a pasteboard reader. All input images are generated here.
 enum ScreenshotCaptureFixture {
     static func runIfRequestedAndExit() {
-        guard let argument = CommandLine.arguments.first(where: { $0.hasPrefix("--capture-fixture=") }) else { return }
+        let configured = Bundle.main.object(forInfoDictionaryKey: "AsterCaptureFixtureDirectory") as? String
+        guard let path = requestedDirectory(arguments: CommandLine.arguments,
+                                            bundleDirectory: configured) else { return }
         do {
-            let directory = try fixtureDirectory(String(argument.dropFirst("--capture-fixture=".count)))
+            let directory = try fixtureDirectory(path)
             let app = NSApplication.shared
             let delegate = FixtureDelegate(directory: directory)
             app.delegate = delegate
@@ -22,7 +24,15 @@ enum ScreenshotCaptureFixture {
         }
     }
 
+    private static func requestedDirectory(arguments: [String], bundleDirectory: String?) -> String? {
+        if let argument = arguments.first(where: { $0.hasPrefix("--capture-fixture=") }) {
+            return String(argument.dropFirst("--capture-fixture=".count))
+        }
+        return bundleDirectory.flatMap { $0.isEmpty ? nil : $0 }
+    }
+
     private static func fixtureDirectory(_ path: String) throws -> URL {
+        guard path.hasPrefix("/"), path != "/" else { throw CocoaError(.fileWriteInvalidFileName) }
         let url = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
         let resolved = canonicalDirectory(url)
         let roots = [canonicalDirectory(FileManager.default.temporaryDirectory).path,

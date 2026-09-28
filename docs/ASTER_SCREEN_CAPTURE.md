@@ -41,6 +41,11 @@ the application delegate, capture services, hotkeys, permission prompts, history
 service, or a general clipboard reader/writer. A unique preferences suite supplies
 editor preferences and is removed on normal termination. The provided temporary
 root receives the initial images, each committed edit and `manifest.json`.
+For a GUI launch that cannot pass arguments, a separately signed temporary app
+copy may put the same absolute private temporary path in its Info.plist key
+`AsterCaptureFixtureDirectory`. The argument takes precedence when both are set.
+The key is absent from production builds. The fixture rejects relative paths,
+the shared temporary root and paths outside a private temporary child directory.
 External output controls are disabled or return no result in this mode. Save
 acts as Done, writing only the fixture's committed image. Editor and corner drag
 still use the real renderer. A fixture control window has named Preview and Edit

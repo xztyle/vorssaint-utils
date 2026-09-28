@@ -42,11 +42,7 @@ extension ScreenshotEditorView {
             }
         }
         .padding(5)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-        )
+        .background(HUDBackdrop(cornerRadius: 15, contrast: .high))
         .shadow(color: .black.opacity(0.18), radius: 16, y: 5)
     }
 
@@ -63,7 +59,6 @@ extension ScreenshotEditorView {
             ZStack(alignment: .topTrailing) {
                 Image(systemName: tool.screenshotSymbolName)
                     .font(.system(size: 13.5, weight: .medium))
-                    .symbolEffect(.bounce, value: isActive)
                     .frame(width: 33, height: 29)
                 if let shortcutLabel {
                     Text(shortcutLabel)
@@ -82,11 +77,11 @@ extension ScreenshotEditorView {
             )
             .foregroundStyle(isActive ? Color.accentColor : Color.primary.opacity(0.85))
             .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-            .scaleEffect(isHovered && !isActive ? 1.06 : 1)
+            .scaleEffect(isHovered && !isActive && !reduceMotion ? 1.06 : 1)
         }
         .buttonStyle(.borderless)
         .onHover { inside in
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
+            withAnimation(reduceMotion ? nil : .spring(response: 0.2, dampingFraction: 0.8)) {
                 hoveredTool = inside ? tool : (hoveredTool == tool ? nil : hoveredTool)
             }
         }
@@ -240,11 +235,7 @@ extension ScreenshotEditorView {
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 6)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-        )
+        .background(HUDBackdrop(cornerRadius: 12, contrast: .high))
         .shadow(color: .black.opacity(0.16), radius: 14, y: 4)
     }
 
@@ -291,7 +282,7 @@ extension ScreenshotEditorView {
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 6)
-        .background(.regularMaterial, in: Capsule(style: .continuous))
+        .background(HUDBackdrop(cornerRadius: 16, contrast: .high))
         .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
     }
 
@@ -317,7 +308,7 @@ extension ScreenshotEditorView {
             }
         }
         .padding(4)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .background(HUDBackdrop(cornerRadius: 9, contrast: .high))
         .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
         .screenshotSafeHelp("⌃ scroll · ⌘+ ⌘-")
     }

@@ -27,6 +27,7 @@ struct ScreenshotEditorView: View {
     @State var sharing = false
     @State var sharedRecord: ScreenshotShareRecord?
     @State var shareAnchor = ShelfSharePickerAnchor.Anchor()
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
     @AppStorage(DefaultsKey.screenshotToolOrder) var toolOrderRaw =
         ScreenshotSupport.Tool.defaultOrderStorage
     @AppStorage(DefaultsKey.screenshotToolShortcuts) var bindingsRaw = ""
@@ -67,9 +68,9 @@ struct ScreenshotEditorView: View {
             }
         }
         .ignoresSafeArea()
-        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: model.tool)
-        .animation(.easeOut(duration: 0.16), value: model.annotationShadowsEnabled)
-        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: model.backdropStyle)
+        .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.86), value: model.tool)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: model.annotationShadowsEnabled)
+        .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.86), value: model.backdropStyle)
         .onAppear { keyboard.start() }
         .onDisappear { keyboard.stop() }
         .sheet(item: $sharedRecord) { record in
@@ -196,7 +197,7 @@ struct ScreenshotEditorView: View {
         .scaleEffect(appeared ? 1 : 0.965)
         .opacity(appeared ? 1 : 0)
         .onAppear {
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+            withAnimation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.82)) {
                 appeared = true
             }
         }

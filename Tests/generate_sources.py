@@ -823,6 +823,8 @@ def main():
     write("CaptureReceiverConstruction.swift", "import AppKit\nimport CryptoKit\nimport ImageIO\n"
           + "extension ScreenshotFixtureReceiverTests {\n"
           + declaration("Sources/Vorssaint/Support/ScreenshotCaptureFixture.swift",
+                        "    private static func requestedDirectory(").replace("private static func", "static func", 1)
+          + declaration("Sources/Vorssaint/Support/ScreenshotCaptureFixture.swift",
                         "    private static func fixtureDirectory(").replace("private static func", "static func", 1)
           + "\n" + declaration("Sources/Vorssaint/Support/ScreenshotCaptureFixture.swift",
                         "    private static func canonicalDirectory(").replace("private static func", "static func", 1)
@@ -843,7 +845,7 @@ def main():
                     for prefix in ["    private func hoverChanged(", "    private func scheduleAutoDismiss(",
                                    "    private func perform("])
           + "}\nstruct Preview {\nlet embedded: Bool\nlet hoverChanged: (Bool) -> Void\n"
-          + declaration(preview, "    private func previewHoverChanged(").replace("private func", "func", 1)
+          + declaration("Sources/Vorssaint/UI/Screenshot/ScreenshotQuickPreviewView.swift", "    private func previewHoverChanged(").replace("private func", "func", 1)
           + "}\n}\n")
     selection = "Sources/Vorssaint/Services/QuickTools/ScreenshotSelectionController.swift"
     refresh_methods = [
