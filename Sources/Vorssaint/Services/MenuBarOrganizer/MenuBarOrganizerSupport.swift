@@ -120,6 +120,11 @@ enum MenuBarOrganizerSupport {
     static let controlCenterBundleIdentifier = "com.apple.controlcenter"
     static let systemUIServerBundleIdentifier = "com.apple.systemuiserver"
 
+    static func windowID(fromWindowNumber number: Int) -> CGWindowID? {
+        guard number > 0 else { return nil }
+        return CGWindowID(exactly: number)
+    }
+
     static func collapsedLength(screenWidths: [CGFloat]) -> CGFloat {
         let widest = screenWidths.max() ?? 2_048
         return min(max(widest * 2, 4_096), 16_384)

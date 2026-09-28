@@ -19,10 +19,10 @@ final class MenuBarDividerItem: NSObject {
     var onRightClick: (() -> Void)?
 
     var windowID: CGWindowID? {
-        // windowNumber can be non-positive for a window without a window
-        // device; CGWindowID's unsigned conversion would trap on it.
+        // Remote status windows can also use identifiers above UInt32.max.
+        // They are not WindowServer IDs and must never be truncated.
         statusItem.button?.window.flatMap {
-            $0.windowNumber > 0 ? CGWindowID($0.windowNumber) : nil
+            MenuBarOrganizerSupport.windowID(fromWindowNumber: $0.windowNumber)
         }
     }
 

@@ -4,6 +4,7 @@ import AppKit
 
 enum MenuBarOrganizerTests {
     static func run(_ suite: TestSuite) {
+        windowNumbers(suite)
         identities(suite)
         layouts(suite)
         newItems(suite)
@@ -11,6 +12,15 @@ enum MenuBarOrganizerTests {
         persistence(suite)
         search(suite)
         localization(suite)
+    }
+
+    static func windowNumbers(_ suite: TestSuite) {
+        suite.expect(MenuBarOrganizerSupport.windowID(fromWindowNumber: 12_712) == 12_712,
+                     "a real WindowServer identifier is retained")
+        for number in [-1, 0, 8_589_934_592, Int.max] {
+            suite.expect(MenuBarOrganizerSupport.windowID(fromWindowNumber: number) == nil,
+                         "unassigned and macOS 26 remote window identifiers cannot trap or alias a real window")
+        }
     }
 
     static func item(_ name: String, x: CGFloat, section: MenuBarOrganizerSection = .visible,
