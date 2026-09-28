@@ -611,3 +611,24 @@ strict signature verification. Its executable SHA-256 is
 It has not replaced the installed app. Live cross-app drag and opaque left
 swipe still need acceptance; the generated-only opaque fixture's launch
 approval is pending. Battery helper and menu-bar input remain untouched.
+
+## Upstream menu panel update — 2026-09-28
+
+Upstream Vorssaint through `ff0df3d` was merged into Aster main as `6dc5510`.
+It limits full-size menu popover content to macOS 26 and gives tall panels
+enough room for the popover arrow, so AppKit can keep them below the menu-bar
+icon. The merge touched five upstream files, preserved Aster's name and bundle
+identity, and had no conflicts. Main passed **79,666 checks** plus preference
+cleanup; its optimized signed bundle, packaged app selftest and deep, strict
+signature verification passed.
+
+Detached integration `d806c68` includes the same upstream fixes and all five
+feature branches. It passed **80,713 checks** plus preference cleanup with zero
+failures. Its optimized signed bundle, packaged app and helper selftests passed.
+The metadata-free candidate at
+`/private/tmp/aster-integrated-upstream-popover-j69Xup/Aster.app` passed deep,
+strict signature verification. Its executable SHA-256 is
+`25bcce966e1842ffd4178add032e5e23852e1b1ca007d367feacd5b192671aa6`.
+It has not replaced the installed app. The panel placement remains unverified
+visually on the owner's Mac, and the battery, menu-bar and screenshot live gates
+above remain open.
