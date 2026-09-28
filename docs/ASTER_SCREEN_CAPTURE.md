@@ -90,5 +90,26 @@ Implementation branch: `feature/screen-capture`.
   a private pasteboard. The screenshot suite passes 822 checks, including new/existing
   temporary-root checks and rejection of the shared temporary root. A generated-only fixture launch stayed alive and wrote all
   three initial manifest entries after this repair.
-- Actual capture permissions, multi-display/Spaces, drag receivers and hardware
-  behavior on Mac16,5 macOS 26.6.2 remain the root's acceptance gate.
+- Real Mac UI acceptance on Mac16,5 / macOS 26.6.2: Capture 3 was edited with
+  a visible arrow, Done returned it to the corner, and Command-3 selected its
+  revision-1 preview. A real native drag inserted a PNG attachment into the
+  fixture's AppKit rich text input. Receipt
+  `received-323B197E-76D0-4C61-9121-4BF1A7D18E90.json` reports acceptance,
+  `public.png`, one attachment and 1800 × 1000 pixels. Its PNG SHA-256 exactly
+  matches capture `992037AF-4621-4C84-8C6B-D7B5B0D7ACE3` revision 1:
+  `ccc9fe30b8d7b560aecf9df561a6ecd5a736d5113ffb35c1f7938cf886acd06f`.
+- Capture 2's discard dialog was cancelled and the editor remained open. Undo
+  then Done returned an image with no arrow visible. An ImageIO comparison of
+  original and edited PNGs found 141 of 1,800,000 pixels changed by only one
+  8-bit level in one channel; dimensions are identical. The renderer uses a
+  DeviceRGB context, so this is consistent with color-conversion rounding.
+  The exported image is not claimed to be pixel-identical to the original.
+- All three previews remained available, including Capture 3's earlier edit.
+  A second actual drag inserted Capture 2 revision 1 as the receiver's second
+  image attachment; its saved PNG exactly matches that committed revision.
+  That interaction was intended as a cancellation check but completed a drop,
+  so actual drag cancellation remains unverified.
+- Production screen-recording permission, real capture, multi-display/Spaces,
+  and external application receivers remain the root's acceptance gate. The
+  fixture proves editing and real preview-to-rich-text drag with generated
+  images; it does not request capture permission or record the user's screen.
