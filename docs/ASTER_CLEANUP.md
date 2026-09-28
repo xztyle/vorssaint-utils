@@ -194,3 +194,8 @@ to Trash. This prevents an old finding or clean result from appearing to
 describe a changed file set. The focused storage suite passed 101 checks, and
 the optimized signed build and app selftest passed. Live UI behavior with a
 changed generated folder remains to be checked.
+
+On first opening the malware page, Aster now checks the installed ClamAV tools
+and private definitions automatically. After a successful Homebrew installation,
+it refreshes the version and verification state without another button press.
+The manual Definitions control remains available for later updates or retries.

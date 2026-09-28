@@ -173,8 +173,10 @@ final class StorageInspectionService: ObservableObject {
             BoundedProcessRunner.run(brew, ["install", "clamav"], timeout: 900, maxOutputBytes: 65_536,
                 environment: HomebrewEnvironment.forBrew, cancellation: cancellation)
         }) { [weak self] result in
-            self?.detail = String(decoding: result.output, as: UTF8.self)
-            self?.engineAvailable = !result.timedOut && result.status == 0 && ClamAVTools.detect() != nil
+            guard let self else { return }
+            self.detail = String(decoding: result.output, as: UTF8.self)
+            self.engineAvailable = !result.timedOut && result.status == 0 && ClamAVTools.detect() != nil
+            if self.engineAvailable { self.refreshEngine() }
         }
     }
 

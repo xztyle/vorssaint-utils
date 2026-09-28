@@ -19,6 +19,7 @@ struct StorageSecurityView: View {
         .confirmationDialog(text[.install], isPresented: $installConfirmation) {
             Button(text[.install]) { service.installEngine() }
         } message: { Text(text[.engineMissing]) }
+        .onAppear { if malwareMode && service.engineVersion.isEmpty { service.refreshEngine() } }
     }
 
     private var malwareControls: some View {
