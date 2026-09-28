@@ -19,6 +19,7 @@ struct BatterySchedule: Codable, Equatable, Identifiable {
     var isValid: Bool {
         TimeZone(identifier: timeZone) != nil && start.timeIntervalSince1970.isFinite
             && (10...100).contains(target) && (action != .limit || target >= 21)
+            && (action != .discharge || target <= 99)
     }
 }
 

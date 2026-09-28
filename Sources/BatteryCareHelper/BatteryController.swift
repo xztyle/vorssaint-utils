@@ -28,13 +28,7 @@ final class BatteryController {
         self.makeHardware = makeHardware
         self.readSample = readSample
         self.readCompetitors = readCompetitors
-        do { state = try journal.load() }
-        catch {
-            state = BatteryCareState()
-            state.ownsHardware = true
-            state.recoveryPending = true
-            state.record(.journalFailed, at: Date())
-        }
+        state = Self.load(journal)
         snapshot.fingerprint = fingerprint
         snapshot.helperBuild = BatteryCareIdentifiers.protocolVersion
         if state.qualifiedFingerprint != snapshot.fingerprint {
@@ -44,6 +38,17 @@ final class BatteryController {
         BatteryPolicy.pauseOperation(&state)
         state.operation?.paused = true
         if automaticallyStart { queue.async { self.start() } }
+    }
+
+    private static func load(_ journal: BatteryStateStore) -> BatteryCareState {
+        do { return try journal.load() }
+        catch {
+            var state = BatteryCareState()
+            state.ownsHardware = true
+            state.recoveryPending = true
+            state.record(.journalFailed, at: Date())
+            return state
+        }
     }
 
     func start() {
@@ -216,7 +221,10 @@ final class BatteryController {
 
     @discardableResult func restoreHardware(disable: Bool) -> Bool {
         if disable { state.policy.enabled = false }
-        guard state.ownsHardware || state.recoveryPending else { return save() }
+        guard state.ownsHardware || state.recoveryPending else {
+            if disable { snapshot.reason = .system; snapshot.command = .system }
+            return save()
+        }
         state.recoveryPending = true
         _ = save()
         if hardware == nil { probe() }

@@ -1,0 +1,85 @@
+# Battery care validation, 2026-09-28
+
+This is implementation evidence, not acceptance of the AlDente replacement.
+The primary agent owns hardware activation and the remaining actual-Mac gate.
+
+## Automated checks
+
+The optimized app build passed, including compilation of the separate protected
+battery daemon, helper selftest, app assembly and deep signature verification with
+**Aster Local Signing**. `build/Aster --selftest` returned `SELFTEST OK`.
+No daemon was installed or started by the battery implementation worker.
+
+The final scoped test compilation used three workers and passed:
+
+```text
+battery-care: OK (121 checks)
+preferences: OK (97 checks)
+repository: OK (246 checks)
+features: OK (1103 checks)
+settings: OK (366 checks)
+localization: OK (7346 checks)
+uninstaller: OK (48 checks)
+TESTS OK (9327 checks)
+```
+
+Battery tests cover range and heat hysteresis; fresh/missing sensor data; signed
+current decoding; manual/automatic discharge bounds and timeout; top-up unplug;
+calibration transitions, observed hold time, cancellation and restart pause;
+missed-task freshness, duplicate claims, stable ties, DST gap/fold and biweekly
+behavior; invalid protocol and policy data; exact CHTE byte order, denied writes,
+readback mismatch and controller drift; failed restore with durable retry;
+journal failure before writes; measured qualification stages with injected
+readings; malformed RPC replies; and exactly-once XPC failure/timeout completion.
+All 15 locale tables and settings-backup inclusion/exclusion pass.
+
+`git diff --check`, `zsh -n build.sh` and `zsh -n Tools/uninstall.sh` passed.
+Removal was not executed against the real app. Its source now blocks deletion
+until hardware/helper restoration succeeds, preserves upstream Vorssaint,
+checks the menu recovery baseline, and moves Aster's bundle to Trash.
+
+## Read-only host evidence
+
+The built helper's `--probe` observed on the actual host:
+
+- Mac model: `Mac16,5`.
+- macOS: `26.6.2`, build `25G83`.
+- Battery: 80%, 34.65°C, external power connected, `IsCharging=false`, 0 W.
+- CHTE/CHIE metadata/read shapes eligible; both controls read as system/charge allowed.
+- No known competing process detected by the bounded process inspection.
+- The firmware value was independently read at `IODeviceTree:/chosen`:
+  `system-firmware-version=mBoot-18000.161.10`.
+
+The first built diagnostic used the wrong registry node for the firmware string
+and reported `unknown`. The final source fixes that path so a firmware change
+also invalidates old qualification. Key eligibility is not write capability.
+
+## Rebuild and hardware gate still required
+
+After the successful optimized bundle, scoped tests found and fixed the
+battery-only Energy page visibility gate and locale-aware decimal formatting.
+The final source also includes the correct firmware node and stricter removal
+preflight. **These final small changes require an incremental app/helper rebuild.**
+The primary agent agreed to own that rebuild and its app selftest.
+
+No SMC write, root helper registration, daemon start, qualification, actual
+charge/discharge transition, thermal cutoff/resume, full top-up, complete
+calibration, sleep/lid/reboot behavior, or real uninstall has been claimed here.
+Those remain the explicit actual-Mac gate in `BATTERY_CARE.md` and the product
+contract. The interface refuses control until bounded qualification passes.
+
+## Diagnostic entry points for the primary agent
+
+Successful pre-final-fix signed bundle: `build/stage/Aster.app` in this feature
+worktree. Use the rebuilt signed app executable, not an ad-hoc standalone copy:
+
+```sh
+Aster.app/Contents/MacOS/Aster --battery-status
+Aster.app/Contents/MacOS/Aster --battery-register
+Aster.app/Contents/MacOS/Aster --battery-request '{"version":1,"kind":"qualify"}'
+Aster.app/Contents/MacOS/Aster --battery-request '{"version":1,"kind":"returnToSystem"}'
+```
+
+Register and request entry points require the Battery care feature availability
+preference and stable signing. Registration can require macOS approval. The
+helper's `--probe` and `--selftest` are read-only. Neither starts its daemon loop.

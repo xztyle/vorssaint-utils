@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Vorssaint and Aster contributors
 
 import Foundation
+import Darwin
 
 extension BatteryController {
     func runSchedules() {
@@ -55,17 +56,16 @@ extension BatteryController {
 /// Unexpected key drift supplies the independent control-integrity check.
 enum BatteryCompetitors {
     static func running() -> [String] {
-        let process = Process()
-        let pipe = Pipe()
-        process.executableURL = URL(fileURLWithPath: "/bin/ps")
-        process.arguments = ["-axo", "comm="]
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        guard (try? process.run()) != nil else { return ["process-inspection-unavailable"] }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else { return ["process-inspection-unavailable"] }
-        let paths = String(decoding: data, as: UTF8.self).split(separator: "\n")
+        let estimate = proc_listallpids(nil, 0)
+        guard estimate > 0, estimate < 100000 else { return ["process-inspection-unavailable"] }
+        var pids = [pid_t](repeating: 0, count: Int(estimate) + 64)
+        let count = pids.withUnsafeMutableBytes { proc_listallpids($0.baseAddress, Int32($0.count)) }
+        guard count > 0, count <= pids.count else { return ["process-inspection-unavailable"] }
+        let paths = pids.prefix(Int(count)).compactMap { pid -> String? in
+            var buffer = [CChar](repeating: 0, count: 4096)
+            guard pid > 0, proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return nil }
+            return String(cString: buffer)
+        }
         return Array(Set(paths.compactMap { path -> String? in
             let value = path.lowercased()
             if value.contains("aldente") { return "AlDente" }

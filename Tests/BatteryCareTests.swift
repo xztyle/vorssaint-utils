@@ -15,8 +15,10 @@ enum BatteryCareTests {
         schedules(suite)
         scheduleDST(suite)
         protocolValidation(suite)
+        replyCompletion(suite)
         hardware(suite)
         sensors(suite)
+        BatteryControllerTests.run(suite)
         #if !BATTERY_STANDALONE
         localizationAndBackup(suite)
         #endif
@@ -186,6 +188,16 @@ enum BatteryCareTests {
         suite.expect(!state.isValid, "unsupported journal schema rejected")
     }
 
+    static func replyCompletion(_ suite: TestSuite) {
+        var gate = BatteryReplyGate()
+        let request = gate.begin()
+        suite.expect(gate.consume(request), "XPC failure completes the active request")
+        suite.expect(!gate.consume(request), "timeout after error cannot complete twice")
+        let retry = gate.begin()
+        suite.expect(!gate.consume(request), "late old reply cannot consume the retry")
+        suite.expect(gate.consume(retry), "retry remains available after the old failure")
+    }
+
     static func hardware(_ suite: TestSuite) {
         let fake = FakeBatteryTransport()
         let hardware = try! BatteryHardware(transport: fake)
@@ -215,6 +227,9 @@ enum BatteryCareTests {
         suite.expect(sample.watts == -12, "unsigned IORegistry current becomes signed discharge")
         suite.expect(sample.isFresh(at: now), "complete measured sample accepted")
         suite.expect(!BatterySensor.decode([:], at: now).isFresh(at: now), "missing properties never imply safe state")
+        var missingCurrent = sample
+        missingCurrent.watts = nil
+        suite.expect(!missingCurrent.isFresh(at: now), "missing current stops discharge immediately")
     }
 
     #if !BATTERY_STANDALONE
@@ -231,7 +246,7 @@ enum BatteryCareTests {
     #endif
 }
 
-private final class FakeBatteryTransport: BatteryKeyTransport {
+final class FakeBatteryTransport: BatteryKeyTransport {
     var values: [String: [UInt8]] = ["CHTE": [0, 0, 0, 0], "CHIE": [0]]
     var denyWrites = false
     var ignoreWrites = false

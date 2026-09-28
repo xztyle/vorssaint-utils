@@ -1,118 +1,90 @@
 #!/bin/zsh
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Vorssaint
+# Copyright (C) 2026 Vorssaint and Aster contributors
 
-# Cleanly removes Vorssaint and every piece of system state it created:
-# the fan helper daemon, the login item, TCC permissions, preferences, saved
-# state, the app's own data folder and (if present) the password-free
-# closed-lid sudoers rule. Leaves no dead entries behind.
-# Also clears the pre-rename "Vorssaint Utils.app" if it is still around.
+# Remove this fork only. Never remove upstream Vorssaint or its saved state.
+# Hardware restoration must finish before deleting the app or its preferences.
 set -uo pipefail
 
-BUNDLE="com.vorssaint.utils"
-APP="/Applications/Vorssaint.app"
-LEGACY_APP="/Applications/Vorssaint Utils.app"
+BUNDLE="io.github.xztyle.Aster"
+APP="/Applications/Aster.app"
+EXECUTABLE="Aster"
+if [[ "${1:-}" == "--dev" ]]; then
+    BUNDLE="io.github.xztyle.Aster.dev"
+    APP="/Applications/Aster (Developer).app"
+    EXECUTABLE="AsterDeveloper"
+elif (( $# )); then
+    print -u2 "Usage: $0 [--dev]"
+    exit 2
+fi
 
-echo "▸ Quitting…"
-pkill -x Vorssaint 2>/dev/null || true
-pkill -x VorssaintUtils 2>/dev/null || true
-sleep 0.5
+refuse_removal() {
+    print -u2 "Aster remains installed: $1"
+    print -u2 "Open Aster, return battery and fan control to macOS, then try removal again."
+    exit 1
+}
 
-# Detach from the system from inside whichever bundle still exists: unregisters
-# the login item (no BTM tombstone) and restores normal sleep.
-# The fan helper's registration lives in the system, not in the bundle, so
-# deleting the app below cannot reach it. Only the binary can drop it, and the
-# check after the loop settles what its absence or failure left behind.
-detached=1
-for candidate in "$APP/Contents/MacOS/Vorssaint" "$LEGACY_APP/Contents/MacOS/VorssaintUtils"; do
-    if [[ -x "$candidate" ]]; then
-        echo "▸ Detaching the fan helper and login item, restoring sleep…"
-        if "$candidate" --uninstall; then detached=0; fi
-        break
+service_absent() {
+    /bin/launchctl print "system/$1" >/dev/null 2>&1
+    # Only the explicit 'no such service' result proves absence.
+    [[ $? == 113 ]]
+}
+
+print "▸ Restoring hardware and detaching Aster services…"
+if /usr/bin/pgrep -x "$EXECUTABLE" >/dev/null 2>&1; then
+    /usr/bin/osascript -e "tell application id \"$BUNDLE\" to quit" \
+        || refuse_removal "Aster could not finish its recovery before quitting."
+    for attempt in {1..15}; do
+        /usr/bin/pgrep -x "$EXECUTABLE" >/dev/null 2>&1 || break
+        /bin/sleep 1
+    done
+    /usr/bin/pgrep -x "$EXECUTABLE" >/dev/null 2>&1 \
+        && refuse_removal "Aster is still restoring its state."
+fi
+candidate="$APP/Contents/MacOS/$EXECUTABLE"
+if [[ -x "$candidate" ]]; then
+    "$candidate" --uninstall || refuse_removal "hardware or service restoration failed."
+else
+    if /usr/bin/defaults read "$BUNDLE" menuBarOrganizerBaseline >/dev/null 2>&1; then
+        refuse_removal "menu layout recovery cannot be verified without Aster. Reinstall and restore the original layout first."
     fi
+    [[ ! -d "/Library/Application Support/$BUNDLE.battery-care" ]] \
+        || refuse_removal "the signed app is missing and battery recovery cannot be verified. Reinstall Aster first."
+fi
+
+for suffix in battery-care fan-control; do
+    for attempt in {1..15}; do
+        service_absent "$BUNDLE.$suffix" && break
+        /bin/sleep 1
+    done
+    service_absent "$BUNDLE.$suffix" || refuse_removal "$suffix is still registered or its state is unknown."
 done
-# `detached` cannot tell a failed unregister from no binary having run, and the
-# second is ordinary: an app trashed by hand, then this script for the rest. It
-# also cannot see a daemon that went despite a reported failure. launchctl
-# settles both without sudo, and still finds a registration held back for a
-# pending fan recovery, which is the one case that must keep warning.
-if (( detached )); then
-    launchctl print "system/$BUNDLE.fan-control" >/dev/null 2>&1
-    # 113 is "no such service", the only answer that proves absence. Any other
-    # failure means launchctl could not tell us, and warning then is the honest
-    # side of a check that exists to stop this script claiming what it cannot see.
-    (( $? == 113 )) && detached=0
+
+# Aster's sleep preference is separate from the upstream app's preference.
+if [[ "$(/usr/bin/defaults read "$BUNDLE" vorssDisabledSleep 2>/dev/null)" == "1" ]]; then
+    sleep_state="$(/usr/bin/pmset -g 2>/dev/null | /usr/bin/awk '/SleepDisabled/ {print $2}')"
+    [[ "$sleep_state" == "0" ]] || refuse_removal "normal sleep has not been verified."
 fi
 
-# Whether the closed-lid feature is the reason sleep is off. Read here because
-# the preferences that hold it are deleted a few lines below, and without it a
-# check on the setting alone would blame Vorssaint for a `pmset disablesleep 1`
-# that somebody else, or the user, had set.
-sleep_was_ours=0
-[[ "$(defaults read "$BUNDLE" vorssDisabledSleep 2>/dev/null)" == "1" ]] && sleep_was_ours=1
+print "▸ Resetting Aster permissions…"
+/usr/bin/tccutil reset All "$BUNDLE" >/dev/null 2>&1 \
+    || refuse_removal "macOS refused permission cleanup."
 
-echo "▸ Resetting permissions (Accessibility, Screen Recording)…"
-tccutil reset All "$BUNDLE" >/dev/null 2>&1 || true
-
-echo "▸ Removing app, preferences, saved state and stored data (clipboard history, shelf files, share links)…"
-rm -rf "$APP" "$LEGACY_APP"
-defaults delete "$BUNDLE" >/dev/null 2>&1 || true
-rm -f "$HOME/Library/Preferences/$BUNDLE.plist"
-rm -rf "$HOME/Library/Saved Application State/$BUNDLE.savedState"
-# Clipboard history, shelf files, captures and the share delete tokens live
-# here; the in-app uninstall takes them, so this path must not keep them.
-rm -rf "$HOME/Library/Application Support/$BUNDLE"
-rm -rf "$HOME/Library/Caches/$BUNDLE"
-# Written by URLSession on the app's behalf, so they exist without the app ever
-# naming the path; `defaults delete` does not reach them either.
-rm -rf "$HOME/Library/HTTPStorages/$BUNDLE" "$HOME/Library/HTTPStorages/$BUNDLE.binarycookies"
-# `defaults delete` does not reach ByHost. The (N) qualifier is load-bearing:
-# without it zsh aborts the command on an unmatched pattern, which is the
-# ordinary case, and prints an error over a successful uninstall.
-rm -f "$HOME/Library/Preferences/ByHost/$BUNDLE".*.plist(N)
-
-RULES="/etc/sudoers.d/vorssaint-clamshell /etc/sudoers.d/vorssaint-utils-clamshell /etc/sudoers.d/vorss-clamshell"
-if ls $RULES >/dev/null 2>&1; then
-    echo "▸ Removing closed-lid sudoers rule (asks for your admin password)…"
-    osascript -e "do shell script \"rm -f $RULES\" with administrator privileges with prompt \"Vorssaint uninstaller\"" || true
+# Keep the bundle recoverable if an unrelated later cleanup step fails.
+if [[ -d "$APP" ]]; then
+    /bin/mkdir -p "$HOME/.Trash"
+    trash_target="$HOME/.Trash/$EXECUTABLE-$(/bin/date +%Y%m%d-%H%M%S).app"
+    /bin/mv "$APP" "$trash_target" || refuse_removal "the app could not move to Trash."
 fi
 
-# `--uninstall` restores sleep, but it runs before the app has an
-# NSApplication and so cannot raise the password dialog the in-app uninstall
-# falls back to. A restore that needed one therefore reaches here as a setting
-# still switched on. `pmset -g` reads it without sudo, and this is the only
-# warning anyone will get: the app that knew the setting was its doing has
-# just been removed.
-sleep_stuck=0
-sleep_unknown=0
-if (( sleep_was_ours )); then
-    sleep_state="$(pmset -g 2>/dev/null | awk '/SleepDisabled/ { print $2 }')"
-    # "0" is the only answer that proves sleep came back, and "1" the only one
-    # that proves it did not. Anything else is pmset not answering: it must not
-    # pass as success, and it must not be reported as a failed restore either.
-    if [[ "$sleep_state" == "1" ]]; then
-        sleep_stuck=1
-    elif [[ "$sleep_state" != "0" ]]; then
-        sleep_unknown=1
-    fi
-fi
-
-if (( detached == 0 && sleep_stuck == 0 && sleep_unknown == 0 )); then
-    echo "✓ Vorssaint fully removed."
-    exit 0
-fi
-if (( detached )); then
-    echo "⚠ Vorssaint removed, but its fan helper is still registered with the system." >&2
-    echo "  Reinstall Vorssaint, then use Settings › Advanced to uninstall from inside the app." >&2
-fi
-if (( sleep_stuck )); then
-    echo "⚠ Vorssaint removed, but this Mac still has sleep switched off." >&2
-    echo "  Closed-lid mode disabled it, and restoring it needed a password this script could not ask for." >&2
-    echo "  Put it back with: sudo pmset disablesleep 0" >&2
-fi
-if (( sleep_unknown )); then
-    echo "⚠ Vorssaint removed, but whether sleep came back could not be read." >&2
-    echo "  Closed-lid mode had switched it off. Check with: pmset -g | grep SleepDisabled" >&2
-    echo "  If that reads 1, put it back with: sudo pmset disablesleep 0" >&2
-fi
-exit 1
+print "▸ Removing only Aster preferences and stored data…"
+/usr/bin/defaults delete "$BUNDLE" >/dev/null 2>&1 || true
+/bin/rm -f "$HOME/Library/Preferences/$BUNDLE.plist"
+/bin/rm -rf "$HOME/Library/Saved Application State/$BUNDLE.savedState" \
+    "$HOME/Library/Application Support/$BUNDLE" "$HOME/Library/Caches/$BUNDLE" \
+    "$HOME/Library/HTTPStorages/$BUNDLE" "$HOME/Library/HTTPStorages/$BUNDLE.binarycookies"
+/bin/rm -f "$HOME/Library/Preferences/ByHost/$BUNDLE".*.plist(N)
+# Shared upstream sudoers rules and root recovery journals are deliberately kept.
+# Their ownership cannot be inferred from a filename; the disabled journal also
+# preserves diagnostic evidence for any later recovery.
+print "✓ Aster removed. The app is in Trash; upstream apps and settings were preserved."

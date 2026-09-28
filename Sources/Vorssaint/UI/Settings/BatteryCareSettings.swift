@@ -33,10 +33,14 @@ struct BatteryCareSettings: View {
             if let sample = snapshot.sample {
                 HStack(spacing: 20) {
                     Text(sample.percent.map { "\($0)%" } ?? "—").font(.largeTitle.monospacedDigit())
-                    Text(sample.temperature.map { String(format: "%.1f °C", $0) } ?? "—")
-                    Text(sample.watts.map { String(format: "%+.1f W", $0) } ?? "—")
+                    Text(sample.temperature.map { String(format: "%.1f °C", locale: l10n.language.formattingLocale(), $0) } ?? "—")
+                    Text(sample.watts.map { String(format: "%+.1f W", locale: l10n.language.formattingLocale(), $0) } ?? "—")
                 }.accessibilityLabel(text[.actual])
-                Text(sample.at, style: .time).font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Image(systemName: sample.connected == true ? "powerplug.fill" : "battery.100percent")
+                    Text(text[!sample.isFresh(at: Date()) ? .unavailable : sample.charging == true ? .charging : (sample.watts ?? 0) < -0.5 ? .discharge : .holding])
+                    Text(sample.at, style: .time)
+                }.font(.caption).foregroundStyle(.secondary)
             }
             if !service.registered {
                 Button(text[service.needsApproval ? .approve : .install]) { service.authorize() }

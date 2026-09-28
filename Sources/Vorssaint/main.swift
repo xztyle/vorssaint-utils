@@ -5,6 +5,7 @@ import AppKit
 
 SuperKeyMappingGuard.runIfRequestedAndExit()
 Defaults.register()
+BatteryCareDiagnostics.runIfRequested()
 MouseAccelerationGuard.runIfRequestedAndExit()
 MouseAccelerationService.recoverPendingAtLaunch()
 

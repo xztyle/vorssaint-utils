@@ -386,7 +386,7 @@ enum FeatureCatalogTests {
 
         // MARK: Features hub catalog
 
-        suite.expect(AppFeature.allCases.count == 73, "feature catalog has 73 features")
+        suite.expect(AppFeature.allCases.count == 74, "feature catalog has 74 features")
         suite.expect(Set(AppFeature.allCases.map(\.rawValue)).count == AppFeature.allCases.count,
                "feature ids are unique")
         suite.expect(AppFeature.allCases.map(\.rawValue) == [
@@ -396,7 +396,7 @@ enum FeatureCatalogTests {
             "clipboardHistory", "pastePlain", "finderCutPaste", "finderRename", "shelf", "urlCleaner",
             "diskImageInstaller",
             "mixer", "soundOutputSwitcher", "audioPriority", "micMute", "musicBlock",
-            "keepAwake", "brightness", "extraBrightness", "bluetoothSleep",
+            "keepAwake", "batteryCare", "brightness", "extraBrightness", "bluetoothSleep",
             "quickLauncher", "quickToggles", "colorPicker", "screenOCR", "cleaningMode", "mediaTools",
             "cleaner", "uninstaller", "homebrew", "appUpdates", "screenshot", "cameraPreview",
             "radialMenu", "scratchpad", "commandBar", "screenRecorder", "wallpaper", "killProcess", "portManager", "notch", "notchCalendar", "notchNotifications", "notchGestures", "notchTimer", "notchAccessories", "notchLyrics", "notchQueue", "notchLiveEqualizer", "notchDownloads", "notchAgents",
@@ -570,7 +570,7 @@ enum FeatureCatalogTests {
                 && AppFeature.allCases.filter {
                     $0 != .focusFollowsMouse && $0 != .fanControl && $0 != .diskImageInstaller
                         && $0 != .killProcess && $0 != .scrollHorizontal && $0 != .portManager && $0 != .wallpaper
-                        && $0 != .audioPriority
+                        && $0 != .audioPriority && $0 != .batteryCare
                 }.allSatisfy {
                     (AppFeature.availabilityDefaults[$0.availabilityKey] as? Bool) == true
                 },
@@ -1752,10 +1752,10 @@ enum FeatureCatalogTests {
                "mouse click debounce alone keeps its Settings page reachable")
         suite.expect(!pageVisible(.mouse, available: []),
                "the mouse page hides only with all eight mouse features off")
-        suite.expect(!pageVisible(.energy, available: allFeatures.subtracting([.keepAwake, .brightness,
+        suite.expect(!pageVisible(.energy, available: allFeatures.subtracting([.keepAwake, .batteryCare, .brightness,
                                                                          .extraBrightness,
                                                                          .bluetoothSleep])),
-               "energy hides when all four of its features are off")
+               "energy hides when all its features are off")
         suite.expect(pageVisible(.energy, available: [.extraBrightness]), "XDR alone keeps the energy page")
         suite.expect(pageVisible(.energy, available: [.brightness]),
                "brightness control alone keeps the energy page")

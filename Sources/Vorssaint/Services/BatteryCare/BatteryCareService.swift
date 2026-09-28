@@ -12,7 +12,7 @@ final class BatteryCareService: ObservableObject {
     @Published private(set) var busy = false
     private var connection: NSXPCConnection?
     private var timer: Timer?
-    private var requestID = UUID()
+    private var replyGate = BatteryReplyGate()
     private var removing = false
 
     private var daemon: SMAppService { .daemon(plistName: BatteryCareIdentifiers.plistName) }
@@ -87,7 +87,7 @@ final class BatteryCareService: ObservableObject {
         send(.init(kind: kind, policy: policy, target: target))
     }
 
-    private func proxy() -> BatteryCareXPCProtocol? {
+    private func proxy(onError: @escaping () -> Void) -> BatteryCareXPCProtocol? {
         if connection == nil {
             let connection = NSXPCConnection(machServiceName: BatteryCareIdentifiers.helperID, options: .privileged)
             connection.remoteObjectInterface = NSXPCInterface(with: BatteryCareXPCProtocol.self)
@@ -96,33 +96,35 @@ final class BatteryCareService: ObservableObject {
             connection.resume()
             self.connection = connection
         }
-        return connection?.remoteObjectProxyWithErrorHandler { [weak self] _ in
-            DispatchQueue.main.async { self?.snapshot.reason = .helperUnavailable; self?.busy = false }
+        return connection?.remoteObjectProxyWithErrorHandler { _ in
+            DispatchQueue.main.async(execute: onError)
         } as? BatteryCareXPCProtocol
     }
 
     private func send(_ request: BatteryCareRequest?, completion: ((Bool) -> Void)? = nil) {
-        guard let proxy = proxy() else { completion?(false); return }
         busy = true
-        let id = UUID()
-        requestID = id
+        let id = replyGate.begin()
+        let failed = { [weak self] in self?.failed(id: id, completion: completion) }
+        guard let proxy = proxy(onError: { failed() }) else { failed(); return }
         let reply: (Data) -> Void = { [weak self] data in
             DispatchQueue.main.async { self?.received(data, id: id, completion: completion) }
         }
         if let request, let data = try? JSONEncoder().encode(request) { proxy.request(data, withReply: reply) }
         else { proxy.status(withReply: reply) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 12) { [weak self] in
-            guard let self, self.requestID == id, self.busy else { return }
-            self.requestID = UUID()
-            self.busy = false
-            self.snapshot.reason = .helperUnavailable
-            completion?(false)
+            self?.failed(id: id, completion: completion)
         }
     }
 
+    private func failed(id: UUID, completion: ((Bool) -> Void)?) {
+        guard replyGate.consume(id) else { return }
+        busy = false
+        snapshot.reason = .helperUnavailable
+        completion?(false)
+    }
+
     private func received(_ data: Data, id: UUID, completion: ((Bool) -> Void)?) {
-        guard requestID == id else { return }
-        requestID = UUID()
+        guard replyGate.consume(id) else { return }
         busy = false
         guard let response = try? JSONDecoder().decode(BatteryCareResponse.self, from: data) else {
             snapshot.reason = .helperUnavailable
@@ -155,7 +157,12 @@ final class BatteryCareService: ObservableObject {
         removing = true
         send(.init(kind: .returnToSystem)) { success in
             self.removing = false
-            guard success, !self.snapshot.state.ownsHardware, !self.snapshot.state.recoveryPending else { return }
+            guard success, !self.snapshot.state.ownsHardware, !self.snapshot.state.recoveryPending else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                    if !AppFeature.batteryCare.isAvailable { self.removeHelper() }
+                }
+                return
+            }
             do {
                 try self.daemon.unregister()
                 self.connection?.invalidate()

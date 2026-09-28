@@ -85,7 +85,18 @@ final class BatteryHardware {
                 kCFAllocatorDefault, 0)?.takeRetainedValue() as? Data else { return "unknown" }
             return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .controlCharacters)
         }
-        return [property("model"), property("firmware-version"),
+        return [property("model"), firmwareVersion,
                 ProcessInfo.processInfo.operatingSystemVersionString].joined(separator: " · ")
     }
+    private static var firmwareVersion: String {
+        let chosen = IORegistryEntryFromPath(kIOMainPortDefault, "IODeviceTree:/chosen")
+        guard chosen != 0 else { return "unknown" }
+        defer { IOObjectRelease(chosen) }
+        guard let value = IORegistryEntryCreateCFProperty(chosen, "system-firmware-version" as CFString,
+            kCFAllocatorDefault, 0)?.takeRetainedValue() else { return "unknown" }
+        if let string = value as? String { return string }
+        guard let data = value as? Data else { return "unknown" }
+        return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .controlCharacters)
+    }
+
 }

@@ -59,8 +59,7 @@ else
     BUILD_CONFIGURATION="release"
 fi
 FAN_HELPER_ID="$APP_BUNDLE_ID.fan-control"
-BATTERY_HELPER_ID="io.github.xztyle.Aster.battery-care"
-(( DEV )) && BATTERY_HELPER_ID="io.github.xztyle.Aster.dev.battery-care"
+BATTERY_HELPER_ID="$APP_BUNDLE_ID.battery-care"
 # Now Playing is read through /usr/bin/perl loading this library; see
 # Sources/NowPlayingAdapter. Staged under Contents/Frameworks, signed on its own.
 NOW_PLAYING_ADAPTER_ID="$APP_BUNDLE_ID.now-playing"
@@ -335,8 +334,13 @@ if (( TEST )); then
         Sources/Vorssaint/Core/KeepAwakeStrings.swift
         Sources/Vorssaint/Core/BluetoothSleepStrings.swift
         Sources/Vorssaint/Core/PermissionGuideStrings.swift
+        Sources/BatteryCareHelper/BatteryJournal.swift
+        Sources/BatteryCareHelper/BatteryController.swift
+        Sources/BatteryCareHelper/BatteryScheduling.swift
+        Sources/BatteryCareHelper/BatteryQualification.swift
         Sources/Vorssaint/Core/BatteryCareStrings.swift
         Sources/Vorssaint/Core/BatteryCarePreferences.swift
+        Sources/Vorssaint/Services/BatteryCare/BatteryReplyGate.swift
         Sources/Vorssaint/Services/BatteryCare/BatteryCareModels.swift
         Sources/Vorssaint/Services/BatteryCare/BatteryPolicy.swift
         Sources/Vorssaint/Services/BatteryCare/BatterySchedule.swift
@@ -805,7 +809,7 @@ sign_bundle() {
         echo "  re-signing after filesystem metadata settled"
         xattr -c -r "$bundle" 2>/dev/null || true
         [[ -f "$helper" ]] && codesign_fan_helper "$helper"
-    [[ -f "$battery" ]] && codesign_battery_helper "$battery"
+        [[ -f "$battery" ]] && codesign_battery_helper "$battery"
         [[ -f "$adapter" ]] && codesign_now_playing_adapter "$adapter"
         codesign_app "$bundle"
     fi

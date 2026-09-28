@@ -42,10 +42,10 @@ struct BatterySample: Codable, Equatable {
     var adapterWatts: Double?
 
     func isFresh(at now: Date) -> Bool {
-        guard let percent, let temperature, connected != nil, charging != nil else { return false }
+        guard let percent, let temperature, let watts, connected != nil, charging != nil else { return false }
         return (-2...20).contains(now.timeIntervalSince(at)) && (0...100).contains(percent)
             && temperature.isFinite && (0...65).contains(temperature)
-            && (watts == nil || (watts!.isFinite && abs(watts!) < 400))
+            && watts.isFinite && abs(watts) < 400
     }
 }
 
