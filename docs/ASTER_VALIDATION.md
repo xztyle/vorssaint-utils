@@ -534,3 +534,20 @@ strict signature verification. Its executable SHA-256 is
 `9a5b91905f15edc341a5e356ae2ef3261e40985213f6e4b6baa1cb34ea66b6b1`.
 It has not replaced the installed app. Real sleep, lid and wake behavior still
 require physical acceptance after the protected battery journal is verified.
+
+## Clipboard backup merge order — 2026-09-28
+
+The clipboard branch `f53b0c9` preserves the saved order of equal-time cards
+when a backup is merged. Existing edits win when a copy has the same identity
+in both libraries; new backup cards follow in their saved order. A disposable
+merge and database reopen verify the result. The focused clipboard suite
+passed **698 checks**, and its optimized bundle and app selftest passed.
+
+Detached integration `b81b7f3` passed **80,709 checks** plus preference cleanup
+with zero failures. Its optimized signed bundle, packaged helper selftests and
+app selftest passed. The metadata-free candidate at
+`/private/tmp/aster-integrated-clipboard-merge-0ryAYx/Aster.app` passed deep,
+strict signature verification. Its executable SHA-256 is
+`7d0ae5326c39b14ced478a00598f320b13581f4cd84f869a8b3d1fac61a6cd15`.
+It has not replaced the installed app. Real cross-app paste and drawer
+behavior remain open on the owner Mac.
