@@ -19,6 +19,7 @@ enum BatteryCareTests {
         hardware(suite)
         sensors(suite)
         adapterPresence(suite)
+        BatteryRegistrationRepairTests.run(suite)
         BatteryControllerTests.run(suite)
         #if !BATTERY_STANDALONE
         localizationAndBackup(suite)
@@ -276,6 +277,7 @@ final class FakeBatteryTransport: BatteryKeyTransport {
     var denyWrites = false
     var ignoreWrites = false
     var wrongShape = false
+    var writeCount = 0
 
     func inspectKey(named name: String) throws -> SMCClient.Key {
         .init(code: 0, name: name, dataSize: wrongShape ? 2 : name == "CHTE" ? 4 : 1,
@@ -283,6 +285,7 @@ final class FakeBatteryTransport: BatteryKeyTransport {
     }
     func checkedRead(_ key: SMCClient.Key) throws -> [UInt8] { values[key.name]! }
     func writeBytes(_ bytes: [UInt8], to key: SMCClient.Key) throws {
+        writeCount += 1
         if denyWrites { throw BatteryHardwareError.unavailable }
         if !ignoreWrites { values[key.name] = bytes }
     }

@@ -179,3 +179,21 @@ an unfinished unregister can register the replacement, and that completion error
 stop registration. The primary agent owns the combined rebuild and safe recovery
 through the previous verified helper. Recovery and a successful replacement launch
 remain pending; no security setting or launch constraint was weakened.
+
+Restoring the previous verified bundle did not resolve the failed service's
+program lookup. The actual read-only hardware probe still showed AC enabled and
+inhibit cleared. The protected journal could not be read without administrator
+authentication, so the primary agent requested that evidence from the owner.
+There is no claim that the probe's default state proves journal contents.
+
+An explicit registration-only diagnostic is prepared for review. It requires
+disabled feature availability, stable signing and verified normal hardware keys,
+then waits for asynchronous removal of the existing registration. It neither
+registers a replacement nor writes hardware or journal state. Its execution is
+pending independent journal verification; the app's normal authenticated
+restore-before-removal path remains unchanged. Tests cover disabled-feature and
+signing gates, waiting for actual removal completion, failed removal, and five
+non-restored/unknown key states. All tests use an injected transport and verify
+zero hardware writes. Scoped battery/repository checks pass 408 checks total
+(162 battery, 246 repository). The primary agent owns the app rebuild and any
+live execution after the required journal evidence is obtained.
