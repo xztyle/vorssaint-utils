@@ -5,6 +5,7 @@ import Foundation
 enum MenuBarRestorationTests {
     static func run(_ suite: TestSuite) {
         actualUndo(suite)
+        currentMacRecovery(suite)
         geometry(suite)
         permutations(suite)
     }
@@ -55,6 +56,27 @@ enum MenuBarRestorationTests {
         suite.expect(MenuBarMoveGeometry.hasSettled(row, previous: row, rowY: 0), "two equal frames on the original row confirm settlement")
         suite.expect(MenuBarMoveGeometry.point(in: row, after: false) == CGPoint(x: 1631, y: 0),
                      "native drags stay on the menu row's top edge rather than pulling the item downward")
+    }
+
+    static func currentMacRecovery(_ suite: TestSuite) {
+        let original = ["ChatGPT", "Docker", "Claude", "TextInput", "Battery", "NowPlaying",
+                        "WiFi", "Control", "Siri", "Clock"]
+        let current = ["Battery", "Aster", "ChatGPT", "Claude", "WiFi", "TextInput",
+                       "Docker", "NowPlaying", "Siri", "Control", "Clock"]
+        let protected: Set<String> = ["Control", "Clock"]
+        let items = current.enumerated().map { index, name in
+            make(name, CGFloat(index * 30), .visible, !protected.contains(name))
+        }
+        let desired = MenuBarLayout(entries: original.map {
+            MenuBarLayoutEntry(identity: id($0), section: .visible)
+        })
+        let plan = MenuBarLayoutPolicy.plan(desired, items: items)
+        suite.expect(!MenuBarLayoutPolicy.isSatisfied(desired, items: items),
+                     "the current Mac order differs from its saved original layout")
+        suite.expect(!plan.isEmpty && !plan.contains { protected.contains($0.identity.title) },
+                     "recovery never drags protected Control Center or Clock")
+        suite.expect(MenuBarLayoutPolicy.isSatisfied(desired, items: apply(plan, to: items)),
+                     "planned moves restore the recorded order without moving the new Aster icon")
     }
 
     static func permutations(_ suite: TestSuite) {

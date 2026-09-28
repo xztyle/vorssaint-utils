@@ -104,6 +104,14 @@ build. It closes the Retry path that could resume automatic moves after a
 collateral change. The original layout still differs from the physical order,
 so this change has not been exercised by moving real icons.
 
+A later read-only inventory found eleven current icons against ten original
+baseline entries. Battery, Docker, Wi-Fi, Text Input, Siri and Control Center
+are not in their original relative order; Aster's newer icon is additional.
+The exact observed order is now a restoration-planner regression. Its model
+plan restores the baseline's relative order without dragging protected Control
+Center or Clock, and the focused suite passes 412 checks. No actual icon was
+moved by this check, so physical restoration remains unverified.
+
 ## Source attribution
 
 The WindowServer/Accessibility/divider/drag substrate and original Settings/string
