@@ -9,10 +9,24 @@ import SwiftUI
 /// engine install, permissions request or automatic scan is started here.
 enum CleanupProbe {
     static var root: URL? {
-        guard let argument = CommandLine.arguments.first(where: { $0.hasPrefix("--cleanup-fixture=") }) else { return nil }
-        let supplied = URL(fileURLWithPath: String(argument.dropFirst("--cleanup-fixture=".count)), isDirectory: true)
+        let argument = CommandLine.arguments.first(where: { $0.hasPrefix("--cleanup-fixture=") })
+        let path = argument.map { String($0.dropFirst("--cleanup-fixture=".count)) } ?? signedBundleFixturePath()
+        guard let path else { return nil }
+        let supplied = URL(fileURLWithPath: path, isDirectory: true)
         return (try? StorageLocalAccess.canonicalRoot(supplied)) ?? supplied
     }
+
+    private static func signedBundleFixturePath() -> String? {
+        guard let path = Bundle.main.object(forInfoDictionaryKey: "AsterCleanupFixtureDirectory") as? String,
+              path.hasPrefix("/") else { return nil }
+        let url = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL.resolvingSymlinksInPath()
+        guard url.path.hasPrefix("/private/tmp/"),
+              (try? CleanupFixturePolicy.needsPreparation(url)) == false else {
+            return nil
+        }
+        return url.path
+    }
+
     private static var window: NSWindow?
     private static var resizeObserver: NSObjectProtocol?
     private static var resultObserver: AnyCancellable?
