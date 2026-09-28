@@ -30,6 +30,10 @@ Alejandro's Mac16,5 running macOS 26.6.2 before this feature is accepted.
 - A local original-layout baseline is written before adding controls or moving
   items. Disable and quit restore the baseline before controls are removed.
   Failed restoration or absent original items retain the baseline for recovery.
+  After each drag, Aster checks that every other stable icon kept its section
+  and order. An unexpected change stops automatic moves and keeps the recovery
+  state. A restart with a changed original layout does not resume automatic
+  rearrangement before that state is resolved.
   Clearing permissions or fully uninstalling refuses to proceed while recovery
   remains pending. Portable backups contain layout/profile/rule intent, never the
   original recovery baseline, live process/window IDs, coordinates or AX caches.
@@ -84,6 +88,13 @@ hide/reorder/menu activation, profiles, rule expiry, notch, secondary display,
 Spaces/full-screen, menu auto-hide, sleep/wake, app restart, disable restoration,
 competing-manager rejection and bounded WindowServer resource use. No such
 interaction is claimed by automated checks.
+
+The later isolated-move safety check covers the observed Docker move that also
+swapped Siri and Control Center. It accepts a Docker-only move, rejects the
+collateral swap or a missing unrelated icon, and recognizes a changed original
+order after restart. The focused menu suite passes 409 checks. This is model
+and source verification; a real icon move, Undo and restart still need hands-on
+acceptance on the owner's Mac.
 
 ## Source attribution
 

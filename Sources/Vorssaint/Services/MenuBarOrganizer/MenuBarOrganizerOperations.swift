@@ -25,20 +25,36 @@ extension MenuBarOrganizerService {
               let destination = destination(for: section, before: target, reference: current.frame)
         else { operationMessage = text.errorUnavailable; return false }
         guard restoring ? restoreAllowed : entryAllowed else { return false }
+        let beforeMove = items
         do {
             try await mover.move(item: current, destinationFrame: destination.frame,
                                  placeAfter: destination.after)
-            guard await settleAndRefresh(), let moved = items.first(where: { $0.id == identity }),
-                  moved.windowID == current.windowID, moved.section == section else {
-                operationMessage = text.errorVerification; return false
-            }
-            if let target, !MenuBarLayoutPolicy.satisfies(MenuBarMovePlanStep(identity: identity,
-                before: target, section: section), items: items) {
-                operationMessage = text.errorVerification; return false
-            }
+            guard await verifyMove(current, before: beforeMove, target: target, section: section) else { return false }
             operationMessage = nil
             return true
-        } catch { operationMessage = moveErrorMessage(error); return false }
+        } catch {
+            if let moveError = error as? MenuBarItemMoveError,
+               case .verificationFailed = moveError { markUnsafeMove() }
+            operationMessage = moveErrorMessage(error)
+            return false
+        }
+    }
+
+    private func verifyMove(_ original: ManagedMenuBarItem, before: [ManagedMenuBarItem],
+                            target: MenuBarItemIdentity?, section: MenuBarOrganizerSection) async -> Bool {
+        guard await settleAndRefresh(), let moved = items.first(where: { $0.id == original.id }),
+              moved.windowID == original.windowID, moved.section == section,
+              MenuBarLayoutPolicy.preservesUnmovedItems(original.id, before: before, after: items),
+              target.map({ MenuBarLayoutPolicy.satisfies(MenuBarMovePlanStep(identity: original.id,
+                  before: $0, section: section), items: items) }) ?? true
+        else { markUnsafeMove(); return false }
+        return true
+    }
+
+    private func markUnsafeMove() {
+        recoveryNeeded = true
+        automationPaused = true
+        operationMessage = text.errorVerification
     }
 
     func settleAndRefresh() async -> Bool {
