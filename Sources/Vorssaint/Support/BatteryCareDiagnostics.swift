@@ -10,7 +10,11 @@ enum BatteryCareDiagnostics {
     static func runIfRequested() {
         let args = CommandLine.arguments
         guard args.contains("--battery-status") || args.contains("--battery-request")
-            || args.contains("--battery-register") else { return }
+            || args.contains("--battery-register") || args.contains("--battery-repair-registration") else { return }
+        if args.contains("--battery-repair-registration") {
+            guard args.count == 2 else { exit(1) }
+            repairRegistration()
+        }
         if args.contains("--battery-register") { register(); exit(0) }
         var request: Data?
         if let index = args.firstIndex(of: "--battery-request") {
@@ -23,6 +27,27 @@ enum BatteryCareDiagnostics {
             request = data
         }
         connect(request: request)
+    }
+
+    private static func repairRegistration() -> Never {
+        let service = SMAppService.daemon(plistName: BatteryCareIdentifiers.plistName)
+        BatteryRegistrationRepair.unregister(featureEnabled: AppFeature.batteryCare.isAvailable,
+            hasStableSigning: AppCodeIdentity.requirement(identifier: BatteryCareIdentifiers.helperID) != "never",
+            readHardware: { try? BatteryHardware().readState() },
+            removeService: { completion in
+                if service.status == .notRegistered { completion(nil) }
+                else { service.unregister(completionHandler: completion) }
+            }, completion: { result in
+                print("battery-registration-repair=\(result.rawValue)")
+                // No registration, journal mutation or hardware write occurs here.
+                exit(result == .unregistered ? 0 : 1)
+            })
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
+            fputs("Battery registration repair timed out.\n", stderr)
+            exit(1)
+        }
+        RunLoop.main.run()
+        exit(1)
     }
 
     private static func register() {

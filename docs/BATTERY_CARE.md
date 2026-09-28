@@ -119,6 +119,22 @@ Diagnostic status/register commands alone do not perform this upgrade; open the
 Battery care panel or run the normal app with Battery care enabled. The status
 field `helperBuild` is the protocol version, not the bundled executable hash.
 
+If a failed bundle replacement prevents the service from executing, the explicit
+maintenance command `--battery-repair-registration` can remove that registration
+without registering or starting a replacement. It accepts no other arguments,
+requires Battery care availability to be off, requires stable signing, and reads
+the actual hardware keys to confirm AC is enabled and charge inhibit is cleared.
+Unknown keys, active inhibit or adapter cut block it. Removal waits for the
+`SMAppService` completion. The command does not edit the journal or write hardware.
+
+This maintenance command is for an operator who has independently verified the
+protected journal has no enabled policy, active operation, ownership or pending
+recovery. The hardware probe's default state is not journal evidence. The command
+does not perform that privileged journal check itself and is never invoked by
+normal feature removal. After confirmed removal, normal feature enablement and
+service authorization register the verified app. A regular helper restart may
+resume a valid saved policy; registration repair must not assume otherwise.
+
 Tests in `BatteryCareTests.swift` and `BatteryControllerTests.swift` exercise the
 pure policy and an injected transport/state store. Run `./build.sh --test-suite=battery-care`, the optimized app build, app selftest and helper
 selftest. Simulated evidence is deliberately separate from actual hardware.

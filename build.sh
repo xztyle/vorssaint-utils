@@ -346,6 +346,7 @@ if (( TEST )); then
         Sources/Vorssaint/Services/BatteryCare/BatteryPolicy.swift
         Sources/Vorssaint/Services/BatteryCare/BatterySchedule.swift
         Sources/Vorssaint/Services/BatteryCare/BatteryHardware.swift
+        Sources/Vorssaint/Services/BatteryCare/BatteryRegistrationRepair.swift
         Sources/Vorssaint/Services/BatteryCare/BatterySensor.swift
         Sources/Vorssaint/Services/BatteryCare/BatteryCareXPC.swift
         Sources/Vorssaint/Services/SystemMonitor/SMCClient.swift
