@@ -785,6 +785,12 @@ def main():
           + declaration(view, "    private func isActive(_ item: QuickLauncherItem)")
           + "func display(_ item: QuickLauncherItem) -> (String, Bool) { (icon(for: item), isActive(item)) }\n}\n}\n")
 
+    write("ScreenshotWorkspaceContract.swift", "import AppKit\n"
+          + "extension ScreenshotCaptureWorkspaceTests {\n"
+          + declaration("Sources/Vorssaint/Services/QuickTools/ScreenshotCaptureWorkspace.swift",
+                        "final class ScreenshotCaptureWorkspace {").replace(
+                            "final class ScreenshotCaptureWorkspace", "final class Workspace")
+          + "}\n")
     preview = "Sources/Vorssaint/Services/QuickTools/ScreenshotQuickPreviewController.swift"
     write("ScreenshotPreviewHover.swift", "import Foundation\n"
           + "extension ScreenshotPreviewHoverTests {\nfinal class Controller: State {\n"

@@ -37,8 +37,9 @@ struct ScreenshotCaptureSettings: View {
     @AppStorage(DefaultsKey.screenshotToolShortcutsEnabled) private var toolShortcutsEnabled = true
     @AppStorage(DefaultsKey.screenshotCopyToClipboard) private var copyToClipboard = false
     @AppStorage(DefaultsKey.screenshotPreviewPosition) private var previewPositionRaw = ""
-    @AppStorage(DefaultsKey.screenshotPreviewTakesFocus) private var previewTakesFocus = true
+    @AppStorage(DefaultsKey.screenshotPreviewTakesFocus) private var previewTakesFocus = false
     @AppStorage(DefaultsKey.screenshotSharingEnabled) private var sharingEnabled = true
+    @AppStorage("screenshotPreviewLifetime") private var previewLifetime = 30
     @State private var showingSharedLinks = false
     @State private var showingSharePrivacy = false
 
@@ -156,6 +157,7 @@ struct ScreenshotCaptureSettings: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     previewPositionRow
+                    previewLifetimeRow
                     previewFocusRow
                     defaultActionRow
                 } label: {
@@ -259,6 +261,20 @@ struct ScreenshotCaptureSettings: View {
             Text(strings.previewFocusCaption)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private var previewLifetimeRow: some View {
+        let labels = FeatureStrings.screenshotPreview(l10n.language)
+        return VStack(alignment: .leading, spacing: 4) {
+            Picker(labels.lifetime, selection: $previewLifetime) {
+                ForEach(ScreenshotPreviewLifetime.allCases, id: \.rawValue) { lifetime in
+                    Text(lifetime == .keepOpen ? labels.keepOpen
+                         : String(format: strings.delaySecondsFormat, lifetime.rawValue))
+                        .tag(lifetime.rawValue)
+                }
+            }
+            Text(labels.caption).font(.caption).foregroundStyle(.secondary)
         }
     }
 

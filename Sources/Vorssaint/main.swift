@@ -3,6 +3,7 @@
 
 import AppKit
 
+ScreenshotCaptureFixture.runIfRequestedAndExit()
 SuperKeyMappingGuard.runIfRequestedAndExit()
 Defaults.register()
 MouseAccelerationGuard.runIfRequestedAndExit()

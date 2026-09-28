@@ -1266,9 +1266,9 @@ enum ScreenshotFeatureTests {
         suite.expect(!ScreenshotSupport.canReorder(layered, moving: UUID(), .forward)
                 && !ScreenshotSupport.canReorder([], moving: layered[0].id, .backward),
                "an annotation that is not there can never be reordered")
-        let screenshotEditorSource = ((try? String(
-            contentsOfFile: "Sources/Vorssaint/Services/QuickTools/ScreenshotEditorController.swift",
-            encoding: .utf8)) ?? "")
+        let screenshotEditorSource = ["ScreenshotEditorController", "ScreenshotEditorModel", "ScreenshotEditorGestures"]
+            .map { (try? String(contentsOfFile: "Sources/Vorssaint/Services/QuickTools/\($0).swift", encoding: .utf8)) ?? "" }
+            .joined(separator: "\n")
             .split(separator: "\n", omittingEmptySubsequences: false)
             .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
             .joined(separator: "\n")
@@ -1578,16 +1578,16 @@ enum ScreenshotFeatureTests {
         suite.expect(screenshotEditorSource.contains("let strokeChanged = usesStroke && annotations[index].stroke != stroke")
                 && screenshotEditorSource.contains("if usesStroke { annotations[index].stroke = stroke }"),
                "picking text or a highlight never records a thickness edit it has no control for")
-        let screenshotEditorViewSource = (try? String(
-            contentsOfFile: "Sources/Vorssaint/UI/Screenshot/ScreenshotEditorView.swift",
-            encoding: .utf8)) ?? ""
+        let screenshotEditorViewSource = ["ScreenshotEditorView", "ScreenshotEditorControls", "ScreenshotEditorStyles"]
+            .map { (try? String(contentsOfFile: "Sources/Vorssaint/UI/Screenshot/\($0).swift", encoding: .utf8)) ?? "" }
+            .joined(separator: "\n")
         suite.expect(screenshotEditorViewSource.contains("isHovered || isActive ? 0.9 : 0.55"),
                "tool shortcut labels stay visible on idle rail buttons")
         suite.expect(screenshotEditorSource.contains("syncControls(to: hit)"),
                "the editor synchronizes controls from the selected annotation")
         let existingSelectionSource: String
-        if let start = screenshotEditorSource.range(of: "private func selectExistingAnnotation"),
-           let end = screenshotEditorSource.range(of: "private func updateDraft") {
+        if let start = screenshotEditorSource.range(of: "func selectExistingAnnotation"),
+           let end = screenshotEditorSource.range(of: "func updateDraft") {
             existingSelectionSource = String(screenshotEditorSource[start.lowerBound..<end.lowerBound])
         } else {
             existingSelectionSource = ""
@@ -1595,8 +1595,8 @@ enum ScreenshotFeatureTests {
         suite.expect(existingSelectionSource.contains("syncControls(to: hit)"),
                "creation-tool taps synchronize controls before selecting the annotation")
         let finishSelectionSource: String
-        if let start = screenshotEditorSource.range(of: "private func finishSelectDrag"),
-           let end = screenshotEditorSource.range(of: "private func selectExistingAnnotation") {
+        if let start = screenshotEditorSource.range(of: "func finishSelectDrag"),
+           let end = screenshotEditorSource.range(of: "func selectExistingAnnotation") {
             finishSelectionSource = String(screenshotEditorSource[start.lowerBound..<end.lowerBound])
         } else {
             finishSelectionSource = ""
@@ -2389,10 +2389,10 @@ enum ScreenshotFeatureTests {
                "magnifier zoom preferences preserve the original behavior by default")
         suite.expect(Defaults.registeredDefaults[DefaultsKey.screenshotToolShortcutsEnabled] as? Bool == true,
                "screenshot number shortcuts ship enabled")
-        suite.expect(Defaults.registeredDefaults[DefaultsKey.screenshotPreviewPosition] as? String == "",
-               "screenshot preview placement preserves the existing automatic behavior by default")
-        suite.expect(Defaults.registeredDefaults[DefaultsKey.screenshotPreviewTakesFocus] as? Bool == true,
-               "the screenshot preview takes the keyboard as it appears by default, so its shortcuts work at once; leaving it is the opt-out")
+        suite.expect(Defaults.registeredDefaults[DefaultsKey.screenshotPreviewPosition] as? String == "bottomLeft",
+               "new screenshot previews default to the bottom-left corner")
+        suite.expect(Defaults.registeredDefaults[DefaultsKey.screenshotPreviewTakesFocus] as? Bool == false,
+               "new previews leave the destination input focused until clicked")
         suite.expect(Defaults.registeredDefaults[DefaultsKey.screenshotSharingEnabled] as? Bool == true,
                "temporary screenshot links preserve their existing availability by default")
         suite.expect(Defaults.registeredDefaults[DefaultsKey.screenshotToolOrder] as? String

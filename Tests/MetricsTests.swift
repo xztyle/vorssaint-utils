@@ -53,6 +53,8 @@ struct MetricsTests {
             ("repository", { RepositoryFeatureTests.run(suite) }),
             ("screenshots", {
                 ScreenshotPreviewHoverTests.run(suite)
+                ScreenshotContinuityTests.run(suite)
+                ScreenshotCaptureWorkspaceTests.run(suite)
                 ScreenshotWatermarkTests.run(suite)
                 ScreenshotFeatureTests.run(suite)
                 ScreenshotScrollingCaptureTests.run(suite)
@@ -96,6 +98,7 @@ struct MetricsTests {
             }),
             ("storage", {
                 RecentCaptureStoreTests.run(suite)
+                ScreenshotHistoryRevisionTests.run(suite)
                 RecorderPresetImageStoreTests.run(suite)
                 StorageFeatureTests.run(suite)
                 ScratchpadStoreContractTests.run(suite)

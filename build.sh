@@ -455,6 +455,9 @@ if (( TEST )); then
         Sources/Vorssaint/Services/SpotlightNamesSupport.swift
         Sources/Vorssaint/Services/QuickTools/MicMuteSupport.swift
         Sources/Vorssaint/Services/QuickTools/QuickTogglesSupport.swift
+        Sources/Vorssaint/Services/QuickTools/ScreenshotPreviewPolicy.swift
+        Sources/Vorssaint/Services/QuickTools/ScreenshotDragTransfer.swift
+        Sources/Vorssaint/Core/ScreenshotPreviewStrings.swift
         Sources/Vorssaint/Services/QuickTools/ScreenshotCapturePolicy.swift
         Sources/Vorssaint/Services/QuickTools/ScreenshotSupport.swift
         Sources/Vorssaint/UI/Settings/ScreenCaptureToolPicker.swift
