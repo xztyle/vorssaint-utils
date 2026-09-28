@@ -283,10 +283,11 @@ It has not replaced the installed app. All feature heads are pushed: battery
 `558b5dd`, clipboard `7c77372`, menu `b7a54cb`, capture `f78c1d2`, cleanup
 `aa51c35`. Actual-Mac replacement acceptance remains incomplete.
 
-The current screen-capture branch `040e233` adds continuous left-swipe motion
+The current screen-capture branch `9906312` adds continuous left-swipe motion
 to the bare corner image. Mouse dragging moves the card directly; a two-finger
 trackpad swipe uses AppKit's gesture progress and release animation. A short or
-cancelled gesture returns the card. The 834 screenshot checks, optimized build
+cancelled gesture now eases the card back instead of snapping it. A completed
+gesture slides the whole card off-screen before closing. The 834 screenshot checks, optimized build
 and packaged selftest pass. The image-only preview was observed in a generated
 fixture, but the Mac locked before live swipe feel and cross-app drop could be
 verified. The new trackpad behavior has not yet been launched in a fixture or
@@ -298,10 +299,18 @@ Finder's Put Back was disabled for this dot-prefixed test app. A visible-name
 generated app is now signed and staged under `/private/tmp` for that test; it
 has not been placed in Applications. No personal app was removed.
 
-Current detached integration `e51800e` combines current main and all five
-feature branches. Its optimized release build, metadata-free deep signature
-check and packaged selftest pass; the verified bundle is staged at
+The upstream Vorssaint update through `bc51165` was merged into main. Its full
+suite completed 79,560 checks with the same 14 notch and switcher visibility
+failures already reproduced before this update; all other suites passed. New
+menu-bar icon labels were rebranded to Aster in every provided localization.
+
+Current detached integration `82e741e` combines upstream main and all five
+feature branches. The prior integration revision passed its optimized release
+build, metadata-free deep signature check and packaged selftest. That verified
+bundle is staged at
 `/private/tmp/aster-integrated-trackpad-g7dldatp/Aster.app`, not installed.
+That signed bundle predates the latest upstream merge and eased swipe and must
+be rebuilt before any installation.
 The combined screenshot suite passes 834 checks. The last full combined run,
 before the trackpad addition and feature-count correction, reported 15 failures
 in 70,968 checks: one stale feature count, one notch-rail visibility check and
@@ -317,6 +326,13 @@ Only those same 14 layout checks failed; all other suites, including the 834
 screenshot checks, passed, and preference cleanup passed. A distinct signed
 generated-image trackpad fixture is staged for the live gesture check but has
 not been launched while the Mac is locked.
+
+After the eased swipe and upstream merge, the combined suite completed
+**80,584 checks** with those same 14 layout failures and no new failures.
+Screenshot, battery, clipboard, menu, cleanup and localization suites passed.
+A newly signed generated-image fixture for the eased swipe is staged at
+`/private/tmp/aster-swipe-eased-vfd4gn3d/Aster Swipe Eased.app`; it has not
+been launched while the Mac remains locked.
 
 Replacement acceptance has not passed. Main retains the baseline and evidence
 docs; feature merges await their actual-Mac gates. Each feature needs its reviewed

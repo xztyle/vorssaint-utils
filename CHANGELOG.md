@@ -19,7 +19,7 @@ Scratchpad gains easier formatting and search, Keep Awake starts with one click 
 - Dynamic Island's Controls page shows a running timer's clock and your next appointment on their shortcuts.
 - Dynamic Island can count down the last hour of the calendar event in progress, alongside or instead of the countdown to the next one.
 - Dynamic Island can keep opening on the page chosen in When reopening while music, a timer or another activity is showing.
-- Menu bar settings can replace the Vorssaint icon with any SF Symbol.
+- Menu bar settings can replace the Aster icon with any SF Symbol.
 - Brightness keys and display brightness shortcuts can move in half or quarter steps, chosen in Displays settings.
 
 ### Changed
