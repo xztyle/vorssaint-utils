@@ -497,3 +497,21 @@ A read-only inventory on the owner's Mac still shows a different physical icon
 order from the saved original baseline. The new startup check would detect
 that mismatch, but no icon was moved or restored during this gate. Actual
 reorder, Undo, recovery and restart behavior still require live acceptance.
+
+## Cleanup duplicate-review gate — 2026-09-28
+
+The cleanup branch `daaf730` keeps a duplicate group in the review after one
+extra copy is moved to Trash, as long as two or more copies remain. It retains
+the group's identity and chosen keeper. If the keeper becomes unavailable, it
+requires a new explicit choice before another removal. A generated three-copy
+case exercises the remaining choices. The focused storage-inspection suite
+passed **101 checks**; the optimized branch bundle and packaged selftest passed.
+
+Detached integration `7ebcfa9` passed **80,701 checks** plus preference cleanup
+with zero failures. Its optimized bundle and packaged selftest passed. The
+metadata-free signed candidate at
+`/private/tmp/aster-integrated-cleanup-review-Zq6hZS/Aster.app` passed deep,
+strict signature verification. Its executable SHA-256 is
+`c95c67add5af816e18f1f109e855952237dd48e7735ca673a3c9427e7bb1f944`.
+It has not replaced the installed app. A live three-copy review and Trash
+recovery check with generated files remain open.
