@@ -58,12 +58,13 @@ final class MenuBarOrganizerPanelController: ObservableObject {
 
     private func makePanel(size: CGSize) -> MenuBarSearchPanel {
         let panel = MenuBarSearchPanel(contentRect: CGRect(origin: .zero, size: size),
-            styleMask: [.titled, .fullSizeContentView, .nonactivatingPanel], backing: .buffered, defer: false)
+            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.level = .popUpMenu
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         panel.isReleasedWhenClosed = false
-        panel.titleVisibility = .hidden
-        panel.titlebarAppearsTransparent = true
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = true
         panel.hidesOnDeactivate = false
         return panel
     }
@@ -123,7 +124,9 @@ private struct MenuBarOrganizerBrowser: View {
             Divider()
             Text(extra.keyboardHint).font(.caption).foregroundStyle(.secondary).padding(10)
         }
-        .background(.regularMaterial)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(HUDBackdrop(cornerRadius: 18, contrast: .high))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .onAppear { focused = true }
         .onChange(of: controller.query) { _, _ in controller.selection = 0 }
     }
@@ -196,4 +199,3 @@ extension MenuBarOrganizerSection {
         }
     }
 }
-
