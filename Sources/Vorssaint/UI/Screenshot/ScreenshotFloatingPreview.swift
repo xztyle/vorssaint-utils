@@ -94,7 +94,8 @@ extension ScreenshotQuickPreviewView {
             Image(systemName: "ellipsis").font(.system(size: 12, weight: .semibold))
                 .frame(width: 28, height: 28).contentShape(Rectangle())
         }
-        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        .menuStyle(.borderlessButton).menuIndicator(.hidden)
+        .fixedSize()
         .background(ShelfSharePickerAnchor(anchor: shareAnchor))
         .accessibilityLabel(FeatureStrings.recorder(L10n.shared.language).moreOptions)
     }
