@@ -698,3 +698,30 @@ signed build, packaged selftests and strict signature check passed. The actual
 protected journal is still unread until the owner enters
 administrator credentials. The current installed helper still fails to start
 with launchd exit 78; the combined app has not replaced it.
+
+## Battery service restored — 2026-09-28
+
+The owner ran the signed read-only journal command with administrator access.
+It reported a present journal, disabled policy, no operation, no hardware
+ownership and no pending recovery. A separate read-only hardware probe showed
+native charging control, AC connected, 80%, about 33 °C, and no competing
+battery controller. The registration-only repair removed the failed service
+without changing the journal or charge keys.
+
+The previous signed bundle was replaced by a locally signed Aster build. The
+first fresh registration still failed: `launchd` reported a spawn-constraint
+violation. The build now places the signed helper's actual code hash in its
+embedded `SpawnConstraint` and records a service version from the signed helper
+and final launch plist. The installed bundle passed deep, strict signature
+verification; app and helper selftests passed; independent checks matched the
+constraint hash and service version to the installed files. The full suite
+passed **80,716 checks** and preference cleanup.
+
+The second fresh registration succeeded. `launchd` reports the service running
+with a spawn constraint, and Aster receives a successful status reply. The
+service remained running and reachable after Aster quit, and the app was
+reopened. Battery Care is available but its saved charge policy remains **off**.
+The service reports no hardware ownership or pending recovery; the separate
+read-only probe still sees native charge keys. The live charge, hold and
+discharge qualification remains open because the battery is currently at 80%
+with 0 W flow, so a charging-power test would not provide useful evidence.

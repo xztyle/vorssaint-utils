@@ -268,3 +268,33 @@ signature verification passed. The signed candidate is staged at
 SHA-256 is `b90c0a89417b4e5a2da578efae3e7baa446b0eaacbd9feae167d11dbaefa5e36`.
 An administrator-authenticated read has **not** run yet, so the journal state
 remains unknown and no registration repair or charge-key write is authorized.
+
+## Installed service recovery — 2026-09-28
+
+The owner completed the administrator-authenticated read. The actual journal
+was present with `policyEnabled=false`, `operation=none`, `ownsHardware=false`
+and `recoveryPending=false`. The read-only hardware probe showed native
+`charge`, AC connected, 80%, about 33 °C, and no competing controller. A
+registration-only repair then unregistered the failed service without a charge
+write.
+
+The first new signed bundle still failed to launch. `launchd` recorded a
+spawn-constraint violation, followed by program resolution errors. The default
+lightweight signing requirement of the locally signed helper pinned its exact
+code hash; the old and new helpers had different hashes. Apple documents
+`SpawnConstraint` in a daemon plist as the check used by `launchd` when it
+starts a daemon. The build now binds that constraint to the final signed
+helper's code hash and calculates the helper version only after signing and
+adding the final constraint. The same binding runs after installed-bundle
+signing. Independent checks on the installed app matched both hashes, and
+`codesign --verify --deep --strict` passed.
+
+With that package, a fresh registration succeeded: `launchctl` showed the
+service running, with `has spawn constraint` and no previous exit; the app's
+status request succeeded. Quitting Aster left the service running and status
+reachable. The app was reopened. The full suite passed **80,716 checks** plus
+preference cleanup, and the installed app/helper selftests passed. The current
+saved charge policy is off, and the service reports no hardware ownership or
+pending recovery. No live charging qualification was attempted in this recovery
+run. The Mac is at 80% and 0 W, which cannot show the required positive charge
+flow; the earlier qualification history also ended in verification failure.

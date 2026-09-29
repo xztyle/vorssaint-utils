@@ -127,6 +127,30 @@ codesign_with_timestamp_retry() {
     return 1
 }
 
+helper_version() {
+    export LC_ALL=C
+    /usr/bin/shasum -a 256 "$1" "$2" \
+        | /usr/bin/awk '{print $1}' | /usr/bin/shasum -a 256 \
+        | /usr/bin/awk '{print $1}'
+}
+
+bind_battery_spawn_constraint() {
+    # macOS 26 pins this locally signed daemon by code hash at launch.
+    # Bind launchd to the helper actually shipped in this signed bundle.
+    local bundle="$1" battery plist cdhash encoded version
+    battery="$bundle/Contents/Library/LaunchServices/$BATTERY_HELPER_ID"
+    plist="$bundle/Contents/Library/LaunchDaemons/$BATTERY_HELPER_ID.plist"
+    cdhash="$(/usr/bin/codesign -dv --verbose=4 "$battery" 2>&1 \
+        | /usr/bin/sed -nE 's/^CDHash=([0-9a-f]{40})$/\1/p')"
+    [[ "$cdhash" =~ '^[0-9a-f]{40}$' ]] || { echo "Invalid battery helper CDHash" >&2; return 1; }
+    encoded="$(printf '%s' "$cdhash" | /usr/bin/xxd -r -p | /usr/bin/base64 | /usr/bin/tr -d '\n')"
+    /usr/bin/plutil -remove SpawnConstraint "$plist" >/dev/null 2>&1 || true
+    /usr/bin/plutil -insert SpawnConstraint -dictionary "$plist"
+    /usr/bin/plutil -insert SpawnConstraint.cdhash -data "$encoded" "$plist"
+    version="$(helper_version "$battery" "$plist")"
+    /usr/libexec/PlistBuddy -c "Set :AsterBatteryCareHelperVersion $version" "$bundle/Contents/Info.plist"
+}
+
 write_swift_output_file_map() {
     local output_file="$1"
     local object_dir="$2"
@@ -151,37 +175,55 @@ write_swift_output_file_map() {
     } > "$output_file"
 }
 
-finalize_installed_bundle_after_child() {
-    local bundle="$1"
+sign_installed_helpers() {
+    local bundle="$1" devid="$2"
     local helper="$bundle/Contents/Library/LaunchServices/$FAN_HELPER_ID"
-    local adapter="$bundle/Contents/Frameworks/$NOW_PLAYING_ADAPTER"
     local battery="$bundle/Contents/Library/LaunchServices/$BATTERY_HELPER_ID"
-    local devid
-    devid="$(developer_id_identity)"
-
-    echo "▸ Finalizing installed signature…"
-    sleep 3
+    local adapter="$bundle/Contents/Frameworks/$NOW_PLAYING_ADAPTER"
     if [[ -n "$devid" ]]; then
         [[ -f "$helper" ]] && codesign_with_timestamp_retry --force --strip-disallowed-xattrs \
             --options runtime --timestamp --identifier "$FAN_HELPER_ID" --sign "$devid" "$helper"
+        [[ -f "$battery" ]] && codesign_with_timestamp_retry --force --strip-disallowed-xattrs \
+            --options runtime --timestamp --identifier "$BATTERY_HELPER_ID" --sign "$devid" "$battery"
         [[ -f "$adapter" ]] && codesign_with_timestamp_retry --force --strip-disallowed-xattrs \
             --options runtime --timestamp --identifier "$NOW_PLAYING_ADAPTER_ID" --sign "$devid" "$adapter"
-        codesign_with_timestamp_retry --force --strip-disallowed-xattrs --options runtime --timestamp \
-            --entitlements "$ENTITLEMENTS" --sign "$devid" "$bundle"
     elif legacy_identity_installed; then
         [[ -f "$helper" ]] && /usr/bin/codesign --force --strip-disallowed-xattrs \
             --identifier "$FAN_HELPER_ID" --sign "$LEGACY_IDENTITY" "$helper"
+        [[ -f "$battery" ]] && /usr/bin/codesign --force --strip-disallowed-xattrs \
+            --identifier "$BATTERY_HELPER_ID" --sign "$LEGACY_IDENTITY" "$battery"
         [[ -f "$adapter" ]] && /usr/bin/codesign --force --strip-disallowed-xattrs \
             --identifier "$NOW_PLAYING_ADAPTER_ID" --sign "$LEGACY_IDENTITY" "$adapter"
-        /usr/bin/codesign --force --strip-disallowed-xattrs --sign "$LEGACY_IDENTITY" "$bundle"
     else
         [[ -f "$helper" ]] && /usr/bin/codesign --force --strip-disallowed-xattrs \
             --identifier "$FAN_HELPER_ID" --sign - "$helper"
+        [[ -f "$battery" ]] && /usr/bin/codesign --force --strip-disallowed-xattrs \
+            --identifier "$BATTERY_HELPER_ID" --sign - "$battery"
         [[ -f "$adapter" ]] && /usr/bin/codesign --force --strip-disallowed-xattrs \
             --identifier "$NOW_PLAYING_ADAPTER_ID" --sign - "$adapter"
+    fi
+}
+
+finalize_installed_bundle_after_child() {
+    local bundle="$1" devid
+    devid="$(developer_id_identity)"
+    echo "▸ Finalizing installed signature…"
+    sleep 3
+    sign_installed_helpers "$bundle" "$devid"
+    bind_battery_spawn_constraint "$bundle"
+    if [[ -n "$devid" ]]; then
+        codesign_with_timestamp_retry --force --strip-disallowed-xattrs --options runtime --timestamp \
+            --entitlements "$ENTITLEMENTS" --sign "$devid" "$bundle"
+    elif legacy_identity_installed; then
+        /usr/bin/codesign --force --strip-disallowed-xattrs --sign "$LEGACY_IDENTITY" "$bundle"
+    else
         /usr/bin/codesign --force --strip-disallowed-xattrs --sign - "$bundle"
     fi
+    local helper="$bundle/Contents/Library/LaunchServices/$FAN_HELPER_ID"
+    local battery="$bundle/Contents/Library/LaunchServices/$BATTERY_HELPER_ID"
+    local adapter="$bundle/Contents/Frameworks/$NOW_PLAYING_ADAPTER"
     [[ -f "$helper" ]] && /usr/bin/codesign --verify --strict "$helper"
+    [[ -f "$battery" ]] && /usr/bin/codesign --verify --strict "$battery"
     [[ -f "$adapter" ]] && /usr/bin/codesign --verify --strict "$adapter"
     /usr/bin/codesign --verify --deep --strict "$bundle"
     echo "✓ Signature ready: $bundle"
@@ -727,22 +769,12 @@ if (( DEV )); then
     /usr/libexec/PlistBuddy -c "Add :VorssaintBuildCommit string '$SHA · $(date '+%Y-%m-%d %H:%M')'" "$STAGE/Contents/Info.plist"
     echo "  stamped dev build: $SHA"
 fi
-helper_version() {
-    export LC_ALL=C
-    /usr/bin/shasum -a 256 \
-        "$1" "$2" \
-        | /usr/bin/awk '{print $1}' | /usr/bin/shasum -a 256 \
-        | /usr/bin/awk '{print $1}'
-}
 FAN_HELPER_VERSION="$(helper_version \
     "$STAGE/Contents/Library/LaunchServices/$FAN_HELPER_ID" \
     "$STAGE/Contents/Library/LaunchDaemons/$FAN_HELPER_ID.plist")"
 /usr/libexec/PlistBuddy -c "Add :VorssaintFanControlHelperVersion string '$FAN_HELPER_VERSION'" \
     "$STAGE/Contents/Info.plist"
-BATTERY_HELPER_VERSION="$(helper_version \
-    "$STAGE/Contents/Library/LaunchServices/$BATTERY_HELPER_ID" \
-    "$STAGE/Contents/Library/LaunchDaemons/$BATTERY_HELPER_ID.plist")"
-/usr/libexec/PlistBuddy -c "Add :AsterBatteryCareHelperVersion string '$BATTERY_HELPER_VERSION'" "$STAGE/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :AsterBatteryCareHelperVersion string ''" "$STAGE/Contents/Info.plist"
 printf 'APPL????'  > "$STAGE/Contents/PkgInfo"
 cp build/AppIcon.icns "$STAGE/Contents/Resources/AppIcon.icns"
 cp build/MenuBarIcon.png build/MenuBarIcon@2x.png build/BrandMark.png "$STAGE/Contents/Resources/"
@@ -842,6 +874,7 @@ sign_bundle() {
     [[ -f "$helper" ]] && codesign_fan_helper "$helper"
     [[ -f "$battery" ]] && codesign_battery_helper "$battery"
     [[ -f "$adapter" ]] && codesign_now_playing_adapter "$adapter"
+    bind_battery_spawn_constraint "$bundle"
     codesign_app "$bundle"
 
     # If local filesystem metadata invalidates the first signature, sign once
@@ -852,6 +885,7 @@ sign_bundle() {
         [[ -f "$helper" ]] && codesign_fan_helper "$helper"
         [[ -f "$battery" ]] && codesign_battery_helper "$battery"
         [[ -f "$adapter" ]] && codesign_now_playing_adapter "$adapter"
+        bind_battery_spawn_constraint "$bundle"
         codesign_app "$bundle"
     fi
     [[ -f "$executable" ]] && codesign --verify --strict "$executable"
