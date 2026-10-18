@@ -977,9 +977,9 @@ stop_process() {
 
 source Tools/install-bundle.zsh
 
-# Installed development builds only need the copy in /Applications. Retaining
-# another app in each checkout pollutes application search with stale builds.
-if (( DEV )); then
+# Installed builds only need the copy in /Applications. Retaining another
+# app in each checkout pollutes application search with stale builds.
+if (( DEV || INSTALL )); then
     for old_bundle in "build/stage/$APP_NAME.app" "build/stage.noindex/$APP_NAME.app"; do
         if [[ -d "$old_bundle" ]]; then
             /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
@@ -989,7 +989,7 @@ if (( DEV )); then
     done
 fi
 
-if (( !DEV || !INSTALL )); then
+if (( !INSTALL )); then
     STAGE_DIRECTORY="build/stage"
     (( DEV )) && STAGE_DIRECTORY="build/stage.noindex"
     mkdir -p "$STAGE_DIRECTORY"
