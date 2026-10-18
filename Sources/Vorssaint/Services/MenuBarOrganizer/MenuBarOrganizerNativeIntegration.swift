@@ -20,8 +20,6 @@ extension MenuBarOrganizerService {
 
     func prepareNativeBackend() async -> Bool {
         guard usesNativeBackend else { return true }
-        MenuBarNativeLayoutAccess.shared.refresh()
-        guard MenuBarNativeLayoutAccess.shared.hasAccess else { operationMessage = text.automaticMoveUnavailable; return false }
         // Validate the original physical baseline before applying the saved
         // logical sections. A saved hidden item is not failed quit recovery.
         nativeBackend.prepareForStartup()

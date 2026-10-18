@@ -18,6 +18,8 @@ enum MenuBarNativeSectionTests {
     }
     class Fixture {
         let layout = Layout(), visibility = Visibility()
+        /// The visible-drag mover is the native backend's only reorder endpoint.
+        var mover: Layout { layout }
         var catalog: [MenuBarItemIdentity: ManagedMenuBarItem] = [:]
         var assignments: [MenuBarItemIdentity: MenuBarOrganizerSection] = [:]
     }

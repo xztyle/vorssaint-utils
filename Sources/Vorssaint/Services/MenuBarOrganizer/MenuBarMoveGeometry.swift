@@ -55,4 +55,27 @@ enum MenuBarMoveGeometry {
         [frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite)
             && frame.width > 0 && frame.height > 0
     }
+
+    // MARK: - macOS 27 visible reorder
+
+    /// Immediately left of the target. Neighbouring frames can overlap by a
+    /// few points, so order uses centres and no other icon may sit between.
+    static func isBefore(_ source: CGRect, _ target: CGRect, among frames: [CGRect]) -> Bool {
+        source.midX < target.midX && !frames.contains { $0.midX > source.midX && $0.midX < target.midX }
+    }
+
+    /// Release over the target's leading part. Dragging rightward, the target
+    /// slides left by the source's width once the source leaves its slot.
+    /// Later attempts nudge the release point further toward the leading edge.
+    static func dropX(source: CGRect, target: CGRect, attempt: Int) -> CGFloat {
+        let shift = source.midX < target.midX ? source.width : 0
+        let inset = max(2, target.width * (0.3 - 0.1 * CGFloat(attempt)))
+        return target.minX - shift + inset
+    }
+
+    static func dragRow(_ source: CGRect, _ target: CGRect) -> CGRect {
+        let minX = min(source.minX, target.minX - source.width) - 4
+        let maxX = max(source.maxX, target.maxX) + 4
+        return CGRect(x: minX, y: source.minY - 2, width: maxX - minX, height: source.height + 4)
+    }
 }

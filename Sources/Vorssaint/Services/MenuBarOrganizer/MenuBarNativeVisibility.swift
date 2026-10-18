@@ -25,7 +25,9 @@ final class MenuBarNativeVisibility {
             .union([Bundle.main.bundleIdentifier ?? "io.github.xztyle.Aster"])
         guard bundles != concealed || !desired.isSubset(of: allowed) || handle == nil && task == nil else { return }
         guard available, desired != failedConfiguration else { reset(); failure(); return }
-        reset(); let token = generation
+        // Keep the current pass until its replacement is active, so a newly
+        // launched app never makes every hidden icon flash back.
+        generation += 1; task?.cancel(); task = nil; let token = generation
         concealed = bundles; allowed = desired
         task = Task { [weak self] in await self?.activate(desired, items: items, token: token, failure: failure) }
     }
@@ -41,9 +43,11 @@ final class MenuBarNativeVisibility {
             fail(desired, token: token, failure: failure); return
         }
         let expected = MenuBarNativeVisibilityExpectation(before.items.filter { !concealed.contains($0.bundleIdentifier) })
+        let previous = handle
         handle = AsterMenuVisibilityActivate(desired.sorted(), (0...8).map { NSNumber(value: $0) }) { [weak self] in
             MainActor.assumeIsolated { self?.fail(desired, token: token, failure: failure) }
         }
+        if let previous { AsterMenuVisibilityInvalidate(previous) }
         guard handle != nil else {
             Logger(subsystem: "io.github.xztyle.Aster", category: "MenuBarNativeVisibility").error("Native visibility assertion unavailable")
             fail(desired, token: token, failure: failure); return
@@ -58,8 +62,9 @@ final class MenuBarNativeVisibility {
             do { try await Task.sleep(for: .milliseconds(150)) } catch { return }
             let current = await MenuBarNativeAXProvider.snapshot(includingOwn: true)
             guard token == generation, !Task.isCancelled else { return }
-            if current.enumerationSucceeded, expected.matches(current.items),
-               current.items.allSatisfy({ !concealed.contains($0.bundleIdentifier) }) { task = nil; return }
+            // Accessibility keeps listing hidden icons at stale frames, so only
+            // the icons meant to stay visible are checked.
+            if current.enumerationSucceeded, expected.matches(current.items) { task = nil; return }
         }
         Logger(subsystem: "io.github.xztyle.Aster", category: "MenuBarNativeVisibility").error("Native visibility did not preserve the requested inventory")
         fail(desired, token: token, failure: failure)

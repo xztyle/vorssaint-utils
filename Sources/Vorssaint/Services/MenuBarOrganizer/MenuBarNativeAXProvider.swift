@@ -101,9 +101,9 @@ enum MenuBarNativeItemPolicy {
     }
 
     static func isPinned(bundle: String, title: String) -> Bool {
+        // Siri moves like any icon; only the clock and Control Center stay fixed.
         bundle == "com.apple.MenuBarAgent" && ["com.apple.menuextra.clock",
-            "com.apple.menuextra.controlcenter", "com.apple.menuextra.siri"].contains(title)
-            || bundle == "com.apple.systemuiserver" && title.localizedCaseInsensitiveContains("siri")
+            "com.apple.menuextra.controlcenter"].contains(title)
     }
 
     /// A stable UI slot, never a WindowServer ID or an event destination.

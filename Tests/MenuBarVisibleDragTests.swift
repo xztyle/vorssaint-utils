@@ -6,6 +6,7 @@ import Foundation
 enum MenuBarVisibleDragTests {
     static func run(_ suite: TestSuite) {
         pathGeometry(suite)
+        nativeReorderGeometry(suite)
         let trace = MenuBarPointerRecoveryTests.executeMove(failure: nil, visibleDrag: true)
         let source = MenuBarOrganizerTests.item("Siri", x: 1711)
         suite.expect(trace.visibleMoves.first?.0 == MenuBarMoveGeometry.pressPoint(in: source.frame),
@@ -129,5 +130,27 @@ enum MenuBarVisibleDragTests {
         wait { complete }
         suite.expect(complete && !events.contains { $0.type == .leftMouseDown || $0.type == .leftMouseDragged },
                      "source revalidation after pointer settling prevents pressing a stale neighbor")
+    }
+
+    private static func nativeReorderGeometry(_ suite: TestSuite) {
+        let claude = CGRect(x: 1480, y: 7, width: 42, height: 26)
+        let text = CGRect(x: 1526, y: 7, width: 46, height: 24)
+        let docker = CGRect(x: 1435, y: 7, width: 47, height: 24)
+        let all = [docker, claude, text]
+        suite.expect(MenuBarMoveGeometry.isBefore(docker, claude, among: all),
+                     "an adjacent icon counts as before even when frames overlap by a few points")
+        suite.expect(!MenuBarMoveGeometry.isBefore(claude, docker, among: all), "an icon to the right is not before")
+        suite.expect(!MenuBarMoveGeometry.isBefore(docker, text, among: all), "an icon with another between is not before")
+        let rightward = MenuBarMoveGeometry.dropX(source: docker, target: text, attempt: 0)
+        suite.expect(rightward < text.minX && rightward > text.minX - docker.width,
+                     "a rightward drop allows for the target sliding left into the vacated slot")
+        let leftward = MenuBarMoveGeometry.dropX(source: text, target: docker, attempt: 0)
+        suite.expect(leftward > docker.minX && leftward < docker.midX, "a leftward drop lands on the target's leading half")
+        suite.expect(MenuBarMoveGeometry.dropX(source: text, target: docker, attempt: 2) < leftward,
+                     "retries move the release toward the target's leading edge")
+        let row = MenuBarMoveGeometry.dragRow(docker, text)
+        let start = MenuBarMoveGeometry.pressPoint(in: docker)
+        suite.expect(MenuBarMoveGeometry.dragRegion(from: start, to: CGPoint(x: rightward, y: start.y), regions: [row]) != nil,
+                     "the drag row contains both the press and the release")
     }
 }

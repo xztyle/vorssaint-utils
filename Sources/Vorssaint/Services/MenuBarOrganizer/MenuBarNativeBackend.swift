@@ -7,6 +7,7 @@ import AppKit
 final class MenuBarNativeBackend {
     let layout = MenuBarNativeLayoutCoordinator()
     let visibility = MenuBarNativeVisibility()
+    let mover = MenuBarNativeDragMover()
     var assignments: [MenuBarItemIdentity: MenuBarOrganizerSection] = [:]
     private var catalog: [MenuBarItemIdentity: ManagedMenuBarItem] = [:]
     private(set) var controlFrame: CGRect?
@@ -33,10 +34,8 @@ final class MenuBarNativeBackend {
         for item in fresh { catalog[item.id] = item }
         let ids = Set(fresh.map(\.id))
         catalog = catalog.filter { ids.contains($0.key) || retainedHidden($0.value) }
-        let document = try? MenuBarNativeLayoutAccess.shared.read()
-        let keyCounts = Dictionary(grouping: (Array(catalog.values) + own).compactMap { item in document.flatMap { layout.key(item, in: $0) } }, by: { $0 }).mapValues(\.count)
-        let items = catalog.values.map { decorate($0, document: document, keyCounts: keyCounts) }.sorted { $0.frame.minX < $1.frame.minX }
-        return .init(items: items, capabilities: .init(canEnumerate: true, canMove: document != nil,
+        let items = catalog.values.map(decorate).sorted { $0.frame.minX < $1.frame.minX }
+        return .init(items: items, capabilities: .init(canEnumerate: true, canMove: true,
             hasPrivateWindowList: false, unresolvedItemCount: items.filter { !$0.isMovable && !$0.isProtected }.count),
             enumerationSucceeded: true)
     }
@@ -47,14 +46,12 @@ final class MenuBarNativeBackend {
         return !publisher.isTerminated && publisher.bundleIdentifier == item.bundleIdentifier
     }
 
-    private func decorate(_ item: ManagedMenuBarItem, document: MenuBarNativeLayoutDocument?,
-                          keyCounts: [String: Int]) -> ManagedMenuBarItem {
-        let key = document.flatMap { layout.key(item, in: $0) }
-        return .init(id: item.id, windowID: item.windowID, ownerPID: item.ownerPID,
+    private func decorate(_ item: ManagedMenuBarItem) -> ManagedMenuBarItem {
+        .init(id: item.id, windowID: item.windowID, ownerPID: item.ownerPID,
             ownerBundleIdentifier: item.ownerBundleIdentifier, sourcePID: item.sourcePID,
             ownerName: item.ownerName, sourceName: item.sourceName, bundleIdentifier: item.bundleIdentifier,
             title: item.title, frame: item.frame, section: item.isProtected ? .visible : assignments[item.id] ?? .visible,
-            identityState: item.identityState, isMovable: key.map { keyCounts[$0] == 1 } == true && !item.isProtected,
+            identityState: item.identityState, isMovable: item.identityState == .stable && !item.isProtected,
             isProtected: item.isProtected, image: item.image)
     }
 
@@ -65,7 +62,7 @@ final class MenuBarNativeBackend {
         visibility.reset()
         // Native hiding is independent of physical position. A section-only
         // choice must not reorder neighbors or require a compositor refresh.
-        if target != nil { try await layout.move(identity, before: target) }
+        if let target { try await mover.move(identity, before: target) }
         assignments[identity] = section
     }
 

@@ -8,7 +8,6 @@ struct MenuBarOrganizerSettings: View {
     @ObservedObject private var l10n = L10n.shared
     @ObservedObject private var service = MenuBarOrganizerService.shared
     @ObservedObject private var permissions = Permissions.shared
-    @ObservedObject private var nativeAccess = MenuBarNativeLayoutAccess.shared
 
     @AppStorage(DefaultsKey.menuBarOrganizerEnabled) private var enabled = false
     @AppStorage(MenuBarBackendPreferences.setup) private var setupComplete = false
@@ -27,11 +26,16 @@ struct MenuBarOrganizerSettings: View {
         Form {
             Section {
                 Toggle(text.enable, isOn: $enabled)
-                    .disabled(!AppFeature.menuBarOrganizer.isSupportedOnCurrentSystem
-                              || !enabled && MenuBarBackendPreferences.native && !nativeAccess.hasAccess)
+                    .disabled(!AppFeature.menuBarOrganizer.isSupportedOnCurrentSystem)
                 Text(MenuBarBackendPreferences.native ? MenuBarNativeStrings.localized(l10n.language).enableCaption : text.enableCaption)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if MenuBarBackendPreferences.native {
+                    Label(MenuBarNativeStrings.localized(l10n.language).hidingWarning,
+                          systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
             } header: {
                 Text(text.pageTitle)
             }
@@ -39,7 +43,6 @@ struct MenuBarOrganizerSettings: View {
             if !AppFeature.menuBarOrganizer.isSupportedOnCurrentSystem {
                 Text(text.unsupportedSystem).foregroundStyle(.secondary)
             }
-            if #available(macOS 27, *) { nativeAccessSection }
             if let message = service.operationMessage, !service.isRunning {
                 Text(message).foregroundStyle(.orange)
             }
@@ -70,7 +73,6 @@ struct MenuBarOrganizerSettings: View {
         }
         .formStyle(.grouped)
         .onAppear {
-            if #available(macOS 27, *) { nativeAccess.refresh() }
             service.syncWithPreferences()
             updateEditingSession()
         }
@@ -81,23 +83,12 @@ struct MenuBarOrganizerSettings: View {
             service.syncWithPreferences()
             updateEditingSession()
         }
-        .onChange(of: nativeAccess.hasAccess) { _, _ in service.syncWithPreferences(); updateEditingSession() }
         .onChange(of: service.isRunning) { _, _ in
             updateEditingSession()
         }
         .onChange(of: preferenceSignature) { _, _ in
             service.syncWithPreferences()
         }
-    }
-
-    private var nativeAccessSection: some View {
-        let native = MenuBarNativeStrings.localized(l10n.language)
-        return Section {
-            Text(native.accessInfo).font(.caption).foregroundStyle(.secondary)
-            if nativeAccess.hasAccess { Label(native.ready, systemImage: "checkmark.circle") }
-            else { Button(native.grant) { nativeAccess.request() } }
-            if nativeAccess.failed { Text(native.failed).foregroundStyle(.orange) }
-        } header: { Text(native.title) }
     }
 
     @ViewBuilder
