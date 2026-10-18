@@ -15,6 +15,8 @@ final class MenuBarNativeVisibility {
     private(set) var concealed: Set<String> = []
     private static let log = Logger(subsystem: "io.github.xztyle.Aster", category: "MenuBarNativeVisibility")
     var available: Bool { AsterMenuVisibilityAvailable() }
+    /// A pass is (or is about to be) restricting the menu bar.
+    var isActive: Bool { handle != nil || task != nil }
 
     func apply(hidden: Set<MenuBarItemIdentity>, items: [ManagedMenuBarItem], failure: @escaping () -> Void) {
         let bundles = Set(hidden.map(\.bundleIdentifier))

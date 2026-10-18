@@ -277,12 +277,20 @@ private struct MenuBarOrganizerEditorItem: View {
         FeatureStrings.menuBarOrganizer(l10n.language)
     }
 
+    @ObservedObject private var icons = MenuBarNativeIconCache.shared
+
     var body: some View {
         HStack(spacing: 5) {
-            MenuBarOrganizerItemIcon(item: item, size: 18)
-            Text(item.shortDisplayName)
-                .font(.caption)
-                .lineLimit(1)
+            // The real menu bar icon, as Bartender shows it; the name moves to
+            // the tooltip. Without a picture yet, show the app icon and name.
+            if let picture = icons.image(for: item.id) {
+                Image(nsImage: picture).resizable().scaledToFit().frame(height: 18)
+            } else {
+                MenuBarOrganizerItemIcon(item: item, size: 18)
+                Text(item.shortDisplayName)
+                    .font(.caption)
+                    .lineLimit(1)
+            }
             if item.identityState == .provisional {
                 Image(systemName: "questionmark.circle")
                     .font(.caption2)

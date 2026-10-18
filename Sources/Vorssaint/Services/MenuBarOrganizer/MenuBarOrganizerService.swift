@@ -193,7 +193,11 @@ final class MenuBarOrganizerService: ObservableObject {
             if windows != inventoryWindows { needsReconciliation = true; inventoryWindows = windows }
             // Native hiding is per publisher, so it follows each fresh inventory;
             // an unchanged configuration returns without touching the pass.
-            if usesNativeBackend { applyNativeVisibility() }
+            if usesNativeBackend {
+                // Pictures are only trustworthy before any icon is hidden.
+                if !nativeBackend.visibility.isActive { MenuBarNativeIconCache.shared.capture(items) }
+                applyNativeVisibility()
+            }
         }
         else { operationMessage = text.automaticMoveUnavailable }
         return snapshot

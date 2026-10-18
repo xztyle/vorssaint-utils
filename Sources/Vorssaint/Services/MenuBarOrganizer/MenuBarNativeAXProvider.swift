@@ -43,7 +43,12 @@ enum MenuBarNativeAXProvider {
         }.filter { includingOwn || ($0.publisher.pid != ProcessInfo.processInfo.processIdentifier
             && $0.publisher.bundleIdentifier != Bundle.main.bundleIdentifier) }
         let counts = Dictionary(grouping: unique, by: { $0.publisher.bundleIdentifier }).mapValues(\.count)
-        let items = unique.compactMap { item($0, count: counts[$0.publisher.bundleIdentifier] ?? 0) }
+        var seen: [String: Int] = [:]
+        let items = unique.compactMap { record -> ManagedMenuBarItem? in
+            let bundle = record.publisher.bundleIdentifier
+            defer { seen[bundle, default: 0] += 1 }
+            return item(record, count: counts[bundle] ?? 0, ordinal: seen[bundle, default: 0])
+        }
             .sorted { $0.frame.minX < $1.frame.minX }
         let duplicates = Dictionary(grouping: items, by: \.id)
         guard duplicates.values.allSatisfy({ $0.count == 1 }) else { return unavailable }
@@ -53,12 +58,12 @@ enum MenuBarNativeAXProvider {
     }
 
     @MainActor
-    private static func item(_ record: Record, count: Int) -> ManagedMenuBarItem? {
+    private static func item(_ record: Record, count: Int, ordinal: Int) -> ManagedMenuBarItem? {
         let frame = record.item.frame
         guard frame.width > 0, frame.height > 0, frame.height <= 40, isInMenuRow(frame) else { return nil }
         let source = record.item.source
         let bundle = record.publisher.bundleIdentifier
-        let stableTitle = MenuBarNativeItemPolicy.title(source, publisher: bundle, count: count)
+        let stableTitle = MenuBarNativeItemPolicy.title(source, publisher: bundle, count: count, ordinal: ordinal)
         let title = stableTitle ?? "@aster.unresolved:\(record.publisher.pid):\(frame.minX):\(frame.minY)"
         let identity = MenuBarItemIdentity(bundleIdentifier: bundle, title: title, occurrence: 0)
         let protected = MenuBarNativeItemPolicy.isPinned(bundle: bundle, title: source.displayTitle ?? title)
@@ -93,11 +98,14 @@ enum MenuBarNativeItemPolicy {
             && abs(first.width - second.width) < 1 && abs(first.height - second.height) < 1
     }
 
-    static func title(_ source: MenuBarItemSourceIdentity, publisher: String, count: Int) -> String? {
+    static func title(_ source: MenuBarItemSourceIdentity, publisher: String, count: Int, ordinal: Int) -> String? {
         if publisher == "com.apple.MenuBarAgent" { return source.axIdentifier ?? source.stableTitle }
         if count == 1 { return "@aster.single-status-item" }
-        guard let identifier = source.axIdentifier, !identifier.hasPrefix("_NS:") else { return nil }
-        return identifier
+        if let identifier = source.axIdentifier, !identifier.hasPrefix("_NS:") { return identifier }
+        // Apps such as iStat Menus give their icons no identifier and live
+        // titles ("CPU 38%"). Their Accessibility order follows creation and
+        // survives rearranging, unlike on-screen position.
+        return "@aster.item-\(ordinal)"
     }
 
     static func isPinned(bundle: String, title: String) -> Bool {
