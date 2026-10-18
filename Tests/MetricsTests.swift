@@ -20,6 +20,7 @@ struct MetricsTests {
                 BatteryNativeArchiveTests.run(suite)
                 BatteryNativeHardwareTests.run(suite)
                 BatteryNativeControllerTests.run(suite)
+                BatteryFirmwareHardwareTests.run(suite)
                 KeepAwakeAssertionTests.run(suite)
             }),
             ("metrics", {

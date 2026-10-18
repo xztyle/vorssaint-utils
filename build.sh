@@ -397,6 +397,7 @@ if (( TEST )); then
         Sources/Vorssaint/Services/BatteryCare/BatteryPolicy.swift
         Sources/Vorssaint/Services/BatteryCare/BatterySchedule.swift
         Sources/Vorssaint/Services/BatteryCare/BatteryHardware.swift
+        Sources/Vorssaint/Services/BatteryCare/BatteryFirmwareHardware.swift
         Sources/Vorssaint/Services/BatteryCare/BatteryRegistrationRepair.swift
         Sources/Vorssaint/Services/BatteryCare/BatterySensor.swift
         Sources/Vorssaint/Services/BatteryCare/BatteryPowerSampler.swift
@@ -709,6 +710,7 @@ swiftc -O -target "$TARGET" -sdk "$SDK" "${SDK_COMPAT_FLAGS[@]}" "${BUILD_VARIAN
     Sources/Vorssaint/Services/BatteryCare/BatteryPolicy.swift \
     Sources/Vorssaint/Services/BatteryCare/BatterySchedule.swift \
     Sources/Vorssaint/Services/BatteryCare/BatteryHardware.swift \
+    Sources/Vorssaint/Services/BatteryCare/BatteryFirmwareHardware.swift \
     Sources/Vorssaint/Services/BatteryCare/BatteryNativePolicyArchive.swift \
     Sources/Vorssaint/Services/BatteryCare/BatteryNativeLease.swift \
     Sources/Vorssaint/Services/BatteryCare/BatteryNativeHardware.swift \

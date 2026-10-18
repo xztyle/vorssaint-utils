@@ -90,7 +90,7 @@ extension BatteryController {
         }
         if stage == 3 {
             qualification = nil
-            if hardware?.backendName != "native-owned-policy" || !state.policy.enabled {
+            if !keepsLimitBetweenSteps || !state.policy.enabled {
                 guard restoreHardware(disable: false) else { return }
             }
             state.qualifiedFingerprint = snapshot.fingerprint
