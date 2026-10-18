@@ -40,7 +40,7 @@ enum BatteryNativeControllerTests {
         suite.expect(controller.configure(policy) && fixture.store.state.nativeLease?.target == 85,
                      "editing the upper limit changes the existing native charge lease")
         fixture.percent = 85; controller.tick()
-        suite.expect(fixture.store.state.nativeLease?.target == 1 && controller.snapshot.command == .hold,
+        suite.expect(fixture.store.state.nativeLease?.target == 75 && controller.snapshot.command == .hold,
                      "reaching the upper limit enters no-drain hold")
         let reloads = fixture.io.reloads
         fixture.percent = 82; controller.tick()

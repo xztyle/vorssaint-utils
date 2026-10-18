@@ -38,8 +38,7 @@ if CommandLine.arguments.contains("--probe") {
     snapshot.fingerprint = BatteryHardware.fingerprint
     snapshot.competitors = BatteryCompetitors.running()
     do {
-        let hardware: any BatteryChargeHardware = try (try? BatteryFirmwareHardware()) ?? BatteryHardware()
-        snapshot.controlBackend = hardware.backendName
+        let hardware = try BatteryHardware()
         snapshot.command = try hardware.readState()
         snapshot.chargeCandidate = true
         snapshot.dischargeCandidate = true

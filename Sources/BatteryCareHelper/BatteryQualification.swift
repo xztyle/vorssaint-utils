@@ -90,7 +90,7 @@ extension BatteryController {
         }
         if stage == 3 {
             qualification = nil
-            if !keepsLimitBetweenSteps || !state.policy.enabled {
+            if hardware?.backendName != "native-owned-policy" || !state.policy.enabled {
                 guard restoreHardware(disable: false) else { return }
             }
             state.qualifiedFingerprint = snapshot.fingerprint
@@ -135,7 +135,8 @@ extension BatteryController {
     private func qualificationCommand(_ command: BatteryCommand) {
         do {
             guard let hardware else { throw BatteryHardwareError.unavailable }
-            hardware.prepare(upper: state.policy.enabled ? state.policy.upper : 100, target: max(1, (snapshot.sample?.percent ?? 20) - 2))
+            hardware.prepare(upper: state.policy.enabled ? state.policy.upper : 100, target: max(1, (snapshot.sample?.percent ?? 20) - 2),
+                             hold: holdCeiling)
             try hardware.apply(command)
             snapshot.command = command
             snapshot.reason = .qualifying

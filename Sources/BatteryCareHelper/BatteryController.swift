@@ -403,9 +403,7 @@ final class BatteryController {
                 BatteryPolicy.pauseOperation(&state)
                 let active = state.policy.enabled && !state.scheduledPause || state.operation != nil
                 if state.ownsHardware || active && canControl(discharge: false) {
-                    // The firmware enforces the ceiling during sleep; others must stop charging.
-                    let firmware = hardware?.backendName == BatteryFirmwareHardware.backend && active
-                    enact(.init(command: firmware ? .charge : .hold, reason: .sleeping))
+                    enact(.init(command: .hold, reason: .sleeping))
                 }
                 _ = save()
             } else { tick() }
@@ -416,7 +414,7 @@ final class BatteryController {
         queue.async {
             self.qualification = nil
             BatteryPolicy.pauseOperation(&self.state)
-            let restored = self.keepFirmwareCeiling() || self.restoreHardware(disable: false)
+            let restored = self.restoreHardware(disable: false)
             completion(restored)
         }
     }

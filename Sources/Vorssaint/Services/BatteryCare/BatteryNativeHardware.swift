@@ -13,6 +13,7 @@ final class BatteryNativeHardware: BatteryChargeHardware {
     private let now: () -> Date
     private var upper = 80
     private var target = 80
+    private var hold = 75
     private(set) var expected: BatteryCommand?
     var backendName: String { "native-owned-policy" }
 
@@ -24,8 +25,9 @@ final class BatteryNativeHardware: BatteryChargeHardware {
         _ = try archive(snapshot: io.snapshot(), boot: io.bootIdentifier(), live: io.registration())
     }
 
-    func prepare(upper: Int, target: Int) {
+    func prepare(upper: Int, target: Int, hold: Int) {
         self.upper = min(100, max(1, upper)); self.target = min(99, max(1, target))
+        self.hold = min(self.upper - 1, max(1, hold))
     }
 
     func apply(_ command: BatteryCommand) throws {
@@ -40,7 +42,7 @@ final class BatteryNativeHardware: BatteryChargeHardware {
         guard !live.hasOtherOwner else { throw BatteryHardwareError.conflict }
         guard let lease = load() else { return .charge }
         guard live.confirms(lease, owner: owner) else { throw BatteryHardwareError.conflict }
-        return lease.drain ? .discharge : lease.target == 1 ? .hold : .charge
+        return lease.drain ? .discharge : lease.target < upper ? .hold : .charge
     }
 
     func verifyOwnership() throws {
@@ -62,7 +64,7 @@ final class BatteryNativeHardware: BatteryChargeHardware {
 
     private func plan(_ command: BatteryCommand) -> (target: Int, drain: Bool)? {
         guard command != .system, command != .charge || upper != 100 else { return nil }
-        return (command == .hold ? 1 : command == .discharge ? target : upper, command == .discharge)
+        return (command == .hold ? hold : command == .discharge ? target : upper, command == .discharge)
     }
 
     private func archive(snapshot: BatteryNativePolicySnapshot, boot: String,

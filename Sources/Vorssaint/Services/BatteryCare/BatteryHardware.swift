@@ -16,7 +16,8 @@ enum BatteryHardwareError: Error { case unavailable, shape, mismatch, conflict }
 protocol BatteryChargeHardware {
     var expected: BatteryCommand? { get }
     var backendName: String { get }
-    func prepare(upper: Int, target: Int)
+    /// `hold` is the ceiling that pauses charging; it never exceeds `upper`.
+    func prepare(upper: Int, target: Int, hold: Int)
     func needsApply(_ command: BatteryCommand) -> Bool
     func readState() throws -> BatteryCommand
     func verifyOwnership() throws
@@ -25,7 +26,7 @@ protocol BatteryChargeHardware {
 
 extension BatteryChargeHardware {
     var backendName: String { "legacy-smc" }
-    func prepare(upper: Int, target: Int) {}
+    func prepare(upper: Int, target: Int, hold: Int) {}
     func needsApply(_ command: BatteryCommand) -> Bool { false }
 }
 

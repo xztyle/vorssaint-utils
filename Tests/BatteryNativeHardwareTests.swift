@@ -50,9 +50,10 @@ enum BatteryNativeHardwareTests {
 
     private static func commandPlans(_ suite: TestSuite) throws {
         let fixture = NativeBatteryFixture(), hardware = try fixture.hardware()
-        hardware.prepare(upper: 80, target: 77)
+        hardware.prepare(upper: 80, target: 77, hold: 75)
         try hardware.apply(.hold)
-        suite.expect(fixture.lease?.target == 1 && fixture.lease?.drain == false, "hold stops charging without forced discharge")
+        suite.expect(fixture.lease?.target == 75 && fixture.lease?.drain == false && (try? hardware.readState()) == .hold,
+                     "hold pauses at a real ceiling below the upper limit, never powerd's ignored 1%")
         try hardware.apply(.discharge)
         suite.expect(fixture.lease?.target == 77 && fixture.lease?.drain == true, "discharge uses the operation's requested target")
         try hardware.apply(.charge)
@@ -60,11 +61,11 @@ enum BatteryNativeHardwareTests {
         let reloads = fixture.io.reloads
         try hardware.apply(.charge); try hardware.verifyOwnership()
         suite.expect(fixture.io.reloads == reloads, "healthy unchanged policy never restarts the power service")
-        hardware.prepare(upper: 85, target: 85)
+        hardware.prepare(upper: 85, target: 85, hold: 75)
         suite.expect(hardware.needsApply(.charge), "editing the limit refreshes an unchanged charge command")
         try hardware.apply(.charge)
         suite.expect(fixture.lease?.target == 85, "new upper limit is applied immediately")
-        hardware.prepare(upper: 100, target: 80); try hardware.apply(.charge)
+        hardware.prepare(upper: 100, target: 80, hold: 75); try hardware.apply(.charge)
         suite.expect(fixture.lease == nil && fixture.io.live.isEmpty, "one-time full charge removes only Aster's rule")
     }
 
