@@ -73,10 +73,14 @@ struct MenuBarOrganizerSettings: View {
         }
         .formStyle(.grouped)
         .onAppear {
+            if MenuBarBackendPreferences.native {
+                MenuBarNativeIconCache.shared.startLive { (service.items, service.nativeUndrawn) }
+            }
             service.syncWithPreferences()
             updateEditingSession()
         }
         .onDisappear {
+            MenuBarNativeIconCache.shared.stopLive()
             endEditingIfNeeded()
         }
         .onChange(of: enabled) { _, _ in
@@ -143,7 +147,8 @@ struct MenuBarOrganizerSettings: View {
                 Button(text.undo) { service.undoLastMove() }
                     .disabled(!service.canUndo)
                 Spacer()
-                Button(text.secondaryBar) { service.showSecondaryBar() }
+                // macOS 27 never draws hidden icons, so the picture panel would be empty.
+                if !MenuBarBackendPreferences.native { Button(text.secondaryBar) { service.showSecondaryBar() } }
             }
 
             organizerLane(.visible, title: text.visible)
@@ -213,14 +218,18 @@ struct MenuBarOrganizerSettings: View {
             ScrollView(.horizontal) {
                 HStack(spacing: 6) {
                     if laneItems.isEmpty {
-                        Text(text.emptySection).font(.caption).foregroundStyle(.tertiary)
+                        Text(text.emptySection).font(.caption)
+                            .foregroundStyle(MenuBarBackendPreferences.native ? AnyShapeStyle(.white.opacity(0.45)) : AnyShapeStyle(.tertiary))
                             .frame(minWidth: 180, minHeight: 38)
                     }
                     ForEach(laneItems) { laneItem($0, section: section) }
                 }.padding(7)
             }
             .frame(height: 60)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.08)))
+            // macOS 27 pictures are white icons cut from a translucent bar, so
+            // each section is drawn as a dark menu bar strip in every theme.
+            .background(RoundedRectangle(cornerRadius: 8).fill(MenuBarBackendPreferences.native
+                ? Color(white: 0.12) : Color.secondary.opacity(0.08)))
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.secondary.opacity(0.16)))
             .onDrop(of: [UTType.text], delegate: MenuBarOrganizerDropDelegate(section: section, target: nil, service: service))
         }.padding(.vertical, 2)
@@ -280,17 +289,36 @@ private struct MenuBarOrganizerEditorItem: View {
     @ObservedObject private var icons = MenuBarNativeIconCache.shared
 
     var body: some View {
-        HStack(spacing: 5) {
-            // The real menu bar icon, as Bartender shows it; the name moves to
-            // the tooltip. Without a picture yet, show the app icon and name.
+        if MenuBarBackendPreferences.native { native } else { classic }
+    }
+
+    /// macOS 27: the icon itself on the strip, as Bartender shows it; the
+    /// name is in the tooltip. Without a picture yet, the app icon stands in.
+    private var native: some View {
+        Group {
             if let picture = icons.image(for: item.id) {
-                Image(nsImage: picture).resizable().scaledToFit().frame(height: 18)
+                Image(nsImage: picture).resizable().scaledToFit().frame(height: 22)
             } else {
-                MenuBarOrganizerItemIcon(item: item, size: 18)
-                Text(item.shortDisplayName)
-                    .font(.caption)
-                    .lineLimit(1)
+                MenuBarOrganizerItemIcon(item: item, size: 18).frame(height: 22)
             }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if !item.isMovable {
+                Image(systemName: "lock.fill").font(.system(size: 7)).foregroundStyle(.white.opacity(0.7))
+            }
+        }
+        .padding(.horizontal, 3)
+        .contentShape(Rectangle())
+        .help(item.isProtected ? text.protectedItem : item.displayName)
+        .opacity(item.isMovable ? 1 : 0.62)
+    }
+
+    private var classic: some View {
+        HStack(spacing: 5) {
+            MenuBarOrganizerItemIcon(item: item, size: 18)
+            Text(item.shortDisplayName)
+                .font(.caption)
+                .lineLimit(1)
             if item.identityState == .provisional {
                 Image(systemName: "questionmark.circle")
                     .font(.caption2)

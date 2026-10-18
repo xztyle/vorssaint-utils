@@ -13,6 +13,7 @@ final class MenuBarOrganizerService: ObservableObject {
     @Published var isRunning = false
     @Published var hiddenSectionShown = true
     private var rehideTask: Task<Void, Never>?
+    private var nativeIconsPrimed = false
     @Published var alwaysHiddenSectionShown = true
     @Published var operationMessage: String?
     @Published var conflictingManagers: [MenuBarManagerDetection.RunningManager] = []
@@ -194,8 +195,12 @@ final class MenuBarOrganizerService: ObservableObject {
             // Native hiding is per publisher, so it follows each fresh inventory;
             // an unchanged configuration returns without touching the pass.
             if usesNativeBackend {
-                // Pictures are only trustworthy before any icon is hidden.
-                if !nativeBackend.visibility.isActive { MenuBarNativeIconCache.shared.capture(items) }
+                if nativeIconsPrimed {
+                    MenuBarNativeIconCache.shared.capture(items, hidden: nativeUndrawn)
+                } else {
+                    nativeIconsPrimed = true
+                    await MenuBarNativeIconCache.shared.captureBeforeHiding(items)
+                }
                 applyNativeVisibility()
             }
         }

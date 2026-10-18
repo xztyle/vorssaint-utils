@@ -84,4 +84,20 @@ extension MenuBarOrganizerService {
         do { try await nativeBackend.mover.move(button.id, before: anchor.id) }
         catch { Self.log.notice("Could not place the menu bar button: \(String(describing: error))") }
     }
+
+    /// Everything not drawn right now, for menu bar pictures: hidden apps and,
+    /// while a pass is active, its side effects. MenuBarAgent keys those
+    /// publishers by process name instead of bundle ID (iStat Menus, Setapp);
+    /// Now Playing is a system module.
+    var nativeUndrawn: Set<String> {
+        let visibility = nativeBackend.visibility
+        guard visibility.isActive else { return visibility.concealed }
+        let keys = (try? MenuBarNativeLayoutAccess.shared.read().positions.keys).map(Array.init) ?? []
+        let byName = keys.compactMap { key -> String? in
+            guard key.hasPrefix("status:"), let name = key.dropFirst(7).components(separatedBy: "::").first,
+                  !name.contains(".") else { return nil }
+            return name
+        }
+        return visibility.concealed.union(byName).union(["com.apple.menuextra.now-playing"])
+    }
 }

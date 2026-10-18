@@ -2,19 +2,24 @@
 // Copyright (C) 2026 Aster contributors
 
 import AppKit
+import ScreenCaptureKit
 
 /// Pictures of the real macOS 27 menu bar icons, as Bartender shows them.
-/// One capture of the menu bar strip is cut into per-icon images. Capture
-/// runs only while no hiding pass is active: hidden icons keep stale frames,
-/// so a cut-out there would show a neighbour. Images persist on disk so an
-/// always-hidden icon keeps its picture across launches.
+/// macOS 27 draws every status icon into one MenuBarAgent window, separate
+/// from the wallpaper and the bar background. Capturing that window alone
+/// gives the icons on a transparent background; each icon is cut at its
+/// frame. Hidden icons are not drawn, so an empty cut keeps the last good
+/// picture. Pictures persist so always-hidden icons keep theirs.
 @MainActor
 final class MenuBarNativeIconCache: ObservableObject {
     static let shared = MenuBarNativeIconCache()
     @Published private(set) var images: [MenuBarItemIdentity: NSImage] = [:]
     private var saved: [MenuBarItemIdentity: NSImage] = [:] // read during view updates; not published
+    private var persisted: Set<MenuBarItemIdentity> = []
     private var lastCapture = Date.distantPast
     private var capturing = false
+    private var liveTimer: Timer?
+    private var liveItems: () -> (items: [ManagedMenuBarItem], hidden: Set<String>) = { ([], []) }
 
     func image(for identity: MenuBarItemIdentity) -> NSImage? {
         if let image = images[identity] ?? saved[identity] { return image }
@@ -23,33 +28,53 @@ final class MenuBarNativeIconCache: ObservableObject {
         return image
     }
 
-    /// Throttled; a missing picture forces a capture sooner.
-    func capture(_ items: [ManagedMenuBarItem]) {
-        let usable = Self.capturable(items)
-        let missing = usable.contains { image(for: $0.id) == nil }
-        guard !capturing, !usable.isEmpty,
-              Date().timeIntervalSince(lastCapture) > (missing ? 5 : 120) else { return }
-        capturing = true
-        Task { [weak self] in
-            defer { self?.capturing = false; self?.lastCapture = Date() }
-            guard let strip = await Self.captureStrip(usable) else { return }
-            for item in usable { self?.store(strip.crop(item.frame), for: item.id) }
-        }
+    /// Background refresh from the organizer; throttled unless a picture is missing.
+    func capture(_ items: [ManagedMenuBarItem], hidden: Set<String>) {
+        let missing = items.contains { $0.identityState == .stable && image(for: $0.id) == nil }
+        guard Date().timeIntervalSince(lastCapture) > (missing ? 5 : 60) else { return }
+        Task { await snapshot(items, hidden: hidden) }
     }
 
-    /// Stable icons whose frame no other icon overlaps: overflowed icons are
-    /// stacked behind the system arrow and have no picture of their own.
-    static func capturable(_ items: [ManagedMenuBarItem]) -> [ManagedMenuBarItem] {
-        items.filter { item in
-            item.identityState == .stable && item.frame.width > 0
-                && !items.contains { $0.id != item.id && $0.frame.intersects(item.frame.insetBy(dx: 1, dy: 0)) }
+    /// Before the first hiding pass every icon is drawn, including apps that
+    /// any pass hides as a side effect (iStat Menus, Setapp); picture them now.
+    func captureBeforeHiding(_ items: [ManagedMenuBarItem]) async {
+        await snapshot(items, hidden: [])
+    }
+
+    /// Live pictures while the editor is on screen, like Bartender's
+    /// updateImagesTimer. Stops by itself after ten minutes.
+    func startLive(_ items: @escaping () -> (items: [ManagedMenuBarItem], hidden: Set<String>)) {
+        liveItems = items
+        liveTimer?.invalidate()
+        let started = Date()
+        liveTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] timer in
+            MainActor.assumeIsolated {
+                guard let self, Date().timeIntervalSince(started) < 600 else { timer.invalidate(); return }
+                let current = self.liveItems()
+                Task { await self.snapshot(current.items, hidden: current.hidden) }
+            }
         }
+        let current = items()
+        Task { await snapshot(current.items, hidden: current.hidden) }
+    }
+
+    func stopLive() { liveTimer?.invalidate(); liveTimer = nil }
+
+    private func snapshot(_ items: [ManagedMenuBarItem], hidden: Set<String>) async {
+        let usable = Self.capturable(items, hidden: hidden)
+        guard !capturing, !usable.isEmpty else { return }
+        capturing = true
+        lastCapture = Date()
+        defer { capturing = false }
+        guard let strip = await Self.captureIconWindow() else { return }
+        for item in usable { store(strip.crop(item.frame), for: item.id) }
     }
 
     private func store(_ image: CGImage?, for identity: MenuBarItemIdentity) {
-        guard let image else { return }
-        let picture = NSImage(cgImage: image, size: .zero)
-        images[identity] = picture
+        guard let image, !Self.isEmpty(image) else { return }
+        images[identity] = NSImage(cgImage: image, size: .zero)
+        guard !persisted.contains(identity) else { return }
+        persisted.insert(identity)
         let url = file(for: identity)
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])?.write(to: url)
@@ -62,23 +87,58 @@ final class MenuBarNativeIconCache: ObservableObject {
             .appendingPathComponent(String(MenuBarNativeItemPolicy.slot(identity), radix: 16) + ".png")
     }
 
-    private struct Strip {
-        let image: CGImage
-        let scale: CGFloat
-        func crop(_ frame: CGRect) -> CGImage? {
-            image.cropping(to: CGRect(x: frame.minX * scale, y: frame.minY * scale,
-                                      width: frame.width * scale, height: frame.height * scale).integral)
+    /// Undrawn icons keep a stale frame where another icon may now be drawn.
+    /// `hidden` names what is undrawn: bundle IDs, publisher names or item
+    /// titles. Any icon overlapping another one is stacked in the overflow.
+    static func capturable(_ items: [ManagedMenuBarItem], hidden: Set<String>) -> [ManagedMenuBarItem] {
+        items.filter { item in
+            item.identityState == .stable && item.frame.width > 0
+                && hidden.isDisjoint(with: [item.bundleIdentifier, item.sourceName, item.id.title])
+                && !items.contains { $0.id != item.id && $0.frame.intersects(item.frame.insetBy(dx: 3, dy: 0)) }
         }
     }
 
-    private static func captureStrip(_ items: [ManagedMenuBarItem]) async -> Strip? {
-        let display = CGMainDisplayID()
+    /// A hidden icon's area is undrawn. The crop is drawn into a gray+alpha
+    /// buffer, so any source pixel layout reads alike.
+    static func isEmpty(_ image: CGImage) -> Bool {
+        let width = image.width, height = image.height
+        guard width > 0, height > 0,
+              let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
+                                      bytesPerRow: width * 2, space: CGColorSpaceCreateDeviceGray(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        guard let data = context.data else { return false }
+        let bytes = data.bindMemory(to: UInt8.self, capacity: width * height * 2) // gray, alpha
+        return !stride(from: 1, to: width * height * 2, by: 2).contains { bytes[$0] > 24 }
+    }
+
+    private struct Strip {
+        let image: CGImage
+        let frame: CGRect
+        /// Every icon is cut from the same 24-point band at the bar's centre.
+        /// Apple's icons report the full bar height, app icons 24 points, so
+        /// per-frame heights would shrink Apple's icons when shown side by side.
+        func crop(_ item: CGRect) -> CGImage? {
+            let scale = CGFloat(image.width) / frame.width
+            return image.cropping(to: CGRect(x: (item.minX - frame.minX) * scale, y: (frame.height / 2 - 12) * scale,
+                                             width: item.width * scale, height: 24 * scale).integral)
+        }
+    }
+
+    /// MenuBarAgent's own menu-bar-height window on the main display.
+    private static func captureIconWindow() async -> Strip? {
+        guard let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false),
+              let window = content.windows.first(where: {
+                  $0.owningApplication?.bundleIdentifier == "com.apple.MenuBarAgent"
+                      && $0.frame.minY == 0 && $0.frame.height <= 60 && $0.frame.width > 400 }) else { return nil }
+        let configuration = SCStreamConfiguration()
         let scale = NSScreen.screens.first { $0.frame.origin == .zero }?.backingScaleFactor ?? 2
-        let height = (items.map(\.frame.maxY).max() ?? 40) + 2
-        let width = CGDisplayBounds(display).width
-        guard let image = await ScreenshotCaptureEngine.captureDisplayRegion(
-            displayID: display, pixelRect: CGRect(x: 0, y: 0, width: width * scale, height: height * scale),
-            includePointer: false, hideVorssaintWindows: false, protectedWindowIDs: []) else { return nil }
-        return Strip(image: image, scale: scale)
+        configuration.width = Int(window.frame.width * scale)
+        configuration.height = Int(window.frame.height * scale)
+        configuration.showsCursor = false
+        configuration.ignoreShadowsSingleWindow = true
+        guard let image = try? await SCScreenshotManager.captureImage(
+            contentFilter: SCContentFilter(desktopIndependentWindow: window), configuration: configuration) else { return nil }
+        return Strip(image: image, frame: window.frame)
     }
 }

@@ -11,10 +11,11 @@ extension MenuBarOrganizerService {
             (extra.search, #selector(contextSearch)),
             (hiddenSectionShown ? text.contextHideHidden : text.contextShowHidden, #selector(contextHidden)),
             (alwaysHiddenSectionShown ? text.contextHideAlways : text.contextShowAlways, #selector(contextAlways)),
-            (text.secondaryBar, #selector(contextPanel)),
+            // macOS 27 never draws hidden icons, so the picture panel would be empty.
+            usesNativeBackend ? nil : (text.secondaryBar, #selector(contextPanel)),
             (text.contextSettings, #selector(contextSettings)),
             (text.contextDisable, #selector(contextDisable)),
-        ]
+        ].compactMap { $0 }
         for row in rows {
             let item = menu.addItem(withTitle: row.0, action: row.1, keyEquivalent: "")
             item.target = self
