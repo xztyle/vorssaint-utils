@@ -9,6 +9,7 @@ MenuBarAXDiagnosticProbe.runIfRequested()
 if CommandLine.arguments.contains("--menu-bar-inventory") {
     MenuBarInventoryProbe.runAndExit()
 }
+MenuBarMoveProbe.runIfRequestedAndExit()
 
 ScreenshotCaptureFixture.runIfRequestedAndExit()
 CleanupProbe.runIfRequested()

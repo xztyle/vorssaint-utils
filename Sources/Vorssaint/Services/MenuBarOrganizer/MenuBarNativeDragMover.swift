@@ -12,9 +12,9 @@ final class MenuBarNativeDragMover {
     private let transport: MenuBarVisibleDragTransport
     private let snapshot: () async -> MenuBarItemSnapshot
 
-    init(transport: MenuBarVisibleDragTransport = MenuBarVisibleDragTransport(),
+    init(transport: MenuBarVisibleDragTransport? = nil,
          snapshot: @escaping () async -> MenuBarItemSnapshot = { await MenuBarNativeAXProvider.snapshot(includingOwn: true) }) {
-        self.transport = transport
+        self.transport = transport ?? MenuBarVisibleDragTransport()
         self.snapshot = snapshot
     }
 
