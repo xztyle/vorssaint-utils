@@ -199,7 +199,9 @@ extension MenuBarOrganizerService {
               !automationPaused, !recoveryNeeded, editingCount == 0,
               !MenuBarItemMover.hasAnyOpenMenu else { return }
         guard adoptNewItems() else { return }
-        if MenuBarLayoutPolicy.isSatisfied(desiredLayout, items: items) {
+        // macOS 27 keeps the order itself and hides by publisher, so sections
+        // never need a physical move; only explicit arrangement drags icons.
+        if usesNativeBackend || MenuBarLayoutPolicy.isSatisfied(desiredLayout, items: items) {
             needsReconciliation = false
             return
         }

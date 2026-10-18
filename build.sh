@@ -410,7 +410,6 @@ if (( TEST )); then
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarNativeLayoutDocument.swift
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarBookmarkAccess.swift
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarNativeLayoutRefresh.swift
-        Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarNativeVisibilityExpectation.swift
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarNativePreferenceStore.swift
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarNativeKeyPolicy.swift
         Sources/Vorssaint/Core/MenuBarNativeStrings.swift

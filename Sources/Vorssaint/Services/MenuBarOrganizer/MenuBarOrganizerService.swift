@@ -3,6 +3,7 @@
 // Backend adapted from ruvelro's Vorssaint PR #360, head 8d0888a.
 import AppKit
 import Combine
+import os
 
 @MainActor
 final class MenuBarOrganizerService: ObservableObject {
@@ -11,6 +12,7 @@ final class MenuBarOrganizerService: ObservableObject {
     @Published var capabilities = MenuBarOrganizerCapabilities.unavailable
     @Published var isRunning = false
     @Published var hiddenSectionShown = true
+    private var rehideTask: Task<Void, Never>?
     @Published var alwaysHiddenSectionShown = true
     @Published var operationMessage: String?
     @Published var conflictingManagers: [MenuBarManagerDetection.RunningManager] = []
@@ -64,12 +66,15 @@ final class MenuBarOrganizerService: ObservableObject {
             && MenuBarManagerDetection.runningManagers().isEmpty
     }
 
+    static let log = Logger(subsystem: "io.github.xztyle.Aster", category: "MenuBarOrganizer")
+
     func syncWithPreferences() {
         conflictingManagers = MenuBarManagerDetection.runningManagers()
         let enabled = AppFeature.menuBarOrganizer.isAvailable
             && UserDefaults.standard.bool(forKey: DefaultsKey.menuBarOrganizerEnabled)
         guard enabled, AppFeature.menuBarOrganizer.isSupportedOnCurrentSystem,
               AXIsProcessTrusted(), conflictingManagers.isEmpty else {
+            if enabled { Self.log.notice("Not starting: supported \(AppFeature.menuBarOrganizer.isSupportedOnCurrentSystem), accessibility \(AXIsProcessTrusted()), conflicts \(self.conflictingManagers.count)") }
             stop()
             return
         }
@@ -84,9 +89,10 @@ final class MenuBarOrganizerService: ObservableObject {
         defer { if !isRunning, controlItem != nil { finishTermination() } }
         do { try loadStoredState() }
         catch { libraryIsValid = false; operationMessage = extra.corruptStore; return }
-        guard await prepareNativeBackend() else { return }
+        guard await prepareNativeBackend() else { Self.log.notice("Not starting: native recovery failed"); return }
         let snapshot = await inventorySnapshot()
         guard !Task.isCancelled, snapshot.enumerationSucceeded, !snapshot.items.isEmpty else {
+            Self.log.notice("Not starting: inventory unavailable (\(snapshot.items.count) items)")
             operationMessage = text.automaticMoveUnavailable; return
         }
         let pendingRecovery: Bool
@@ -94,7 +100,10 @@ final class MenuBarOrganizerService: ObservableObject {
         catch { operationMessage = extra.corruptStore; return }
         guard !Task.isCancelled, AppFeature.menuBarOrganizer.isAvailable,
               UserDefaults.standard.bool(forKey: DefaultsKey.menuBarOrganizerEnabled),
-              AXIsProcessTrusted(), MenuBarManagerDetection.runningManagers().isEmpty else { return }
+              AXIsProcessTrusted(), MenuBarManagerDetection.runningManagers().isEmpty else {
+            Self.log.notice("Not starting: conditions changed during startup"); return
+        }
+        Self.log.notice("Starting with \(snapshot.items.count) items, recovery \(pendingRecovery)")
         await finishStart(pendingRecovery: pendingRecovery)
     }
 
@@ -109,6 +118,7 @@ final class MenuBarOrganizerService: ObservableObject {
         syncHotkeys()
         scheduleRefreshTimer()
         _ = await refreshNow()
+        if usesNativeBackend { await placeNativeControl() }
         if !pendingRecovery && !desiredLayout.entries.isEmpty { await reconcile() }
     }
 
@@ -125,6 +135,9 @@ final class MenuBarOrganizerService: ObservableObject {
             try store.save(original, for: baselinePreferenceKey)
             baseline = original
         }
+        // macOS 27 persists the order itself, and an app that is not running
+        // is not an interrupted move; the saved original stays for Restore.
+        if usesNativeBackend { return false }
         return baseline.map { !MenuBarLayoutPolicy.isSatisfied($0, items: items)
             || !MenuBarLayoutPolicy.allItemsAvailable($0, items: items) } ?? false
     }
@@ -178,6 +191,9 @@ final class MenuBarOrganizerService: ObservableObject {
             items = snapshot.items
             let windows = Dictionary(uniqueKeysWithValues: items.filter { $0.identityState == .stable }.map { ($0.id, $0.windowID) })
             if windows != inventoryWindows { needsReconciliation = true; inventoryWindows = windows }
+            // Native hiding is per publisher, so it follows each fresh inventory;
+            // an unchanged configuration returns without touching the pass.
+            if usesNativeBackend { applyNativeVisibility() }
         }
         else { operationMessage = text.automaticMoveUnavailable }
         return snapshot
@@ -240,10 +256,26 @@ final class MenuBarOrganizerService: ObservableObject {
         let screen = activeScreen
         let width = items.filter { $0.section != .visible }.reduce(CGFloat(0)) { $0 + $1.frame.width }
         let available = screen?.auxiliaryTopRightArea?.width ?? (screen?.visibleFrame.width ?? 1024) * 0.45
-        if MenuBarOrganizerSupport.shouldUseSecondaryBar(mode: mode, hiddenWidth: width,
+        // macOS 27 hidden icons are never drawn, so a panel of their pictures
+        // would be empty; lifting the pass returns them to the menu bar.
+        if !usesNativeBackend, MenuBarOrganizerSupport.shouldUseSecondaryBar(mode: mode, hiddenWidth: width,
             availableWidth: available, hasNotch: screen?.safeAreaInsets.top ?? 0 > 0) {
             showSecondaryBar(includeAlwaysHidden: section == .alwaysHidden)
-        } else { revealInMenuBar(section) }
+        } else {
+            revealInMenuBar(section)
+            if usesNativeBackend { scheduleRehide() }
+        }
+    }
+
+    /// On macOS 27 revealed icons can push Aster's own button into the system
+    /// overflow, so a reveal always ends by itself, as in Bartender.
+    private func scheduleRehide() {
+        rehideTask?.cancel()
+        rehideTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(15))
+            guard !Task.isCancelled, let self, self.editingCount == 0, !self.isBusy else { return }
+            self.hideAll()
+        }
     }
 
     var activeScreen: NSScreen? {
@@ -270,6 +302,7 @@ final class MenuBarOrganizerService: ObservableObject {
 
     func hideAll() {
         guard isRunning, !stopping else { return }
+        rehideTask?.cancel(); rehideTask = nil
         secondaryPanel?.close()
         hiddenSectionShown = false
         alwaysHiddenSectionShown = false

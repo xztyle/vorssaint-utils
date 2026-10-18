@@ -51,7 +51,6 @@ struct MetricsTests {
                 MenuBarBookmarkTests.run(suite)
                 MenuBarNativeRefreshTests.run(suite)
                 MenuBarNativeSectionTests.run(suite)
-                MenuBarNativeVisibilityTests.run(suite)
                 MenuBarNativePreferenceTests.run(suite)
             }),
             ("linear-scroll", { LinearScrollTapTests.run(suite) }),

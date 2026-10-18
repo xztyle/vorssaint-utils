@@ -57,4 +57,31 @@ extension MenuBarOrganizerService {
         if usesNativeBackend { try await MenuBarNativePress.press(item) }
         else { try await mover.click(item: item) }
     }
+
+    /// macOS 27 tucks the leftmost icons behind its overflow arrow when the
+    /// bar is full, which hid Aster's button exactly when icons were revealed.
+    /// Apple's own icons never overflow, so the button sits just left of them.
+    /// MenuBarAgent remembers the spot; an already placed button is not moved.
+    func placeNativeControl() async {
+        try? await Task.sleep(for: .seconds(1.5)) // let a hiding pass free space first
+        let snapshot = await MenuBarNativeAXProvider.snapshot(includingOwn: true)
+        let control = MenuBarDividerItem.Kind.control.autosaveName
+        guard snapshot.enumerationSucceeded,
+              let button = snapshot.items.first(where: {
+                  $0.bundleIdentifier == Bundle.main.bundleIdentifier && $0.id.title == control }),
+              let anchor = snapshot.items.filter({
+                  $0.bundleIdentifier == "com.apple.MenuBarAgent" && !$0.isProtected
+                      && $0.id.title.hasPrefix("com.apple.menuextra.") && !$0.id.title.hasSuffix("now-playing") })
+                  .min(by: { $0.frame.minX < $1.frame.minX }) else { return }
+        // Overflowed icons sit at or behind the system overflow arrow (Apple's
+        // only icon outside com.apple.menuextra.*). Hidden icons keep stale
+        // frames, so overlap with them says nothing about the button.
+        let overflow = snapshot.items.first {
+            $0.bundleIdentifier == "com.apple.MenuBarAgent" && !$0.id.title.hasPrefix("com.apple.menuextra.") }
+        if let overflow, button.frame.minX <= overflow.frame.maxX {
+            Self.log.notice("Menu bar button is in the overflow; placement skipped"); return
+        }
+        do { try await nativeBackend.mover.move(button.id, before: anchor.id) }
+        catch { Self.log.notice("Could not place the menu bar button: \(String(describing: error))") }
+    }
 }
