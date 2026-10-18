@@ -183,6 +183,11 @@ sign_installed_helpers() {
     local helper="$bundle/Contents/Library/LaunchServices/$FAN_HELPER_ID"
     local battery="$bundle/Contents/Library/LaunchServices/$BATTERY_HELPER_ID"
     local adapter="$bundle/Contents/Frameworks/$NOW_PLAYING_ADAPTER"
+    # A preserved helper is the live daemon's own file. Re-signing replaces
+    # it under the running process, which then fails the app's code check.
+    # Only re-sign a helper whose installed signature no longer verifies.
+    /usr/bin/codesign --verify --strict "$helper" 2>/dev/null && helper=""
+    /usr/bin/codesign --verify --strict "$battery" 2>/dev/null && battery=""
     if [[ -n "$devid" ]]; then
         [[ -f "$helper" ]] && codesign_with_timestamp_retry --force --strip-disallowed-xattrs \
             --options runtime --timestamp --identifier "$FAN_HELPER_ID" --sign "$devid" "$helper"
