@@ -6,6 +6,7 @@ import Foundation
 extension DefaultsKey {
     static let batteryCarePolicy = "batteryCarePolicy"
     static let batteryCareHelperVersion = "batteryCareHelperVersion"
+    static let batteryCarePendingUpgradeActivation = "batteryCarePendingUpgradeActivation"
 }
 
 enum BatteryCarePreferences {

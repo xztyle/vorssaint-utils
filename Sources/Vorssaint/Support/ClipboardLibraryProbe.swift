@@ -43,7 +43,7 @@ enum ClipboardLibraryProbe {
         let state: [String: Any] = [
             "frame": rect(panel.frame), "screenFrame": rect(screen?.frame ?? .zero),
             "visibleFrame": rect(screen?.visibleFrame ?? .zero),
-            "targetFrame": rect(ClipboardHistoryWindowSizing.frame(on: screen?.frame ?? .zero)),
+            "targetFrame": rect(panel.targetFrame),
             "level": panel.level.rawValue, "dockLevel": CGWindowLevelForKey(.dockWindow),
             "visible": panel.isVisible, "presented": history.drawerPresentation.isPresented,
             "preview": history.quickPreviewPresented, "query": history.quickQuery,

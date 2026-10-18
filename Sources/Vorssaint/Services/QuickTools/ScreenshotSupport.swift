@@ -882,30 +882,25 @@ enum ScreenshotSupport {
 
     // MARK: - Editor layout
 
-    /// A fresh editor should be large enough for its controls and canvas,
-    /// while still fitting compact or rotated displays.
+    /// Controls float over the image, so the window needs no chrome margin.
     static func editorMinimumContentSize(visibleSize: CGSize) -> CGSize {
-        CGSize(width: min(visibleSize.width,
-                          min(980, max(760, visibleSize.width * 0.76))),
-               height: min(visibleSize.height,
-                           min(680, max(560, visibleSize.height * 0.72))))
+        CGSize(width: min(visibleSize.width, 280),
+               height: min(visibleSize.height, 180))
     }
 
-    /// Initial content size for an editor window. Large captures fit inside
-    /// the display and small captures still open on a comfortable canvas.
+    /// Keep the window in the image's shape when it fits the display.
     static func editorContentSize(imagePointSize: CGSize,
                                   visibleSize: CGSize) -> CGSize {
-        let chrome = CGSize(width: 96, height: 140)
         let minimum = editorMinimumContentSize(visibleSize: visibleSize)
         let maximum = CGSize(width: max(minimum.width, visibleSize.width * 0.90),
                              height: max(minimum.height, visibleSize.height * 0.88))
-        let fit = min(1,
-                      min((maximum.width - chrome.width) / max(imagePointSize.width, 1),
-                          (maximum.height - chrome.height) / max(imagePointSize.height, 1)))
-        let preferred = CGSize(width: imagePointSize.width * fit + chrome.width,
-                               height: imagePointSize.height * fit + chrome.height)
-        return CGSize(width: min(maximum.width, max(minimum.width, preferred.width)),
-                      height: min(maximum.height, max(minimum.height, preferred.height)))
+        let image = CGSize(width: max(imagePointSize.width, 1),
+                           height: max(imagePointSize.height, 1))
+        let fit = min(maximum.width / image.width, maximum.height / image.height)
+        let comfortable = max(1, max(420 / image.width, 280 / image.height))
+        let scale = min(fit, comfortable)
+        return CGSize(width: max(minimum.width, image.width * scale),
+                      height: max(minimum.height, image.height * scale))
     }
 
     /// Local key monitors normally receive the editor's window number, but

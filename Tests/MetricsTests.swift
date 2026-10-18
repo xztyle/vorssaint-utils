@@ -14,13 +14,27 @@ struct MetricsTests {
                 TestHarnessTests.run(suite)
                 PreferenceNamespaceTests.run(suite)
             }),
-            ("battery-care", { BatteryCareTests.run(suite) }),
+            ("battery-care", {
+                BatteryCareTests.run(suite)
+                BatteryCompatibilityTests.run(suite)
+                BatteryNativeArchiveTests.run(suite)
+                BatteryNativeHardwareTests.run(suite)
+                BatteryNativeControllerTests.run(suite)
+                KeepAwakeAssertionTests.run(suite)
+            }),
             ("metrics", {
                 MetricsFeatureTests.run(suite)
+                PowerFlowTests.run(suite)
+                BatteryPowerTelemetryTests.run(suite)
+                ChipPowerTests.run(suite)
                 ProcessNameContract.run(suite)
                 SystemMonitorCPUTests.run(suite)
             }),
-            ("clipboard", { ClipboardFeatureTests.run(suite) }),
+            ("clipboard", {
+                ClipboardFeatureTests.run(suite)
+                ClipboardDrawerSizingTests.run(suite)
+                ClipboardPopoverTests.run(suite)
+            }),
             ("pointer-input", {
                 PointerOnDisplayContract.run(suite)
                 PointerInputFeatureTests.run(suite)
@@ -30,7 +44,16 @@ struct MetricsTests {
                 PointerScreenContract.run(suite)
             }),
             ("scroll-modifier", { ScrollHorizontalModifierTests.run(suite) }),
-            ("menu-bar", { MenuBarOrganizerTests.run(suite); MenuBarActivationTests.run(suite) }),
+            ("menu-bar", {
+                MenuBarOrganizerTests.run(suite)
+                MenuBarActivationTests.run(suite)
+                MenuBarNativeLayoutTests.run(suite)
+                MenuBarBookmarkTests.run(suite)
+                MenuBarNativeRefreshTests.run(suite)
+                MenuBarNativeSectionTests.run(suite)
+                MenuBarNativeVisibilityTests.run(suite)
+                MenuBarNativePreferenceTests.run(suite)
+            }),
             ("linear-scroll", { LinearScrollTapTests.run(suite) }),
             ("preferences", { PreferencesFeatureTests.run(suite) }),
             ("app-management", { AppManagementFeatureTests.run(suite) }),
@@ -56,6 +79,8 @@ struct MetricsTests {
             ("repository", { RepositoryFeatureTests.run(suite) }),
             ("screenshots", {
                 ScreenshotPreviewHoverTests.run(suite)
+                ScreenshotPreviewTransferTests.run(suite)
+                ScreenshotPreviewKeyboardTests.run(suite)
                 ScreenshotContinuityTests.run(suite)
                 ScreenshotFixtureReceiverTests.run(suite)
                 ScreenshotCaptureWorkspaceTests.run(suite)
@@ -101,7 +126,10 @@ struct MetricsTests {
                 AssistiveKeyboardTests.run(suite)
                 ScreenshotToolShortcutTests.run(suite)
             }),
-            ("storage-inspection", { StorageInspectionTests.run(suite) }),
+            ("storage-inspection", {
+                StorageInspectionTests.run(suite)
+                StorageMapTests.run(suite)
+            }),
             ("storage", {
                 RecentCaptureStoreTests.run(suite)
                 ScreenshotHistoryRevisionTests.run(suite)

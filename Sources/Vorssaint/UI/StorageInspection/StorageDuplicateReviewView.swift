@@ -14,6 +14,7 @@ struct StorageDuplicateReviewView: View {
                 ForEach(service.duplicates.groups.prefix(shown)) { group in StorageDuplicateGroupView(group: group) }
                 if service.duplicates.groups.count > shown { Button(text[.more]) { shown += 50 } }
                 ForEach(service.duplicates.issues) { issue in Text("\(text[.partial]): \(issue.path)").font(.caption).textSelection(.enabled) }
+                StorageRecoveryView()
             }
         }
     }

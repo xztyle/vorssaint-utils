@@ -32,6 +32,24 @@ struct ClipboardLibraryStrings {
     var editCopy: String { Self.editCopyValues[language]! }
     var copyFallback: String { Self.copyFallbackValues[language]! }
     var dragFiles: String { Self.dragFilesValues[language]! }
+    var resizeHeight: String { Self.resizeHeightValues[language]! }
+    private static let resizeHeightValues: [AppLanguage: String] = [
+        .enUS: "Resize clipboard height",
+        .es: "Cambiar la altura del portapapeles",
+        .ptBR: "Alterar a altura da área de transferência",
+        .tr: "Pano yüksekliğini değiştir",
+        .ru: "Изменить высоту буфера обмена",
+        .sk: "Zmeniť výšku schránky",
+        .de: "Höhe der Zwischenablage ändern",
+        .fr: "Modifier la hauteur du presse-papiers",
+        .it: "Modifica l’altezza degli appunti",
+        .ja: "クリップボードの高さを変更",
+        .ko: "클립보드 높이 조절",
+        .zhHans: "调整剪贴板高度",
+        .zhTW: "調整剪貼簿高度",
+        .zhHK: "調整剪貼簿高度",
+        .uk: "Змінити висоту буфера обміну",
+    ]
     private static let dragFilesValues: [AppLanguage: String] = [
         .enUS: "Drag all files",
         .es: "Arrastrar todos los archivos",

@@ -214,10 +214,10 @@ extension MenuBarOrganizerService {
         do {
             if let baseline {
                 let original = baseline.includingNewItems(from: current)
-                try store.save(original, for: DefaultsKey.menuBarOrganizerBaseline)
+                try store.save(original, for: baselinePreferenceKey)
                 self.baseline = original
             }
-            try store.save(updated, for: DefaultsKey.menuBarOrganizerLayout)
+            try store.save(updated, for: layoutPreferenceKey)
             desiredLayout = updated
             return true
         } catch { operationMessage = extra.corruptStore; return false }
@@ -272,7 +272,7 @@ extension MenuBarOrganizerService {
             activeRule = nil
             if await applyLayout(profile.layout) {
                 desiredLayout = profile.layout
-                try? store.save(desiredLayout, for: DefaultsKey.menuBarOrganizerLayout)
+                try? store.save(desiredLayout, for: layoutPreferenceKey)
                 var updated = library
                 updated.activeProfileID = id
                 saveLibrary(updated)

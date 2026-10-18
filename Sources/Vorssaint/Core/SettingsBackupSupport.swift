@@ -104,6 +104,10 @@ enum SettingsBackupSupport {
         DefaultsKey.batteryCareHelperVersion,
         DefaultsKey.menuBarOrganizerBaseline,
         DefaultsKey.menuBarOrganizerSetupComplete,
+        DefaultsKey.menuBarNativeBaseline,
+        DefaultsKey.menuBarNativeSetupComplete,
+        DefaultsKey.menuBarNativeBookmark,
+        DefaultsKey.menuBarNativeTransaction,
         DefaultsKey.dockPreviewRestoreAutohide,
         // A Bluetooth restore owed by one sleeping Mac means nothing on another.
         DefaultsKey.bluetoothSleepRestorePending,

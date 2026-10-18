@@ -10,13 +10,13 @@ import Foundation
 /// identity. AX work runs away from the main actor and is bounded by the app's
 /// process-wide AX timeout.
 actor MenuBarItemSourceResolver {
-    private struct ApplicationRecord: Sendable {
+    struct ApplicationRecord: Sendable {
         let pid: pid_t
         let bundleIdentifier: String
         let name: String
     }
 
-    private struct AXItemRecord: Sendable {
+    struct AXItemRecord: Sendable {
         let source: MenuBarItemSourceIdentity
         let frame: CGRect
     }
@@ -66,7 +66,7 @@ actor MenuBarItemSourceResolver {
     }
 
     @MainActor
-    private static func runningApplications() -> ([ApplicationRecord], Bool) {
+    static func runningApplications() -> ([ApplicationRecord], Bool) {
         let applications = NSWorkspace.shared.runningApplications.compactMap { app -> ApplicationRecord? in
             guard !app.isTerminated, let bundle = app.bundleIdentifier else { return nil }
             return ApplicationRecord(pid: app.processIdentifier, bundleIdentifier: bundle,
@@ -108,7 +108,8 @@ actor MenuBarItemSourceResolver {
         return MenuBarSourceCandidate(windowID: record.windowID, source: axItem.source, score: score, sourceSlot: slot)
     }
 
-    private static func scanExtrasMenuBar(_ app: ApplicationRecord, trace: MenuBarAXDiagnosticTrace?) -> [AXItemRecord] {
+    static func scanExtrasMenuBar(_ app: ApplicationRecord, trace: MenuBarAXDiagnosticTrace?,
+                                 includeNestedMetadata: Bool = false) -> [AXItemRecord] {
         let application = AXUIElementCreateApplication(app.pid)
         AXUIElementSetMessagingTimeout(application, 0.2)
         let extras: Read<AXUIElement> = read("AXExtrasMenuBar", from: application)
@@ -116,7 +117,8 @@ actor MenuBarItemSourceResolver {
         var childReports: [[String: Any]] = []
         let result = (children.value ?? []).prefix(trace == nil ? Int.max : 64).compactMap { child -> AXItemRecord? in
             if let trace, !trace.shouldContinue { return nil }
-            return scanChild(child, app: app, single: children.value?.count == 1, reports: &childReports, trace: trace)
+            return scanChild(child, app: app, single: children.value?.count == 1,
+                reports: &childReports, trace: trace, nested: includeNestedMetadata)
         }
         trace?.applications.append(["bundle": app.bundleIdentifier, "pid": app.pid,
             "extrasError": extras.error as Any? ?? NSNull(), "childrenError": children.error as Any? ?? NSNull(),
@@ -125,26 +127,17 @@ actor MenuBarItemSourceResolver {
     }
 
     private static func scanChild(_ child: AXUIElement, app: ApplicationRecord, single: Bool, reports: inout [[String: Any]],
-                                  trace: MenuBarAXDiagnosticTrace?) -> AXItemRecord? {
+                                  trace: MenuBarAXDiagnosticTrace?, nested: Bool) -> AXItemRecord? {
         if trace != nil { AXUIElementSetMessagingTimeout(child, 0.35) }
         let frame: Read<AXValue> = read("AXFrame", from: child)
         let point: Read<AXValue> = read(kAXPositionAttribute, from: child)
         let size: Read<AXValue> = read(kAXSizeAttribute, from: child)
         let geometry = MenuBarOrganizerSupport.accessibilityFrame(frame: frame.value, position: point.value, size: size.value)
         guard geometry != nil || trace != nil else { return nil }
-        let identifier: Read<String> = read(kAXIdentifierAttribute, from: child)
-        let title: Read<String> = read(kAXTitleAttribute, from: child)
-        let description: Read<String> = read(kAXDescriptionAttribute, from: child)
-        if trace != nil {
-            reports.append(["frame": geometry.map(MenuBarAXDiagnosticTrace.rect) as Any? ?? NSNull(),
-                "rawFrame": MenuBarAXDiagnosticTrace.geometry(frame.value),
-                "position": MenuBarAXDiagnosticTrace.geometry(point.value), "size": MenuBarAXDiagnosticTrace.geometry(size.value),
-                "frameError": frame.error as Any? ?? NSNull(), "positionError": point.error as Any? ?? NSNull(),
-                "sizeError": size.error as Any? ?? NSNull(), "identifier": MenuBarAXDiagnosticTrace.textPresence(identifier.value),
-                "title": MenuBarAXDiagnosticTrace.textPresence(title.value), "description": MenuBarAXDiagnosticTrace.textPresence(description.value),
-                "identifierError": identifier.error as Any? ?? NSNull(), "titleError": title.error as Any? ?? NSNull(),
-                "descriptionError": description.error as Any? ?? NSNull()])
-        }
+        let identifier = metadata(kAXIdentifierAttribute, from: child, nested: nested)
+        let title = metadata(kAXTitleAttribute, from: child, nested: nested)
+        let description = metadata(kAXDescriptionAttribute, from: child, nested: nested)
+        if trace != nil { reports.append(childReport(geometry, frame, point, size, identifier, title, description)) }
         guard let geometry else { return nil }
         var pid = app.pid
         AXUIElementGetPid(child, &pid)
@@ -152,6 +145,30 @@ actor MenuBarItemSourceResolver {
             axIdentifier: identifier.value, axTitle: title.value, axDescription: description.value,
             isOnlyStatusItem: single && pid == app.pid)
         return AXItemRecord(source: source, frame: geometry)
+    }
+
+    private static func metadata(_ name: String, from child: AXUIElement, nested: Bool) -> Read<String> {
+        let direct: Read<String> = read(name, from: child)
+        guard nested, direct.value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false else { return direct }
+        let children: Read<[AXUIElement]> = read(kAXChildrenAttribute, from: child)
+        for element in (children.value ?? []).prefix(16) {
+            let result: Read<String> = read(name, from: element)
+            if result.value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false { return result }
+        }
+        return direct
+    }
+
+    private static func childReport(_ geometry: CGRect?, _ frame: Read<AXValue>, _ point: Read<AXValue>,
+                                    _ size: Read<AXValue>, _ identifier: Read<String>, _ title: Read<String>,
+                                    _ description: Read<String>) -> [String: Any] {
+        ["frame": geometry.map(MenuBarAXDiagnosticTrace.rect) as Any? ?? NSNull(),
+                "rawFrame": MenuBarAXDiagnosticTrace.geometry(frame.value),
+                "position": MenuBarAXDiagnosticTrace.geometry(point.value), "size": MenuBarAXDiagnosticTrace.geometry(size.value),
+                "frameError": frame.error as Any? ?? NSNull(), "positionError": point.error as Any? ?? NSNull(),
+                "sizeError": size.error as Any? ?? NSNull(), "identifier": MenuBarAXDiagnosticTrace.textPresence(identifier.value),
+                "title": MenuBarAXDiagnosticTrace.textPresence(title.value), "description": MenuBarAXDiagnosticTrace.textPresence(description.value),
+                "identifierError": identifier.error as Any? ?? NSNull(), "titleError": title.error as Any? ?? NSNull(),
+                "descriptionError": description.error as Any? ?? NSNull()]
     }
 
     private struct Read<T> {

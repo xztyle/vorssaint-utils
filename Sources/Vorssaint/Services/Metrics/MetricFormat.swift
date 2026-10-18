@@ -258,6 +258,10 @@ enum MetricFormat {
         String(format: "%.0fW", locale: Self.locale, value.rounded())
     }
 
+    static func wattsPrecise(_ value: Double) -> String {
+        String(format: "%.2f W", locale: locale, value)
+    }
+
     static func systemPowerWatts(measured: Double?,
                                  batteryWatts: Double?,
                                  externalConnected: Bool) -> Double? {

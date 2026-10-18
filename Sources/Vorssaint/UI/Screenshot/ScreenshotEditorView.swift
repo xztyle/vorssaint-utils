@@ -27,6 +27,9 @@ struct ScreenshotEditorView: View {
     @State var sharing = false
     @State var sharedRecord: ScreenshotShareRecord?
     @State var shareAnchor = ShelfSharePickerAnchor.Anchor()
+    @State private var revealsTopControls = false
+    @State private var revealsLeftControls = false
+    @State private var revealsBottomControls = false
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @AppStorage(DefaultsKey.screenshotToolOrder) var toolOrderRaw =
         ScreenshotSupport.Tool.defaultOrderStorage
@@ -43,28 +46,16 @@ struct ScreenshotEditorView: View {
     }
 
     var body: some View {
-        // Real rows and columns, not overlays: the canvas scrolls in its own
-        // region, so zoomed content can never slide under the controls.
-        ZStack {
-            artboard
-            VStack(spacing: 0) {
-                topBand
-                    .padding(.top, 10)
-                    .padding(.horizontal, 12)
-                HStack(spacing: 0) {
-                    ScrollView(.vertical) {
-                        toolRail
-                    }
-                    .scrollIndicators(.never)
-                    .fixedSize(horizontal: true, vertical: false)
-                    .padding(.leading, 10)
-                    canvasArea
-                }
-                .padding(.top, 6)
-                bottomRow
-                    .padding(.horizontal, 12)
-                    .padding(.top, 6)
-                    .padding(.bottom, 10)
+        GeometryReader { proxy in
+            ZStack {
+                artboard
+                canvasArea
+            }
+            .overlay(alignment: .topTrailing) { topControls }
+            .overlay(alignment: .leading) { leftControls }
+            .overlay(alignment: .bottom) { bottomControls }
+            .onContinuousHover { phase in
+                updateControlVisibility(phase, in: proxy.size)
             }
         }
         .ignoresSafeArea()
@@ -80,17 +71,59 @@ struct ScreenshotEditorView: View {
         }
     }
 
-    /// The window's crown: the brand centered like the menu bar panel, the
-    /// actions on the right, the trash for a capture not worth keeping.
-    var topBand: some View {
-        ZStack {
-            BrandMark(width: 40, tint: Color(white: 0.92))
+    var topControls: some View {
+        ScrollView(.horizontal) {
             HStack {
-                Spacer()
+                Spacer(minLength: 0)
                 actionCluster
             }
         }
-        .frame(height: 38)
+        .scrollIndicators(.never)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 30)
+        .padding(.horizontal, 10)
+        .opacity(revealsTopControls ? 1 : 0)
+        .allowsHitTesting(revealsTopControls)
+    }
+
+    var leftControls: some View {
+        ScrollView(.vertical) { toolRail }
+            .scrollIndicators(.never)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.leading, 8)
+            .padding(.vertical, 48)
+            .opacity(revealsLeftControls || toolOptionsShown ? 1 : 0)
+            .allowsHitTesting(revealsLeftControls || toolOptionsShown)
+    }
+
+    var bottomControls: some View {
+        ScrollView(.horizontal) { bottomRow }
+            .scrollIndicators(.never)
+            .padding(.horizontal, 8)
+            .padding(.bottom, 8)
+            .opacity(revealsBottomControls ? 1 : 0)
+            .allowsHitTesting(revealsBottomControls)
+    }
+
+    func updateControlVisibility(_ phase: HoverPhase, in size: CGSize) {
+        let top: Bool, left: Bool, bottom: Bool
+        switch phase {
+        case .active(let point):
+            top = point.y < 78
+            left = point.x < 66
+            bottom = point.y > size.height - 72
+        case .ended:
+            top = false
+            left = false
+            bottom = false
+        }
+        guard top != revealsTopControls || left != revealsLeftControls
+                || bottom != revealsBottomControls else { return }
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
+            revealsTopControls = top
+            revealsLeftControls = left
+            revealsBottomControls = bottom
+        }
     }
 
     // MARK: - Artboard
@@ -141,21 +174,13 @@ struct ScreenshotEditorView: View {
     }
 
 
-    // Margin around the capture inside its scroll region.
-    static let canvasMargin: CGFloat = 14
-
     func zoomFactor(available: CGSize) -> CGFloat {
         let zoom: CGFloat
         if let override = model.zoomOverride {
             zoom = override
         } else {
-            let width = max(available.width - Self.canvasMargin * 2, 80)
-            let height = max(available.height - Self.canvasMargin * 2, 80)
-            let fit = min(width / max(contentPixelSize.width, 1),
-                          height / max(contentPixelSize.height, 1))
-            // Small captures grow to a practical editing size. This affects
-            // only the canvas; exported pixels stay untouched.
-            zoom = min(fit, 1)
+            zoom = min(available.width / max(contentPixelSize.width, 1),
+                       available.height / max(contentPixelSize.height, 1))
         }
         // Pinch and scroll zoom start from what is actually on screen.
         model.currentDisplayZoom = zoom
@@ -163,10 +188,10 @@ struct ScreenshotEditorView: View {
     }
 
     func canvasInsets(available: CGSize, canvas: CGSize) -> EdgeInsets {
-        EdgeInsets(top: max((available.height - canvas.height) / 2, Self.canvasMargin),
-                   leading: max((available.width - canvas.width) / 2, Self.canvasMargin),
-                   bottom: max((available.height - canvas.height) / 2, Self.canvasMargin),
-                   trailing: max((available.width - canvas.width) / 2, Self.canvasMargin))
+        EdgeInsets(top: max((available.height - canvas.height) / 2, 0),
+                   leading: max((available.width - canvas.width) / 2, 0),
+                   bottom: max((available.height - canvas.height) / 2, 0),
+                   trailing: max((available.width - canvas.width) / 2, 0))
     }
 
     func canvas(zoom: CGFloat, canvasSize: CGSize) -> some View {
@@ -188,12 +213,6 @@ struct ScreenshotEditorView: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: outerRadius, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: outerRadius, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.14), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.30), radius: 24, y: 10)
-        .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
         .scaleEffect(appeared ? 1 : 0.965)
         .opacity(appeared ? 1 : 0)
         .onAppear {

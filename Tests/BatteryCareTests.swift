@@ -19,8 +19,10 @@ enum BatteryCareTests {
         hardware(suite)
         sensors(suite)
         adapterPresence(suite)
+        adapterPlaceholders(suite)
         BatteryRegistrationRepairTests.run(suite)
         BatteryControllerTests.run(suite)
+        BatteryLivePowerControlTests.run(suite)
         #if !BATTERY_STANDALONE
         localizationAndBackup(suite)
         BatteryHelperUpgradeTests.run(suite)
@@ -208,11 +210,12 @@ enum BatteryCareTests {
         suite.expect(fake.values["CHTE"] == [1, 0, 0, 0] && fake.values["CHIE"] == [0],
                      "hold inhibits charging while leaving adapter power connected")
         try! hardware.apply(.discharge)
-        suite.expect(fake.values["CHTE"] == [0, 0, 0, 0] && fake.values["CHIE"] == [8], "discharge clears inhibit first")
+        suite.expect(fake.values["CHTE"] == [1, 0, 0, 0] && fake.values["CHIE"] == [8],
+                     "discharge keeps charging inhibited while cutting adapter power")
         fake.writeKeys.removeAll()
         try! hardware.apply(.hold)
         suite.expect(fake.values["CHIE"] == [0] && fake.values["CHTE"] == [1, 0, 0, 0]
-            && fake.writeKeys == ["CHIE", "CHTE"],
+            && fake.writeKeys == ["CHIE"],
             "ending discharge reconnects adapter before inhibiting charge")
         try! hardware.apply(.system)
         suite.expect(fake.values["CHIE"] == [0] && fake.values["CHTE"] == [0, 0, 0, 0], "return clears both controls")
@@ -231,9 +234,10 @@ enum BatteryCareTests {
     static func sensors(_ suite: TestSuite) {
         let sample = BatterySensor.decode(["CurrentCapacity": 80, "MaxCapacity": 100,
             "Temperature": 3078, "ExternalConnected": true, "IsCharging": false,
-            "Voltage": 12000, "Amperage": UInt32.max - 999], at: now)
+            "Voltage": 12000, "Amperage": UInt32.max - 999, "FullyCharged": false], at: now)
         suite.expect(abs((sample.temperature ?? 0) - 34.65) < 0.01, "battery decikelvin conversion")
         suite.expect(sample.watts == -12, "unsigned IORegistry current becomes signed discharge")
+        suite.expect(sample.fullyCharged == false, "macOS full flag remains available beside its rounded percentage")
         suite.expect(sample.isFresh(at: now), "complete measured sample accepted")
         suite.expect(!BatterySensor.decode([:], at: now).isFresh(at: now), "missing properties never imply safe state")
         var missingCurrent = sample
@@ -244,24 +248,55 @@ enum BatteryCareTests {
     static func adapterPresence(_ suite: TestSuite) {
         var properties: [String: Any] = ["CurrentCapacity": 80, "MaxCapacity": 100,
             "Temperature": 3078, "ExternalConnected": false, "IsCharging": false,
-            "Voltage": 12000, "Amperage": -1000, "AppleRawExternalConnected": true]
+            "Voltage": 12000, "Amperage": -1000, "AppleRawExternalConnected": false,
+            "AdapterDetails": ["Watts": 68]]
         let cut = BatterySensor.decode(properties, at: now)
         suite.expect(cut.connected == true && cut.externalPowerConnected == false && cut.isFresh(at: now),
-                     "physical attachment remains distinct from intentionally cut effective AC")
-        properties["AppleRawExternalConnected"] = false
+                     "adapter details preserve physical attachment when CHIE clears both connection flags")
+        properties["AdapterDetails"] = [String: Any]()
         properties["ExternalConnected"] = true
         let unplugged = BatterySensor.decode(properties, at: now)
         suite.expect(unplugged.connected == false && unplugged.externalPowerConnected == true,
-                     "physical unplug wins over a lagging effective-power flag")
+                     "missing adapter details win over a lagging effective-power flag")
+        properties.removeValue(forKey: "AdapterDetails")
+        properties["AppleRawAdapterDetails"] = [["Watts": 68]]
+        properties["ExternalConnected"] = false
+        suite.expect(BatterySensor.decode(properties, at: now).connected == true,
+                     "raw adapter details also preserve presence during AC cut")
+        properties["AppleRawAdapterDetails"] = [[String: Any]]()
+        suite.expect(BatterySensor.decode(properties, at: now).connected == false,
+                     "empty raw adapter details detect physical unplug")
+        properties.removeValue(forKey: "AppleRawAdapterDetails")
         properties["AppleRawExternalConnected"] = "invalid"
         suite.expect(!BatterySensor.decode(properties, at: now).isFresh(at: now),
                      "malformed physical presence fails closed instead of assuming attachment")
+        properties["ExternalConnected"] = true
         properties.removeValue(forKey: "AppleRawExternalConnected")
         suite.expect(BatterySensor.decode(properties, at: now).connected == true,
                      "legacy registry without a raw signal retains effective AC detection")
         properties["ExternalConnected"] = false
         suite.expect(BatterySensor.decode(properties, at: now).connected == false,
                      "legacy effective AC loss remains conservative when physical presence is unavailable")
+    }
+
+    static func adapterPlaceholders(_ suite: TestSuite) {
+        var props: [String: Any] = ["ExternalConnected": false, "AppleRawExternalConnected": false,
+                                  "AdapterDetails": ["FamilyCode": 0], "AppleRawAdapterDetails": []]
+        suite.expect(BatterySensor.decode(props, at: now).connected == false,
+                     "live unplugged FamilyCode zero is not a physically attached adapter")
+        props["AdapterDetails"] = ["FamilyCode": 1]
+        suite.expect(BatterySensor.decode(props, at: now).connected == true,
+                     "nonzero adapter family preserves attachment during intentional AC cut")
+        props["AdapterDetails"] = ["FamilyCode": 0, "Watts": 68]
+        suite.expect(BatterySensor.decode(props, at: now).connected == true,
+                     "positive power rating identifies an adapter even without its family")
+        props.removeValue(forKey: "AdapterDetails")
+        props["AppleRawAdapterDetails"] = [["FamilyCode": 0]]
+        suite.expect(BatterySensor.decode(props, at: now).connected == false,
+                     "raw adapter placeholder also does not imply attachment")
+        props["AppleRawAdapterDetails"] = [["FamilyCode": 0], ["Watts": 68]]
+        suite.expect(BatterySensor.decode(props, at: now).connected == true,
+                     "raw adapter array accepts a real adapter beside an empty placeholder")
     }
 
     #if !BATTERY_STANDALONE

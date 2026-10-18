@@ -405,9 +405,14 @@ struct PanelUninstallerView: View {
                 .foregroundStyle(failed.isEmpty ? .green : .orange)
             Text(l10n.s.uninstallerDoneTitle)
                 .font(.system(size: 14, weight: .bold))
-            Text(String(format: l10n.s.uninstallerFreedFormat, Self.byteString(freed)))
+            Text(CleanupOutcomeStrings.removedSize(Self.byteString(freed), language: l10n.language))
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
+            if uninstaller.homebrewPackage == nil {
+                Text(CleanupOutcomeStrings.recovery(language: l10n.language))
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
             if !failed.isEmpty {
                 UninstallFailureNote(items: failed, compact: true)
             }

@@ -203,6 +203,12 @@ struct GlobalShortcut: Equatable, Hashable {
     // Full screen sits beside the selector's 4 and the recorder's 5.
     static let screenshotFullScreenDefault = GlobalShortcut(keyCode: Int64(kVK_ANSI_3),
                                                             modifiers: [.control, .option, .command])
+    static let screenshotCaptureMenuDefault = GlobalShortcut(keyCode: Int64(kVK_ANSI_5),
+                                                             modifiers: [.shift, .command])
+    static let screenshotAreaClipboardDefault = GlobalShortcut(keyCode: Int64(kVK_ANSI_4),
+                                                               modifiers: [.control, .shift, .command])
+    static let screenshotFullScreenClipboardDefault = GlobalShortcut(keyCode: Int64(kVK_ANSI_3),
+                                                                     modifiers: [.control, .shift, .command])
     // E opens the latest capture in the editor, beside the capture shortcut.
     static let screenshotLastCaptureDefault = GlobalShortcut(keyCode: Int64(kVK_ANSI_E),
                                                              modifiers: [.control, .option, .command])

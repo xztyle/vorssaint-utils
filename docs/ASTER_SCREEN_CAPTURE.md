@@ -11,10 +11,13 @@ Reopening a committed edit starts with the flattened image. The existing backdro
 and watermark are not applied twice.
 
 Preview lifetime is 30 seconds by default, with 15 seconds, 60 seconds and
-Until closed also available in capture settings. Hover, editing, dragging and
+Until closed also available in capture settings. Hover, editing, dragging, swiping and
 sharing pause dismissal. Returning from an interaction starts a fresh interval.
-Copy, Save, Pin and a completed or cancelled drag leave the capture available.
-Escape and Command-W dismiss the focused preview. Return, E and Command-E edit;
+Copy, Save, Pin and a failed or cancelled drag leave the capture available.
+A successful external drop dismisses its source preview unless Option is held.
+Escape and Command-W dismiss the focused preview outside an active gesture.
+During a drag/swipe, Escape cancels the gesture without also closing the card.
+Return, E and Command-E edit;
 Command-C copies, Command-S saves, and Delete discards the focused capture.
 
 Up to six previews share a 256 MiB image budget. The newest single image and
@@ -191,3 +194,38 @@ The full branch gate currently has 14 failures in notch-rail and switcher-scroll
 visibility checks. The same 13 switcher failures also occur on current main
 while the screenshot fixture is open. These are not counted as a passing full
 gate; they need a clean rerun after fixture interaction ends.
+
+## Installed reference-driven refinement — 2026-09-30
+
+The restored CleanShot X 5.0.1 was tested with a generated PNG in its real editor.
+An added arrow appeared after Copy and explicit paste into a generated TextEdit
+document. Its Quick Access settings specify close-after-drag with Option to keep.
+Aster's corner preview now closes only after an accepted native dragging-session
+operation; cancellation, a rejected drop and Option retain it. Thirteen callback
+contract checks cover cleanup and ordering using the production implementation.
+The screenshot suite passes 848 checks; the full installed build passes 81,523
+checks plus preference cleanup, optimized build, selftest and strict signing.
+Native cross-app drop and physical swipe feel remain unverified. The owner's
+image-only preview and image-filling floating-controls canvas take precedence over
+the original editor's visible dark stage.
+
+
+## Owner-confirmed external drop — 2026-09-30
+
+After installation of the gesture-keyboard correction, the owner captured with
+physical Shift-Command-4 and dragged the corner card into the disposable
+TextEdit Untitled document without Option. The image appeared and the card
+disappeared. This passes native external transfer and successful-drop dismissal.
+The earlier automated transfer failures remain historical evidence; they are not
+the current acceptance result. Cancelled-drag retention, smooth physical left
+swipe, edited-pixel fidelity for that drop, multiple displays and Spaces remain
+separate gates. The installed candidate passes 877 screenshot checks and the
+complete 81,603-check Swift gate, preference cleanup and eleven installer checks.
+
+
+The owner also confirmed both follow-up gestures: Escape during a rightward
+native drag retains the preview, and left dragging/swiping dismisses it smoothly
+off-screen. The reply was “both work.” These physical gesture gates are passed.
+They do not establish multiple-display, Spaces or every possible text-input
+receiver. The gesture receipt is
+`work/acceptance/screenshot-native-gestures-owner-pass.json` outside the checkout.

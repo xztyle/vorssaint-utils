@@ -10,7 +10,12 @@ enum BatteryCareDiagnostics {
     static func runIfRequested() {
         let args = CommandLine.arguments
         guard args.contains("--battery-status") || args.contains("--battery-request")
-            || args.contains("--battery-register") || args.contains("--battery-repair-registration") else { return }
+            || args.contains("--battery-register") || args.contains("--battery-repair-registration")
+            || args.contains("--battery-prepare-update") else { return }
+        if args.contains("--battery-prepare-update") {
+            guard args.count == 2 else { exit(1) }
+            prepareUpdate()
+        }
         if args.contains("--battery-repair-registration") {
             guard args.count == 2 else { exit(1) }
             repairRegistration()
@@ -27,6 +32,22 @@ enum BatteryCareDiagnostics {
             request = data
         }
         connect(request: request)
+    }
+
+    private static func prepareUpdate() -> Never {
+        // Use the uninstall path's authenticated restoration guard. Do not
+        // clear local policy or feature preferences during a service update.
+        DispatchQueue.global(qos: .userInitiated).async {
+            let prepared = BatteryCareService.detachForRemoval()
+            DispatchQueue.main.async {
+                if prepared { BatteryCareService.shared.recordPendingPolicyRestoration() }
+                print("battery-update-prepared=\(prepared)")
+                exit(prepared ? 0 : 1)
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 25) { exit(1) }
+        RunLoop.main.run()
+        exit(1)
     }
 
     private static func repairRegistration() -> Never {
@@ -66,6 +87,7 @@ enum BatteryCareDiagnostics {
             fputs("Battery service did not register.\n", stderr)
             exit(1)
         }
+        BatteryCareService.shared.recordAuthorizedBuild()
         print("battery-service-status=\(service.status.rawValue)")
     }
 

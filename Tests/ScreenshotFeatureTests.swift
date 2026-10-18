@@ -42,14 +42,11 @@ enum ScreenshotFeatureTests {
         let ownScreenshotWindows: Set<CGWindowID> = [11, 12, 13]
         let protectedScreenshotWindows: Set<CGWindowID> = [12, 99]
         suite.expect(Defaults.registeredDefaults[DefaultsKey.screenshotHideVorssaintWindows]
-                as? Bool == true,
-               "screenshots hide Aster windows by default")
+                as? Bool == false, "screenshots show Aster windows by default")
         suite.expect(SettingsBackupSupport.exportKeys().contains(
             DefaultsKey.screenshotHideVorssaintWindows),
                "the screenshot window visibility preference travels in backups")
-        // An editor or a pinned capture is an ordinary window, so the
-        // visibility preference has to reach it; the overlays and HUDs taking
-        // the capture stay out either way (issue #780).
+        // Editors and pins follow visibility; capture overlays stay out (issue #780).
         let workflowWindows: Set<CGWindowID> = [12]
         let contentWindows: Set<CGWindowID> = [11, 13]
         suite.expect(ScreenshotCapturePolicy.protectedWindowIDs(
@@ -1080,17 +1077,18 @@ enum ScreenshotFeatureTests {
                "the capture loupe clamps source points at display edges")
         let editorMinimum = ScreenshotSupport.editorMinimumContentSize(
             visibleSize: CGSize(width: 1470, height: 956))
-        suite.expect(editorMinimum == CGSize(width: 980, height: 680),
-               "the screenshot editor opens on a comfortable canvas")
+        suite.expect(editorMinimum == CGSize(width: 280, height: 180),
+               "floating editor controls need no surrounding canvas")
         let editorSmallDisplay = ScreenshotSupport.editorMinimumContentSize(
             visibleSize: CGSize(width: 700, height: 500))
-        suite.expect(editorSmallDisplay == CGSize(width: 700, height: 500),
-               "the editor minimum never exceeds a compact display")
+        suite.expect(editorSmallDisplay == editorMinimum,
+               "the editor minimum remains compact on a small display")
         let smallCaptureWindow = ScreenshotSupport.editorContentSize(
             imagePointSize: CGSize(width: 180, height: 100),
             visibleSize: CGSize(width: 1470, height: 956))
-        suite.expect(smallCaptureWindow == editorMinimum,
-               "a small screenshot still receives the full editing canvas")
+        suite.expect(abs(smallCaptureWindow.width - 504) < 0.01
+                && abs(smallCaptureWindow.height - 280) < 0.01,
+               "a small screenshot grows without a surrounding border")
         let largeCaptureWindow = ScreenshotSupport.editorContentSize(
             imagePointSize: CGSize(width: 2200, height: 1400),
             visibleSize: CGSize(width: 1470, height: 956))

@@ -5,8 +5,11 @@ import AppKit
 
 /// Drawer placement always uses the full display frame, including the Dock.
 enum ClipboardHistoryWindowSizing {
-    static func frame(on screen: NSRect) -> NSRect {
-        let height = min(screen.height, max(280, min(440, screen.height * 0.46)))
+    static func frame(on screen: NSRect, preferredHeight: Double? = nil) -> NSRect {
+        let automatic = max(280, min(440, screen.height * 0.46))
+        let requested = preferredHeight.flatMap { $0.isFinite && $0 > 0 ? $0 : nil } ?? automatic
+        let maximum = min(screen.height, max(280, min(760, screen.height * 0.7)))
+        let height = min(maximum, max(min(280, screen.height), requested))
         return NSRect(x: screen.minX, y: screen.minY, width: screen.width, height: height)
     }
 
@@ -621,19 +624,18 @@ enum ClipboardHistoryPreview {
 
 enum ClipboardHistoryEscape {
     enum Action: Equatable {
+        case closePreview
         case clearBatchSelection
+        case clearQuery
         case hideWindow
     }
 
-    /// Esc backs out one layer at a time - selection, then the window.
-    /// Preview is a persistent view setting, not a layer: only clicking its
-    /// own toggle turns it off (or Space, but only once arrow-key navigation
-    /// has made a row's selection visible - see `ClipboardHistoryPreview
-    /// .handlesSpace`; while the search field has focus, Space just types),
-    /// so a keystroke meant to close the panel can never silently re-hide
-    /// it first.
-    static func action(batchCount: Int) -> Action {
-        batchCount > 0 ? .clearBatchSelection : .hideWindow
+    /// Close the visible preview before changing the selection or search.
+    static func action(batchCount: Int, previewIsPresented: Bool = false,
+                       queryIsEmpty: Bool = true) -> Action {
+        if previewIsPresented { return .closePreview }
+        if batchCount > 0 { return .clearBatchSelection }
+        return queryIsEmpty ? .hideWindow : .clearQuery
     }
 }
 
@@ -645,8 +647,9 @@ enum ClipboardHistoryFocus {
     /// Outside composition the multiline editor keeps its editing keys, while
     /// the search field (a field editor) and the read-only preview leave the
     /// list's shortcuts intact.
-    static func textViewOwnsKeys(isComposing: Bool, isFieldEditor: Bool, isEditable: Bool) -> Bool {
-        isComposing || (isEditable && !isFieldEditor)
+    static func textViewOwnsKeys(isComposing: Bool, isFieldEditor: Bool, isEditable: Bool,
+                                 copyingSelection: Bool = false) -> Bool {
+        isComposing || copyingSelection || (isEditable && !isFieldEditor)
     }
 }
 
@@ -878,6 +881,7 @@ enum ClipboardHistoryImageSupport {
 
 extension DefaultsKey {
     static let clipboardRetentionDays = "clipboardRetentionDays"
+    static let clipboardDrawerHeight = "clipboardDrawerHeight"
 }
 
 

@@ -3,7 +3,9 @@
 Aster keeps a local library of copied text, formatting, images and file references.
 The library slides up from the very bottom of the active display, across its full
 width and above the Dock. It contains a horizontal row of visual cards and named,
-colored collections. It has no floating gap, title bar, resize handles or window
+colored collections. Drag its invisible top edge to change its height; shorter
+drawers use compact cards. The height is saved locally and clamped to the current
+display. It has no floating gap, title bar, visible resize handles or window
 dragging. Reduced motion removes the slide. The notch can open the same drawer
 through its expand action; normal history opens always use the drawer.
 
@@ -16,7 +18,8 @@ through its expand action; normal history opens always use the drawer.
 - Arrow keys move through cards. Command-Up/Down selects the first/last result.
   Shift-Arrows extend selection. Command-click and Shift-click also select several.
 - Command-1 through Command-9 acts on the numbered cards currently in view.
-- Space opens a full preview. Command-E edits a new copy; the original is retained.
+- Space opens a preview attached above the selected card. The timeline keeps its
+  width and position. Command-E edits a new copy; the original is retained.
   Command-R edits the searchable title.
 - Tab and Shift-Tab move between Search, results and collections. Command-F returns
   to Search. Escape closes the preview, clears selection/query, then closes the drawer.
@@ -178,3 +181,82 @@ edit precedence and the order after reopening the database. The focused
 clipboard suite passed 698 checks, and the optimized signed build passed.
 This is backup storage evidence; the live drawer and cross-app paste gates
 above remain open.
+
+## Production capture and resize checks — 2026-09-29
+
+The installed app captured generated text from a disposable TextEdit document.
+Search found the earlier copy after a newer copy, Down/Space previewed its exact
+text, and restoring that entry to the clipboard followed by an explicit paste
+into TextEdit reproduced the original text. The automation delivered input to
+TextEdit without consistently making it the foreground app: recorded source
+metadata showed Discord, Unknown app and Aster across attempts. This does not
+validate source attribution or automatic prior-app pasting for a physical user.
+The global history shortcut was not observed opening the drawer via this tool;
+the settings action did. Those two live integration gates remain open.
+
+Top-edge resizing was exercised in the installed app. The accessible splitter
+changed the drawer from 440 to 310 points without losing the search query or its
+focus, and the visible cards changed to their compact layout. A real pointer drag
+on the top edge reduced it to the 280-point minimum. Closing and reopening kept
+280 points. No content host was recreated during resize. The focused clipboard,
+preferences, repository and localization suites passed 8,621 checks, including
+722 clipboard checks. The optimized signed bundle built and was installed.
+
+## Original Paste interaction check — 2026-09-30
+
+Paste 7.0.0 was restored and its bottom drawer, cards, search and anchored Space
+preview inspected. Escape closes the preview, clears search, then closes the
+drawer, matching Aster's existing sequence. Generated earlier and later TextEdit
+copies appeared in the original history. Source attribution and automatic prior-app
+paste remain unproven because the tool did not establish TextEdit as foreground.
+Aster's header still differs from Paste's compact centered navigation. A focus
+handoff was requested for the generated document; no test text was sent to the
+user's active work app. The attempted return to the former 440-point drawer height
+lost focus; the remembered height remains 280 points. Paste was quit afterward.
+
+## Compact original-informed navigation — 2026-09-30
+
+The installed refinement replaces the large left title and second collection row with one
+compact glass navigation row: search on the left, collections centered, and
+pause/preview/close controls on the right. The save signal remains available by
+icon and accessible label, while the footer is shorter. This gives the timeline
+more room at the owner's chosen 280-point height. Search, collections, keyboard
+focus, preview and resize use the same existing history service. Visual and
+actual paste acceptance are recorded in ASTER_UX_PARITY.md.
+
+The installed header was visually confirmed after removing the empty collection
+scroll area: Recent and Add are adjacent in the center, with search on the left
+and actions on the right. The drawer retained 280 points. Search and preview of
+the generated older entry passed; staged Escape dismissal passed. Automatic
+previous-app paste remains gated on an unlocked desktop and the disposable test
+document being the real foreground app.
+
+## Card-attached preview — 2026-09-30
+
+The installed preview attaches above the selected card. Space and Preview use
+the same content surface, with glass header/actions, pinning, copy, editing and
+file previews. The drawer stays at its saved height and the timeline keeps its
+width. The native preview window shares the library's keyboard and click scope.
+Search, Space opening, Copy, Edit a copy and button Cancel were exercised with
+the generated FIRST/SECOND references. Copy reproduced FIRST exactly in the
+clipboard's plain-text representation; Cancel preserved its original content.
+
+Escape from the draft editor exposed a native routing defect. The final candidate
+adds explicit draft cancellation while preserving composition and modified keys,
+and isolates editing state by entry identity. It passes 742 clipboard checks,
+81,569 complete checks plus preference cleanup, eleven installer tests, its
+optimized build, packaged selftest and strict signature verification. That final
+correction is staged and still needs installation and native recheck after
+desktop unlock. Automatic previous-app paste and cross-app dragging remain open.
+
+
+## Automatic previous-app paste — 2026-09-30
+
+The actual foreground app was confirmed as TextEdit after opening it through
+Finder. Opening the normal drawer through Aster's nonactivating History button,
+searching only the generated reference copies and selecting FIRST followed by
+Return inserted the exact generated text in the disposable Untitled document.
+The drawer closed automatically. No manual Command-V was used. This verifies
+remembered-app paste; the computer-control key did not trigger the Carbon global
+shortcut, and physical shortcut acceptance remains open. Native draft Escape
+also awaits the requested physical-key check.

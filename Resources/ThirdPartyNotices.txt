@@ -1,0 +1,66 @@
+Aster menu-bar manager
+
+Window-bound event routing and barriers adapt Ice and Thaw (GPLv3).
+Copyright (Ice) 2023–2025 Jordan Baird
+Copyright (Thaw) 2026 Toni Förster
+Aster is distributed under GPL-3.0-or-later; see its source LICENSE.
+
+macOS 27 AX inventory adapts Thaw revision
+528b9503b051cc1ccccae766014e64404670088b.
+MenuBarClientCore visibility adapts Thaw revision
+7a4ce9fd68c1ba614d409000afef3d18d4b2db3d (GPLv3).
+https://github.com/thaw-app/Thaw
+
+Visible Command-drag timing and interpolation adapt SaneBar:
+https://github.com/sane-apps/SaneBar
+Revision 2311b2379018dd67e4134866b1ce4d599227d457
+
+MIT License
+
+Copyright (c) 2025-2026 SaneApps (hi@saneapps.com)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Aster native battery-policy archive and resident ownership adapt the
+Battery macOS 27 compatibility patch, revision
+2124764eef17aaba4b0f1ea97969d79185609029.
+https://github.com/actuallymentor/battery/pull/479
+https://github.com/PrGermux/battery
+
+MIT License
+
+Copyright (c) 2026 Battery macOS 27 compatibility patch contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

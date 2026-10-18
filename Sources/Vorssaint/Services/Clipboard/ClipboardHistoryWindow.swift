@@ -82,6 +82,11 @@ extension ClipboardHistoryService {
 
     func setQuickPreviewPresented(_ presented: Bool) {
         guard presented != quickPreviewPresented else { return }
+        if presented {
+            guard selectedQuickEntry != nil else { return }
+            keyboardFocus = .results
+            quickSelectionIsVisible = true
+        }
         quickPreviewPresented = presented
         DispatchQueue.main.async { ClipboardLibraryProbe.recordState() }
         if ClipboardLibraryProbe.root == nil { UserDefaults.standard.set(presented, forKey: DefaultsKey.clipboardHistoryQuickPreview) }
@@ -94,6 +99,7 @@ extension ClipboardHistoryService {
     func showHistoryWindow(preferNotch: Bool = true) {
         let panel = ensurePanel()
         rememberPasteTarget()
+        setQuickPreviewPresented(false)
         keyboardFocus = .search
         visibleShortcutIDs = []
         quickWindowPresentationID = UUID()
@@ -111,6 +117,7 @@ extension ClipboardHistoryService {
     func hideHistoryWindow() {
         guard drawerPresentation.isPresented else { return }
         let token = drawerPresentation.request(false)
+        setQuickPreviewPresented(false)
         removeKeyMonitor()
         removeDismissMonitors()
         panel?.dismiss(reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) { [weak self] in
@@ -221,12 +228,27 @@ extension ClipboardHistoryService {
     func installKeyMonitor(for panel: NSPanel) {
         removeKeyMonitor()
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak panel] event in
-            guard let self, let panel, event.window === panel, panel.attachedSheet == nil else { return event }
-            if let textView = panel.firstResponder as? NSTextView,
+            guard let self, let panel, self.libraryWindowScope(panel).owns(event.window),
+                  panel.attachedSheet == nil else { return event }
+            if self.cancelPreviewEditor(with: event) { return nil }
+            if let textView = event.window?.firstResponder as? NSTextView,
                ClipboardHistoryFocus.textViewOwnsKeys(isComposing: textView.hasMarkedText(),
-                   isFieldEditor: textView.isFieldEditor, isEditable: textView.isEditable) { return event }
+                   isFieldEditor: textView.isFieldEditor, isEditable: textView.isEditable,
+                   copyingSelection: event.modifierFlags.intersection([.command, .option, .shift, .control]) == [.command]
+                       && event.charactersIgnoringModifiers?.lowercased() == "c"
+                       && textView.isSelectable && textView.selectedRange().length > 0) { return event }
             return self.handleLibraryKey(event) ? nil : event
         }
+    }
+
+    func cancelPreviewEditor(with event: NSEvent) -> Bool {
+        guard event.keyCode == UInt16(kVK_Escape),
+              event.modifierFlags.intersection([.command, .option, .shift, .control]).isEmpty,
+              let window = event.window, window === quickPreviewWindow,
+              let editor = window.firstResponder as? NSTextView,
+              editor.isEditable, !editor.isFieldEditor, !editor.hasMarkedText() else { return false }
+        cancelEditRequest = UUID()
+        return true
     }
 
     func handleLibraryKey(_ event: NSEvent) -> Bool {
@@ -234,20 +256,7 @@ extension ClipboardHistoryService {
         let key = event.charactersIgnoringModifiers?.lowercased() ?? ""
         if modifiers == [.command], handleCommandKey(key) { return true }
         if event.keyCode == UInt16(kVK_Escape) { escapeLibrary(); return true }
-        if event.keyCode == UInt16(kVK_Tab) {
-            keyboardFocus = keyboardFocus.next(reverse: modifiers.contains(.shift))
-            quickSelectionIsVisible = keyboardFocus == .results
-            if keyboardFocus == .search { searchFocusRequest = UUID() }
-            if keyboardFocus == .collections { collectionFocusRequest = UUID() }
-            return true
-        }
-        if event.keyCode == UInt16(kVK_Space), quickSelectionIsVisible, modifiers.isEmpty {
-            fullPreviewRequest = UUID(); return true
-        }
-        if event.keyCode == UInt16(kVK_Return) || event.keyCode == UInt16(kVK_ANSI_KeypadEnter) {
-            return handleLibraryReturn(modifiers)
-        }
-        if handleLibraryArrows(event.keyCode, modifiers: modifiers) { return true }
+        if handleLibraryNavigation(event.keyCode, modifiers: modifiers) { return true }
         if modifiers == [.option], key == "p" { togglePinSelectedQuickEntry(); return true }
         if modifiers == [.command], event.keyCode == UInt16(kVK_Delete), quickSelectionIsVisible {
             removeSelectedQuickEntries(); return true
@@ -256,6 +265,24 @@ extension ClipboardHistoryService {
             keyboardFocus = .search; quickQuery += chars; searchFocusRequest = UUID(); return true
         }
         return false
+    }
+
+    private func handleLibraryNavigation(_ keyCode: UInt16, modifiers: NSEvent.ModifierFlags) -> Bool {
+        if keyCode == UInt16(kVK_Tab) {
+            keyboardFocus = keyboardFocus.next(reverse: modifiers.contains(.shift))
+            quickSelectionIsVisible = keyboardFocus == .results
+            if keyboardFocus == .search { searchFocusRequest = UUID() }
+            if keyboardFocus == .collections { collectionFocusRequest = UUID() }
+            return true
+        }
+        if keyCode == UInt16(kVK_Space), ClipboardHistoryPreview.handlesSpace(
+            selectionIsVisible: quickSelectionIsVisible, hasModifiers: !modifiers.isEmpty) {
+            toggleQuickPreview(); return true
+        }
+        if keyCode == UInt16(kVK_Return) || keyCode == UInt16(kVK_ANSI_KeypadEnter) {
+            return handleLibraryReturn(modifiers)
+        }
+        return handleLibraryArrows(keyCode, modifiers: modifiers)
     }
 
     func handleCommandKey(_ key: String) -> Bool {
@@ -303,10 +330,14 @@ extension ClipboardHistoryService {
     }
 
     func escapeLibrary() {
-        if quickBatchCount > 0 { clearQuickBatchSelection() }
-        else if quickPreviewPresented { setQuickPreviewPresented(false) }
-        else if !quickQuery.isEmpty { quickQuery = ""; searchFocusRequest = UUID() }
-        else { hideHistoryWindow() }
+        switch ClipboardHistoryEscape.action(batchCount: quickBatchCount,
+                                              previewIsPresented: quickPreviewPresented,
+                                              queryIsEmpty: quickQuery.isEmpty) {
+        case .closePreview: setQuickPreviewPresented(false)
+        case .clearBatchSelection: clearQuickBatchSelection()
+        case .clearQuery: quickQuery = ""; searchFocusRequest = UUID()
+        case .hideWindow: hideHistoryWindow()
+        }
     }
 
     func pastePlain(_ entry: ClipboardHistoryEntry) {
@@ -322,22 +353,36 @@ extension ClipboardHistoryService {
         // works in another app. Production retains normal outside dismissal.
         guard ClipboardLibraryProbe.root == nil else { return }
         let mouseEvents: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
-        localClickMonitor = NSEvent.addLocalMonitorForEvents(matching: mouseEvents) { [weak self, weak panel] event in
+        installLocalClickMonitor(panel, events: mouseEvents)
+        installGlobalClickMonitor(panel, events: mouseEvents)
+        installActivationObserver()
+    }
+
+    private func installLocalClickMonitor(_ panel: NSPanel, events: NSEvent.EventTypeMask) {
+        localClickMonitor = NSEvent.addLocalMonitorForEvents(matching: events) { [weak self, weak panel] event in
             guard let self, let panel, panel.isVisible, panel.attachedSheet == nil else { return event }
-            if event.window !== panel, !Self.mouseIsInside(panel) {
+            let scope = self.libraryWindowScope(panel)
+            if !scope.owns(event.window), !scope.contains(NSEvent.mouseLocation) {
                 self.hideHistoryWindow()
             }
             return event
         }
-        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: mouseEvents) { [weak self, weak panel] event in
+    }
+
+    private func installGlobalClickMonitor(_ panel: NSPanel, events: NSEvent.EventTypeMask) {
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: events) { [weak self, weak panel] event in
             guard let self, let panel, panel.isVisible, panel.attachedSheet == nil else { return }
-            if event.windowNumber != panel.windowNumber, !Self.mouseIsInside(panel),
+            let scope = self.libraryWindowScope(panel)
+            if !scope.owns(windowNumber: event.windowNumber), !scope.contains(NSEvent.mouseLocation),
                // Every key on the Accessibility Keyboard is a click outside this
                // panel. Dismissing on those makes the panel impossible to type into.
                !AssistiveKeyboard.ownsCocoaPoint(NSEvent.mouseLocation) {
                 self.hideHistoryWindow()
             }
         }
+    }
+
+    private func installActivationObserver() {
         activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil,
@@ -352,8 +397,8 @@ extension ClipboardHistoryService {
         }
     }
 
-    static func mouseIsInside(_ panel: NSPanel) -> Bool {
-        panel.frame.insetBy(dx: -2, dy: -2).contains(NSEvent.mouseLocation)
+    private func libraryWindowScope(_ panel: NSPanel) -> ClipboardLibraryWindowScope {
+        ClipboardLibraryWindowScope(drawer: panel, preview: quickPreviewWindow)
     }
 
     func removeDismissMonitors() {

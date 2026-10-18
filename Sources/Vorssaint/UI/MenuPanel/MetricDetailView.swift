@@ -527,6 +527,9 @@ struct MetricDetailView: View {
             return "\(MetricFormat.diskBytes(disk.freeBytes)) \(l10n.s.diskAvailable)"
         case .battery:
             if PowerSampler.hasInternalBattery {
+                if let flow = snapshot.power?.batteryWatts {
+                    return PowerFlowPresentation.caption(flow, l10n: l10n)
+                }
                 return (snapshot.power?.isCharging ?? false) ? l10n.s.powerCharging : l10n.s.powerOnBattery
             }
             return PeripheralBatterySupport.sorted(snapshot.peripheralBatteries).first?.name
@@ -768,7 +771,7 @@ struct MetricDetailView: View {
 
     private func batteryFlowText(_ power: PowerReading?) -> String {
         guard let flow = power?.batteryWatts else { return "-" }
-        let label = flow >= 0 ? l10n.s.powerCharging : l10n.s.powerOnBattery
+        let label = PowerFlowPresentation.caption(flow, l10n: l10n)
         return "\(MetricFormat.watts(abs(flow))) · \(label)"
     }
 

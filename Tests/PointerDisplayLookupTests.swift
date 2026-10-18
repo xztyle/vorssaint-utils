@@ -63,6 +63,7 @@ enum PointerDisplayLookupContract {
         let hideVorssaintWindows = false
         let protectedWindowIDs: Set<CGWindowID> = []
         func route(_ capture: ScreenshotSelectionController.Capture) {}
+        func routeToClipboard(_ capture: ScreenshotSelectionController.Capture) {}
     }
 
     /// `SpaceWindowBridge` over a fixed Space topology.
@@ -179,7 +180,7 @@ enum PointerDisplayLookupContract {
         Event.mouseLocation = pointer
         Capturer.ScreenshotCaptureEngine.displays = []
         let capturer = Capturer()
-        capturer.beginFullScreenCapture()
+        capturer.beginFullScreenCapture(clipboardOnly: false)
         await capturer.directCaptureTask?.value
         let layout = Layout()
         layout.showDirectionalIndicator(at: pointer, action: nil)

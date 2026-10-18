@@ -14,11 +14,13 @@ final class ScreenshotService: ObservableObject {
     static let shared = ScreenshotService()
 
     @Published private(set) var fullScreenShortcutRegistrationFailed = false
+    @Published private(set) var fullScreenClipboardShortcutRegistrationFailed = false
     @Published private(set) var lastCaptureShortcutRegistrationFailed = false
     @Published private(set) var clipboardShortcutRegistrationFailed = false
 
     private let lastCaptureHotkey = QuickToolHotkey(id: 22)
     private let fullScreenHotkey = QuickToolHotkey(id: 23)
+    private let fullScreenClipboardHotkey = QuickToolHotkey(id: 30)
     private let clipboardHotkey = QuickToolHotkey(id: 24)
     private var session: ScreenshotSelectionController?
     private lazy var previews = makeCaptureWorkspace()
@@ -37,6 +39,7 @@ final class ScreenshotService: ObservableObject {
     private enum CaptureMode {
         case standard
         case fullScreen
+        case fullScreenClipboard
         case scrolling
     }
 
@@ -93,6 +96,9 @@ final class ScreenshotService: ObservableObject {
             ScreenshotDragTransfer.removeExpiredFiles()
         }
         fullScreenHotkey.onPress = { [weak self] in self?.captureFullScreen() }
+        fullScreenClipboardHotkey.onPress = { [weak self] in
+            self?.startCapture(.fullScreenClipboard)
+        }
         lastCaptureHotkey.onPress = { [weak self] in self?.openLastCapture() }
         clipboardHotkey.onPress = { [weak self] in self?.openClipboardImage() }
     }
@@ -100,9 +106,11 @@ final class ScreenshotService: ObservableObject {
     func syncWithPreferences() {
         guard AppFeature.screenshot.isAvailable else {
             fullScreenShortcutRegistrationFailed = false
+            fullScreenClipboardShortcutRegistrationFailed = false
             lastCaptureShortcutRegistrationFailed = false
             clipboardShortcutRegistrationFailed = false
             fullScreenHotkey.unregister()
+            fullScreenClipboardHotkey.unregister()
             lastCaptureHotkey.unregister()
             clipboardHotkey.unregister()
             ScreenshotLastCaptureStore.clear()
@@ -119,6 +127,12 @@ final class ScreenshotService: ObservableObject {
             enabled: fullScreenEnabled,
             shortcut: fullScreenShortcut,
             storageKey: DefaultsKey.screenshotFullScreenShortcut)
+        let fullScreenClipboardEnabled = defaults.bool(
+            forKey: DefaultsKey.screenshotFullScreenClipboardShortcutEnabled)
+        fullScreenClipboardShortcutRegistrationFailed = !fullScreenClipboardHotkey.sync(
+            enabled: fullScreenClipboardEnabled,
+            shortcut: GlobalShortcutRole.screenshotFullScreenClipboard.savedShortcut,
+            storageKey: DefaultsKey.screenshotFullScreenClipboardShortcut)
         let lastCaptureEnabled = defaults.bool(
             forKey: DefaultsKey.screenshotLastCaptureShortcutEnabled)
         let lastCaptureShortcut = GlobalShortcut.saved(
@@ -144,6 +158,7 @@ final class ScreenshotService: ObservableObject {
 
     func suspend() {
         fullScreenHotkey.unregister()
+        fullScreenClipboardHotkey.unregister()
         lastCaptureHotkey.unregister()
         clipboardHotkey.unregister()
     }
@@ -240,10 +255,10 @@ final class ScreenshotService: ObservableObject {
     }
 
     private func beginCapture(_ mode: CaptureMode) {
-        if mode == .fullScreen {
-            beginFullScreenCapture()
-        } else {
-            beginSelection(mode)
+        switch mode {
+        case .fullScreen: beginFullScreenCapture(clipboardOnly: false)
+        case .fullScreenClipboard: beginFullScreenCapture(clipboardOnly: true)
+        case .standard, .scrolling: beginSelection(mode)
         }
     }
 
@@ -283,15 +298,17 @@ final class ScreenshotService: ObservableObject {
         }
     }
 
-    func receiveUnifiedCapture(_ capture: ScreenshotSelectionController.Capture) {
-        route(capture)
+    func receiveUnifiedCapture(_ capture: ScreenshotSelectionController.Capture,
+                               clipboardOnly: Bool = false) {
+        if clipboardOnly { routeToClipboard(capture) }
+        else { route(capture) }
     }
 
     func receiveUnifiedScrollingRegion(_ region: RecorderSupport.Region) {
         captureScrolling(region)
     }
 
-    private func beginFullScreenCapture() {
+    private func beginFullScreenCapture(clipboardOnly: Bool) {
         guard directCaptureTask == nil, !ScreenshotSelectionController.isSessionOnScreen else {
             return
         }
@@ -320,10 +337,12 @@ final class ScreenshotService: ObservableObject {
                 QuickToolHUD.show(icon: "camera.viewfinder", message: self.strings.captureFailed)
                 return
             }
-            self.route(ScreenshotSelectionController.Capture(
+            let capture = ScreenshotSelectionController.Capture(
                 image: image,
                 scale: scale,
-                anchorRect: frame))
+                anchorRect: frame)
+            if clipboardOnly { self.routeToClipboard(capture) }
+            else { self.route(capture) }
         }
     }
 
@@ -402,6 +421,14 @@ final class ScreenshotService: ObservableObject {
             autoCopy(capture)
         }
         previews.add(capture, id: id, defaultAction: ScreenshotDefaultAction.current)
+    }
+
+    private func routeToClipboard(_ capture: ScreenshotSelectionController.Capture) {
+        RecentCaptureService.shared.recordScreenshot(capture, id: UUID())
+        remember(capture)
+        if !copyDirect(capture) {
+            QuickToolHUD.show(icon: "camera.viewfinder", message: strings.captureFailed)
+        }
     }
 
     func restorePreview(_ capture: ScreenshotSelectionController.Capture, id: UUID = UUID(), edited: Bool = false) {

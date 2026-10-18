@@ -23,6 +23,7 @@ enum ScreenshotPreviewHoverTests {
         var interactionEnded: (() -> Void)?
         var editing = false
         var dragging = false
+        var swiping = false
         var pointerInside = false
         var systemSharing = false
         var dismissWork: DispatchWorkItem?
@@ -56,10 +57,11 @@ enum ScreenshotPreviewHoverTests {
         suite.expect(!failedCopy.closed, "failed Copy still leaves the preview available for retry")
         DispatchQueue.main = NotchScreenRefreshContract.Scheduler()
 
-        for pause in ["dragging", "editing", "keepOpen"] {
+        for pause in ["dragging", "swiping", "editing", "keepOpen"] {
             DispatchQueue.main = NotchScreenRefreshContract.Scheduler()
             let paused = Controller()
             paused.dragging = pause == "dragging"
+            paused.swiping = pause == "swiping"
             paused.editing = pause == "editing"
             if pause == "keepOpen" { paused.autoDismissDuration = 0 }
             paused.scheduleAutoDismiss()

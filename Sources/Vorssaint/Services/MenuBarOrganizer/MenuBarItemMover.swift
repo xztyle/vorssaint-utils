@@ -3,45 +3,46 @@
 // Command-drag transport adapted from Vorssaint PR #360 (ruvelro).
 import AppKit
 import CoreGraphics
-
-enum MenuBarItemMoveError: Error {
-    case permissionMissing, itemUnavailable, itemNotMovable, provisionalIdentity
-    case menuOpen, eventCreationFailed, verificationFailed, busy
-}
+import os
 
 @MainActor
 final class MenuBarItemMover {
     private(set) var isMoving = false
 
-    func move(item: ManagedMenuBarItem, destinationFrame: CGRect, placeAfter: Bool) async throws {
+    func move(item: ManagedMenuBarItem, destination: MenuBarMoveDestination) async throws {
         try check(item)
         guard item.isMovable, !item.isProtected else { throw MenuBarItemMoveError.itemNotMovable }
         isMoving = true
         defer { isMoving = false }
         try await waitForIdleInput()
         try checkFrame(item)
-        guard MenuBarMoveGeometry.isOnMenuRow(destinationFrame, screens: Self.screenFrames()),
-              abs(destinationFrame.minY - item.frame.minY) <= 1 else { throw MenuBarItemMoveError.itemUnavailable }
-        try await dragWithCursor(item, to: MenuBarMoveGeometry.point(in: destinationFrame, after: placeAfter))
+        guard destination.windowID != item.windowID,
+              let frame = MenuBarWindowServerBridge.shared.frame(for: destination.windowID),
+              MenuBarOrganizerSupport.frameMatchScore(frame, destination.frame) != nil,
+              MenuBarMoveGeometry.isOnMenuRow(frame, screens: Self.screenFrames()),
+              abs(frame.minY - item.frame.minY) <= 1 else { throw MenuBarItemMoveError.itemUnavailable }
+        try await dragWithCursor(item, to: destination.point, destinationWindowID: destination.windowID,
+                                 after: destination.after, usesWindowRouting: destination.usesWindowRouting)
     }
 
-    private func dragWithCursor(_ item: ManagedMenuBarItem, to end: CGPoint) async throws {
+    private func dragWithCursor(_ item: ManagedMenuBarItem, to end: CGPoint,
+                                destinationWindowID: CGWindowID, after: Bool = false,
+                                usesWindowRouting: Bool = false) async throws {
         let pointer = mouseLocation(item)
         let displays = Self.activeDisplays()
         var restorePointer = false
         displays.forEach { _ = CGDisplayHideCursor($0) }
-        CGAssociateMouseAndMouseCursorPosition(0)
         defer {
             if restorePointer { CGWarpMouseCursorPosition(pointer) }
-            CGAssociateMouseAndMouseCursorPosition(1)
             displays.forEach { _ = CGDisplayShowCursor($0) }
         }
         do {
-            try await postCommandDrag(item: item, to: end)
+            try await postCommandDrag(item: item, to: end, destinationWindowID: destinationWindowID,
+                                      after: after, usesWindowRouting: usesWindowRouting)
             restorePointer = await waitForRestingFrame(item)
             if !restorePointer { throw MenuBarItemMoveError.verificationFailed }
         } catch {
-            restorePointer = await recoverRelease(item, at: end)
+            restorePointer = await recoverRelease(item, at: MenuBarMoveGeometry.pressPoint(in: item.frame))
             throw error
         }
     }
@@ -73,6 +74,7 @@ final class MenuBarItemMover {
 
     private func check(_ item: ManagedMenuBarItem) throws {
         guard AppFeature.menuBarOrganizer.isSupportedOnCurrentSystem,
+              ProcessInfo.processInfo.operatingSystemVersion.majorVersion < 27,
               AXIsProcessTrusted() else { throw MenuBarItemMoveError.permissionMissing }
         guard item.identityState == .stable else { throw MenuBarItemMoveError.provisionalIdentity }
         guard !isMoving else { throw MenuBarItemMoveError.busy }
@@ -123,34 +125,76 @@ final class MenuBarItemMover {
         return event
     }
 
-    private func postCommandDrag(item: ManagedMenuBarItem, to end: CGPoint) async throws {
-        let start = CGPoint(x: item.frame.midX, y: item.frame.minY)
+    private func postCommandDrag(item: ManagedMenuBarItem, to end: CGPoint,
+                                 destinationWindowID: CGWindowID, after: Bool = false,
+                                 usesWindowRouting: Bool = false) async throws {
+        let start = MenuBarMoveGeometry.pressPoint(in: item.frame)
+        let end = CGPoint(x: end.x, y: start.y)
+        if !usesWindowRouting,
+           let region = MenuBarMoveGeometry.dragRegion(from: start, to: end, regions: Self.dragRegions()) {
+            try await MenuBarVisibleDragTransport().drag(from: start, region: region, validateSource: {
+                try self.checkFrame(item)
+            }) {
+                try self.currentDestination(destinationWindowID, rowY: item.frame.minY, after: after)
+            }
+            return
+        }
+        try await postRoutedDrag(item, destinationWindowID: destinationWindowID, after: after)
+    }
+
+    private func postRoutedDrag(_ item: ManagedMenuBarItem, destinationWindowID: CGWindowID,
+                                after: Bool) async throws {
         let targetPID = targetPID(item)
-        let source = try source()
-        let down = try event(.leftMouseDown, source: source, point: start, item: item, moving: true)
-        let up = try event(.leftMouseUp, source: source, point: end, item: item, moving: true)
+        let point = try currentDestination(destinationWindowID, rowY: item.frame.minY, after: after, topEdge: true)
+        guard let events = MenuBarItemEventFactory.moveEvents(source: try source(), sourceWindowID: item.windowID,
+            destinationWindowID: destinationWindowID, targetPID: targetPID,
+            destination: point, fallback: MenuBarMoveGeometry.pressPoint(in: item.frame))
+        else { throw MenuBarItemMoveError.eventCreationFailed }
         let relay = MenuBarItemEventRelay(pid: targetPID)
         try relay.start()
         defer { relay.close() }
-        let release = try releaseGuard(up, pid: targetPID)
+        let release = try releaseGuard(events.fallback, pid: targetPID)
         defer { release.releaseIfArmed() }
-        CGWarpMouseCursorPosition(start)
-        try await relay.send(down, press: release)
-        try await Task.sleep(for: .milliseconds(18))
-        try await postDragSteps(item: item, source: source, from: start, to: end, relay: relay, press: release)
-        try await relay.send(up, press: release)
+        try await postDirectMove(item, events: events, destinationWindowID: destinationWindowID,
+            after: after, relay: relay, press: release)
         release.confirmRelease()
     }
 
-    private func postDragSteps(item: ManagedMenuBarItem, source: CGEventSource, from start: CGPoint,
-                               to end: CGPoint, relay: MenuBarItemEventRelay, press: MenuBarPressReleaseGuard) async throws {
-        for step in 1...10 {
-            let fraction = CGFloat(step) / 10
-            let point = CGPoint(x: start.x + (end.x - start.x) * fraction,
-                                y: start.y + (end.y - start.y) * fraction)
-            try await relay.send(event(.leftMouseDragged, source: source, point: point, item: item, moving: true), press: press)
-            try await Task.sleep(for: .milliseconds(8))
+    private func postDirectMove(_ item: ManagedMenuBarItem, events: (down: CGEvent, up: CGEvent, fallback: CGEvent),
+                                destinationWindowID: CGWindowID, after: Bool, relay: MenuBarItemEventRelay,
+                                press: MenuBarPressReleaseGuard) async throws {
+        guard CGWarpMouseCursorPosition(events.down.location) == .success else { throw MenuBarItemMoveError.itemUnavailable }
+        try await sendMoveEvent(events.down, item: item, relay: relay, press: press)
+        events.up.location = try currentDestination(destinationWindowID, rowY: item.frame.minY, after: after, topEdge: true)
+        try await sendMoveEvent(events.up, item: item, relay: relay, press: press)
+    }
+
+    private func currentDestination(_ destinationWindowID: CGWindowID, rowY: CGFloat, after: Bool,
+                                    topEdge: Bool = false) throws -> CGPoint {
+        guard let frame = MenuBarWindowServerBridge.shared.frame(for: destinationWindowID),
+              MenuBarMoveGeometry.isOnMenuRow(frame, screens: Self.screenFrames()),
+              abs(frame.minY - rowY) <= 1 else { throw MenuBarItemMoveError.itemUnavailable }
+        return MenuBarMoveGeometry.point(in: frame, after: after, topEdge: topEdge)
+    }
+
+    private func sendMoveEvent(_ event: CGEvent, item: ManagedMenuBarItem,
+                               relay: MenuBarItemEventRelay, press: MenuBarPressReleaseGuard) async throws {
+        guard let before = MenuBarWindowServerBridge.shared.frame(for: item.windowID) else {
+            throw MenuBarItemMoveError.itemUnavailable
         }
+        try await relay.send(event, press: press)
+        for _ in 0..<25 {
+            guard let current = MenuBarWindowServerBridge.shared.frame(for: item.windowID) else {
+                throw MenuBarItemMoveError.verificationFailed
+            }
+            if current != before {
+                Logger(subsystem: "io.github.xztyle.Aster", category: "MenuBarMove")
+                    .notice("Menu response: type \(event.type.rawValue), x \(before.minX) -> \(current.minX), y \(current.minY), pointer \(event.location.x),\(event.location.y)")
+                return
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        throw MenuBarItemMoveError.verificationFailed
     }
 
     private func releaseGuard(_ up: CGEvent, pid: pid_t) throws -> MenuBarPressReleaseGuard {
@@ -196,6 +240,16 @@ final class MenuBarItemMover {
         let top = NSScreen.screens.first?.frame.maxY ?? 0
         return NSScreen.screens.map { CGRect(x: $0.frame.minX, y: top - $0.frame.maxY,
             width: $0.frame.width, height: $0.frame.height) }
+    }
+
+    private static func dragRegions() -> [CGRect] {
+        let top = NSScreen.screens.first?.frame.maxY ?? 0
+        return NSScreen.screens.flatMap { screen -> [CGRect] in
+            let areas = [screen.auxiliaryTopLeftArea, screen.auxiliaryTopRightArea].compactMap { $0 }
+            return (areas.isEmpty ? [screen.frame] : areas).map {
+                CGRect(x: $0.minX, y: top - $0.maxY, width: $0.width, height: $0.height)
+            }
+        }
     }
 
     static var hasAnyOpenMenu: Bool {

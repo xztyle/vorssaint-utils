@@ -199,3 +199,120 @@ On first opening the malware page, Aster now checks the installed ClamAV tools
 and private definitions automatically. After a successful Homebrew installation,
 it refreshes the version and verification state without another button press.
 The manual Definitions control remains available for later updates or retries.
+
+## Storage-map candidate — 2026-09-29
+
+Storage browsing now uses an allocated-space bubble map and a linked list. Circle
+area, not diameter, is proportional to measured local bytes. Up to sixteen circles
+are packed without overlap; additional items are represented by an Other items
+circle and remain accessible in the paginated list. Zero-size items stay in the
+list. Excluded content is not assigned a guessed size. Nested selected roots do
+not count the same scanned contents twice.
+
+A folder click drills into its direct children. Back/Forward, clickable breadcrumbs
+and a double-click on the empty map area navigate the scanned hierarchy. Hovering
+a circle or row highlights its counterpart. File circles reuse Quick Look, Finder
+reveal and the existing explicit selection/review/Trash flow. Browsing does not
+select folders or scan additional paths. Large/old filters keep their whole-scope
+search when chosen; they do not infer descendant folder sizes from matching files.
+
+The map sits beside compact rows when the available width permits, and above the
+list in a narrow window. Navigation uses the shared Liquid Glass backdrop; data
+circles use the native accent and secondary colors. Reduced motion removes the
+hover transition, and increased contrast strengthens circle outlines.
+
+The reference for these interactions is MacPaw's current
+[Space Lens results guide](https://macpaw.com/support/cleanmymac/knowledgebase/space-lens-results).
+Its text was read; the remote screenshot could not be displayed by the web tool.
+The original app is absent and the Mac is locked. This is a built candidate, not
+a claim of visual acceptance or of inspecting the original application's runtime.
+Generated-file and geometry checks cover area ratios, bounds, non-overlap,
+50,000-item grouping, size overflow, nested roots, filters and navigation history.
+
+The final candidate release build, packaged selftest and deep, strict signature
+verification passed. The complete suite passed 81,485 checks plus preference
+cleanup. Generated staging metadata had to be cleared before strict signature
+verification. The installed app still precedes this storage-map candidate;
+native layout and interaction checks remain pending while the Mac is locked.
+
+## Native Space Lens comparison — 2026-09-30
+
+CleanMyMac 5.7.0 was restored and its Space Lens scanned only generated sample
+files. Its map/list, double-click folder drill-down, Back and review controls were
+inspected. Selecting a sample in Documents produced a cloud-deletion warning;
+Change Selection cancelled it and no file was removed. CleanMyMac was then quit.
+
+Aster intentionally skipped that cloud-root sample. A local temporary copy
+produced measured 13.1 MB and 4.2 MB folder circles, a 1 MB file and the small
+README. Folder-circle navigation and Back worked. Selecting the 1 MB file updated
+the estimated selected size, and Review showed exactly that path. Cancel closed
+the sheet without deletion. The final installed refinement uses short scope names,
+shows size/age controls only for their selected filter, and puts technical limits
+in help text. Its release build passed; that final presentation awaits a native
+recheck. The full functional suite passes 81,523 checks plus preference cleanup.
+
+## Current installed cleanup recheck — 2026-09-30
+
+The installed app scanned a new private, generated five-file folder. Its short
+scope label and filter-specific controls were present. The allocated-space map
+opened Archive and Back returned to Sample. The duplicate view found three equal
+copies, required an explicit keeper, reviewed only Copy One.txt for removal, and
+moved that copy to Trash. The remaining two-copy group retained Original.txt as
+keeper and still allowed selecting Copy Two.txt. Finder Put Back restored Copy
+One.txt; hashes of all five generated files remained unchanged. Evidence:
+`cleanup-current-fixture.json`, `cleanup-current-storage-map.png`,
+`cleanup-current-three-copy-after-trash.txt`, `cleanup-current-recovery-report.json`.
+
+The shipping malware page detected ClamAV 1.5.4 and blocked scanning while its
+private definitions were missing. Updating downloaded official definitions and
+the separate signature check accepted them. FreshClam's retained output included
+NULL X509 store messages despite its successful database tests/update; Aster did
+not suppress those diagnostics. The local generated-file scan reported four
+files, zero skipped, no matches within the stated scope. Choosing a different
+generated folder cleared that report and disabled scanning until the new folder
+is scanned. Evidence: `cleanup-current-malware-result.txt` and
+`cleanup-current-malware-changed-scope.txt`.
+
+The recovery link is now also included directly in duplicate results using the
+existing shared recovery view. This final presentation change awaits installation
+and a native recheck. The preceding full gate passed 81,804 checks, preference
+cleanup and eleven installer checks.
+
+A normal visible generated app under Applications also passed review and Trash
+movement. Finder's Put Back remained disabled, so this is not a Put Back pass.
+Finder's Move Here restored it to Applications instead, with every bundle file's
+SHA-256 unchanged. The never-launched test app was then moved back into the private
+generated fixture folder, removing it from Applications. See
+`uninstaller-current-visible-trash-report.json` and
+`uninstaller-current-visible-recovery-report.json`.
+
+The completion messages now say bytes were removed or moved to Trash, rather than
+claiming immediate recovered disk space. Uninstaller recovery instructions name
+moving the item back to its original folder, with Put Back used when available.
+All fifteen locales have the new messages. These presentation changes passed the
+optimized build and are included in the final candidate.
+
+The final candidate is installed. Its release build, strict signatures, packaged
+selftest, 81,805-check full suite, preference cleanup and eleven installer checks
+passed. A native duplicate removal then displayed the exact returned Trash link
+directly in duplicate results. That link selected Copy One.txt in Finder Trash,
+and Put Back restored it. All five original fixture files retained their hashes.
+See `cleanup-final-duplicate-recovery-link.txt` and
+`cleanup-final-recovery-report.json`. No personal file was scanned or removed.
+
+## macOS 27 definition recovery — 2026-10-02
+
+The native ClamAV 1.5.4 integration exposed a patched daily.cld without its
+separate signature. Scanning refused it, as required. Updates now download into
+a private staging directory and reuse only verified complete CVD files and their
+signatures. An unverifiable CLD triggers a fresh full daily CVD download. All
+three databases must pass signature and freshness checks before publication.
+Failed downloads, verification and cancellation leave the previous database
+unchanged. A failed directory promotion restores the previous directory.
+
+On macOS 27.0.1 the actual backend recovered from that generated database
+fixture, updated from the official mirror, and scanned two generated originals:
+one EICAR match, one benign file, complete coverage, originals retained. The
+focused production/recovery suite passes 688 checks without optional live
+network tests. This code still needs installation and a native UI acceptance
+pass; these are backend results. No personal file was scanned or removed.

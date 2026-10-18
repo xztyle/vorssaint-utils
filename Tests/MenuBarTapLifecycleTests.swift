@@ -9,7 +9,13 @@ enum MenuBarTapLifecycleTests {
         let id: Int
         var enabled = false
         var invalidations = 0
-        init(_ id: Int) { self.id = id }
+        let place: CGEventTapPlacement
+        let options: CGEventTapOptions
+        let mask: CGEventMask
+        let target: Bool
+        init(_ id: Int, place: CGEventTapPlacement, options: CGEventTapOptions, mask: CGEventMask, target: Bool) {
+            self.id = id; self.place = place; self.options = options; self.mask = mask; self.target = target
+        }
     }
     final class Source {
         var attached = false
@@ -18,15 +24,20 @@ enum MenuBarTapLifecycleTests {
         static var records: [Port] = []
         static var attempts = 0
         static var failAt = 0
-        static func make() -> Port? {
+        static func make(place: CGEventTapPlacement, options: CGEventTapOptions, mask: CGEventMask, target: Bool) -> Port? {
             attempts += 1
             guard attempts != failAt else { return nil }
-            let port = Port(attempts); records.append(port); return port
+            let port = Port(attempts, place: place, options: options, mask: mask, target: target)
+            records.append(port); return port
         }
         static func tapCreateForPid(pid: pid_t, place: CGEventTapPlacement, options: CGEventTapOptions,
-            eventsOfInterest: CGEventMask, callback: CGEventTapCallBack, userInfo: UnsafeMutableRawPointer?) -> Port? { make() }
+            eventsOfInterest: CGEventMask, callback: CGEventTapCallBack, userInfo: UnsafeMutableRawPointer?) -> Port? {
+            make(place: place, options: options, mask: eventsOfInterest, target: true)
+        }
         static func tapCreate(tap: CGEventTapLocation, place: CGEventTapPlacement, options: CGEventTapOptions,
-            eventsOfInterest: CGEventMask, callback: CGEventTapCallBack, userInfo: UnsafeMutableRawPointer?) -> Port? { make() }
+            eventsOfInterest: CGEventMask, callback: CGEventTapCallBack, userInfo: UnsafeMutableRawPointer?) -> Port? {
+            make(place: place, options: options, mask: eventsOfInterest, target: false)
+        }
         static func tapEnable(tap: Port, enable: Bool) { tap.enabled = enable }
     }
     class Fixture {
@@ -36,12 +47,14 @@ enum MenuBarTapLifecycleTests {
         enum MenuBarItemMoveError: Error { case eventCreationFailed, busy }
         let pid: pid_t = 42
         var taps: [(Port, Source)] = []
+        var dragOriginWindow: CGWindowID? = 5139
         var sources: [Source] = []
         var failSourceAt = 0
         var waiting = false
         var cancellations = 0
         static let targetCallback: CGEventTapCallBack = { _, _, event, _ in Unmanaged.passUnretained(event) }
         static let sessionCallback = targetCallback
+        static let guardCallback = targetCallback
         func CFMachPortCreateRunLoopSource(_ allocator: CFAllocator?, _ port: Port, _ order: CFIndex) -> Source? {
             guard port.id != failSourceAt else { return nil }
             let source = Source(); sources.append(source); return source
@@ -56,7 +69,7 @@ enum MenuBarTapLifecycleTests {
     }
 
     static func run(_ suite: TestSuite) {
-        for index in 1...2 {
+        for index in 1...4 {
             let creation = fixture(); EventAPI.failAt = index
             suite.expect((try? creation.start()) == nil, "tap creation failure propagates")
             closed(creation, suite, "tap \(index) creation failure")
@@ -66,12 +79,29 @@ enum MenuBarTapLifecycleTests {
         }
         let normal = fixture()
         do { try normal.start() } catch { suite.expect(false, "normal tap setup: \(error)"); return }
-        suite.expect(normal.taps.count == 2 && normal.sources.allSatisfy(\.attached), "normal setup owns and attaches both taps")
-        suite.expect((try? normal.start()) == nil && normal.taps.count == 2, "repeated setup preserves existing ownership instead of adding taps")
+        suite.expect(normal.taps.count == 4 && normal.sources.allSatisfy(\.attached), "normal setup owns and attaches the routing guard and three handshake taps")
+        routingRoles(suite)
+        suite.expect((try? normal.start()) == nil && normal.taps.count == 4, "repeated setup preserves existing ownership instead of adding taps")
         normal.waiting = true
         normal.close(); normal.close()
         closed(normal, suite, "normal/cancelled delivery teardown")
         suite.expect(normal.cancellations == 1, "teardown cancels a pending waiter once, even when closed twice")
+        suite.expect(normal.dragOriginWindow == nil, "closing the transport discards the acknowledged drag origin")
+    }
+
+    private static func routingRoles(_ suite: TestSuite) {
+        let ports = EventAPI.records
+        guard ports.count == 4 else { suite.expect(false, "all four relay roles exist"); return }
+        let mouse = [CGEventType.leftMouseDown, .leftMouseDragged, .leftMouseUp]
+            .reduce(CGEventMask(0)) { $0 | 1 << $1.rawValue }
+        suite.expect(ports[0].target && ports[0].options == .defaultTap && ports[0].mask == 1 << CGEventType.null.rawValue,
+                     "only private barriers are consumed by the target entry tap")
+        suite.expect(!ports[1].target && ports[1].place == .headInsertEventTap && ports[1].options == .defaultTap && ports[1].mask == mouse,
+                     "stray mouse routing is guarded before downstream session delivery")
+        suite.expect(!ports[2].target && ports[2].place == .tailAppendEventTap && ports[2].options == .listenOnly && ports[2].mask == mouse,
+                     "the session acknowledgement observes the complete session stream without altering it")
+        suite.expect(ports[3].target && ports[3].options == .listenOnly && ports[3].mask == mouse,
+                     "host acknowledgement observes mouse events without consuming them")
     }
 
     private static func fixture() -> Host {

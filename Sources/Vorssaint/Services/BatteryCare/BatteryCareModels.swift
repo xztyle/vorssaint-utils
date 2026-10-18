@@ -41,8 +41,11 @@ struct BatterySample: Codable, Equatable {
     var charging: Bool?
     var watts: Double?
     var adapterWatts: Double?
+    var fullyCharged: Bool?
     /// Effective AC availability can become false during an intentional adapter cut.
     var externalPowerConnected: Bool?
+    /// Raw cell charge can show headroom while macOS still rounds its gauge to 100%.
+    var rawPercent: Double?
 
     func isFresh(at now: Date) -> Bool {
         guard let percent, let temperature, let watts, connected != nil, charging != nil else { return false }
@@ -77,14 +80,19 @@ struct BatteryCareState: Codable, Equatable {
     var scheduleCursor: Date = Date()
     var fired: [String] = []
     var ownsHardware = false
+    var nativeLease: BatteryNativeLease?
     var recoveryPending = false
     var qualifiedFingerprint: String?
     var chargeQualified = false
     var dischargeQualified = false
+    var qualificationFailures: Int?
+    var nextQualificationAt: Date?
     var events: [BatteryCareEvent] = []
 
     var isValid: Bool {
-        version == 1 && policy.isValid && fired.count <= 256 && events.count <= 100
+        version == 1 && policy.isValid && (0...3).contains(qualificationFailures ?? 0)
+            && fired.count <= 256 && events.count <= 100
+            && (nativeLease?.isValid ?? true)
             && (operation == nil || (operation!.savedPolicy.isValid
                 && (10...99).contains(operation!.target)))
     }
@@ -127,6 +135,7 @@ struct BatteryCareSnapshot: Codable {
     var competitors: [String] = []
     var qualificationStep: Int?
     var helperBuild = ""
+    var controlBackend: String?
 }
 
 struct BatteryCareResponse: Codable {

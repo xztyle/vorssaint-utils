@@ -26,6 +26,11 @@ hardware/permission-dependent behavior remains unverified.
 - Explicit capability detection, stale/missing-reading handling, competing-controller
   detection, authenticated privileged requests and a reliable return-to-system action.
 - No hardware claim based only on a readme or successful write return code.
+- Live power-flow diagram: charger to Mac and battery, battery to Mac, and
+  simultaneous charger/battery supply. Use measured source watts, make derived
+  values identifiable, and show stale or unsupported readings honestly.
+- Useful power breakdowns and app activity, without presenting a CPU/GPU activity
+  score as measured watts per application.
 
 ## Clipboard
 
@@ -89,14 +94,15 @@ hardware/permission-dependent behavior remains unverified.
 
 ## Delivery and engineering
 
-- Five branches: `feature/battery-care`, `feature/clipboard`, `feature/menu-bar`,
-  `feature/screen-capture`, `feature/mac-cleanup`, each with a distinct worktree.
+- The owner later replaced the separate feature-branch workflow with one branch,
+  `main`, for the integrated Aster app. Continue there.
 - The original research and implementation workers used the requested separate
   feature scopes. From the owner's later instruction onward, use GPT 6 Sol at
   xhigh for all further work; do not resume GPT 6 Astra workers.
 - The primary agent owns shared identity/signing work, review, integration and final
   real-Mac verification. No external Fable/Claude review.
-- Finish each branch, verify it, then merge it into main. Commit and push are authorized.
+- Keep changes reviewable and verified. Follow the owner's current Git instructions
+  before committing or pushing.
 - Preserve an `upstream` remote. Periodic upstream changes must be merged with our
   app identity and feature requirements rechecked; no unattended overwrite.
 - Browser research and browser tests use the Codex in-app browser only. Do not
@@ -116,3 +122,8 @@ hardware/permission-dependent behavior remains unverified.
 Record per-feature research, implementation commits, automated checks, actual UI and
 hardware checks, and unresolved failures separately. A feature's status is determined
 by evidence, not by an agent saying it is complete.
+
+Inspect the reference apps' actual interactions and aesthetics, then test Aster's
+equivalent workflows. Official interface material is useful when an app is missing,
+but does not establish that its installed behavior has been tested. Track this
+distinction in `docs/ASTER_UX_PARITY.md`.

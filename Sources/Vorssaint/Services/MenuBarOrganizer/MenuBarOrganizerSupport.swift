@@ -99,6 +99,12 @@ struct ManagedMenuBarItem: Identifiable {
     let isProtected: Bool
     let image: NSImage?
 
+    var shortDisplayName: String {
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if bundleIdentifier.hasPrefix("com.apple."), !cleanTitle.isEmpty { return cleanTitle }
+        return sourceName.isEmpty ? displayName : sourceName
+    }
+
     var displayName: String {
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let appName = sourceName.isEmpty ? ownerName : sourceName

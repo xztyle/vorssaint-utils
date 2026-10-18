@@ -24,6 +24,7 @@ enum MenuBarActivationTests {
         var menuCloses = true
         var applied = 0
         let mover = Clicker()
+        func clickItem(_ item: ManagedMenuBarItem) async throws { try await mover.click(item: item) }
         let text = FeatureStrings.menuBarOrganizer(.enUS)
         let extra = MenuBarProductStrings.localized(.enUS)
         func settleAndRefresh() async -> Bool { refreshResults.isEmpty ? true : refreshResults.removeFirst() }

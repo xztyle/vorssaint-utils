@@ -54,6 +54,7 @@ final class ClipboardHistoryService: ObservableObject {
     @Published var quickQuery = "" {
         didSet {
             if quickQuery != oldValue {
+                setQuickPreviewPresented(false)
                 quickResults = []
                 resetQuickSelection()
                 scheduleSearch()
@@ -71,7 +72,9 @@ final class ClipboardHistoryService: ObservableObject {
     )
 
     @Published var collections: [ClipboardCollection] = []
-    @Published var selectedCollectionID: UUID? { didSet { resetQuickSelection(); scheduleSearch() } }
+    @Published var selectedCollectionID: UUID? {
+        didSet { setQuickPreviewPresented(false); resetQuickSelection(); scheduleSearch() }
+    }
     @Published var quickResults: [ClipboardHistoryEntry] = []
     @Published var storageError: String?
     @Published var libraryReady = false
@@ -81,8 +84,8 @@ final class ClipboardHistoryService: ObservableObject {
     @Published var migrationCount = 0
     @Published var searchFocusRequest = UUID()
     @Published var editRequest = UUID()
+    @Published var cancelEditRequest = UUID()
     @Published var renameRequest = UUID()
-    @Published var fullPreviewRequest = UUID()
     var library: ClipboardLibraryStore?
     var searchGeneration = 0
     var searchScheduled = false
@@ -102,6 +105,7 @@ final class ClipboardHistoryService: ObservableObject {
     var copyInFlight = false
     static let pasteboardTimeout: TimeInterval = 5
     var panel: ClipboardDrawerPanel?
+    weak var quickPreviewWindow: NSWindow?
     var drawerPresentation = ClipboardDrawerPresentation()
     var drawerScreenObserver: NSObjectProtocol?
     var keyMonitor: Any?

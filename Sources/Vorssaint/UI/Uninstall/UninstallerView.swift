@@ -300,8 +300,13 @@ struct UninstallerView: View {
                 .font(.system(size: 54))
                 .foregroundStyle(failed.isEmpty ? .green : .orange)
             Text(l10n.s.uninstallerDoneTitle).font(.system(size: 20, weight: .bold))
-            Text(String(format: l10n.s.uninstallerFreedFormat, Self.byteString(freed)))
+            Text(CleanupOutcomeStrings.removedSize(Self.byteString(freed), language: l10n.language))
                 .font(.system(size: 13)).foregroundStyle(.secondary)
+            if uninstaller.homebrewPackage == nil {
+                Text(CleanupOutcomeStrings.recovery(language: l10n.language))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center).frame(maxWidth: 360)
+            }
             if !failed.isEmpty {
                 UninstallFailureNote(items: failed).frame(width: 360)
             }

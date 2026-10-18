@@ -821,7 +821,7 @@ struct CleanerView: View {
                 .font(.system(size: compact ? 40 : 54))
                 .foregroundStyle(.green)
             Text(l10n.s.uninstallerDoneTitle).font(.system(size: compact ? 17 : 20, weight: .bold))
-            Text(String(format: l10n.s.uninstallerFreedFormat, Self.byteString(freed)))
+            Text(CleanupOutcomeStrings.trashedSize(Self.byteString(freed), language: l10n.language))
                 .font(.system(size: 13)).foregroundStyle(.secondary)
             Text(l10n.s.cleanerDoneNote)
                 .font(.caption).foregroundStyle(.tertiary)

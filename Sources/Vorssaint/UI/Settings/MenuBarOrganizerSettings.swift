@@ -8,9 +8,10 @@ struct MenuBarOrganizerSettings: View {
     @ObservedObject private var l10n = L10n.shared
     @ObservedObject private var service = MenuBarOrganizerService.shared
     @ObservedObject private var permissions = Permissions.shared
+    @ObservedObject private var nativeAccess = MenuBarNativeLayoutAccess.shared
 
     @AppStorage(DefaultsKey.menuBarOrganizerEnabled) private var enabled = false
-    @AppStorage(DefaultsKey.menuBarOrganizerSetupComplete) private var setupComplete = false
+    @AppStorage(MenuBarBackendPreferences.setup) private var setupComplete = false
     @AppStorage(DefaultsKey.menuBarOrganizerAlwaysHiddenEnabled)
     private var alwaysHiddenEnabled = true
     @AppStorage(DefaultsKey.menuBarOrganizerShowDividers) private var showDividers = false
@@ -26,8 +27,9 @@ struct MenuBarOrganizerSettings: View {
         Form {
             Section {
                 Toggle(text.enable, isOn: $enabled)
-                    .disabled(!AppFeature.menuBarOrganizer.isSupportedOnCurrentSystem)
-                Text(text.enableCaption)
+                    .disabled(!AppFeature.menuBarOrganizer.isSupportedOnCurrentSystem
+                              || !enabled && MenuBarBackendPreferences.native && !nativeAccess.hasAccess)
+                Text(MenuBarBackendPreferences.native ? MenuBarNativeStrings.localized(l10n.language).enableCaption : text.enableCaption)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
@@ -37,6 +39,7 @@ struct MenuBarOrganizerSettings: View {
             if !AppFeature.menuBarOrganizer.isSupportedOnCurrentSystem {
                 Text(text.unsupportedSystem).foregroundStyle(.secondary)
             }
+            if #available(macOS 27, *) { nativeAccessSection }
             if let message = service.operationMessage, !service.isRunning {
                 Text(message).foregroundStyle(.orange)
             }
@@ -67,6 +70,7 @@ struct MenuBarOrganizerSettings: View {
         }
         .formStyle(.grouped)
         .onAppear {
+            if #available(macOS 27, *) { nativeAccess.refresh() }
             service.syncWithPreferences()
             updateEditingSession()
         }
@@ -77,12 +81,23 @@ struct MenuBarOrganizerSettings: View {
             service.syncWithPreferences()
             updateEditingSession()
         }
+        .onChange(of: nativeAccess.hasAccess) { _, _ in service.syncWithPreferences(); updateEditingSession() }
         .onChange(of: service.isRunning) { _, _ in
             updateEditingSession()
         }
         .onChange(of: preferenceSignature) { _, _ in
             service.syncWithPreferences()
         }
+    }
+
+    private var nativeAccessSection: some View {
+        let native = MenuBarNativeStrings.localized(l10n.language)
+        return Section {
+            Text(native.accessInfo).font(.caption).foregroundStyle(.secondary)
+            if nativeAccess.hasAccess { Label(native.ready, systemImage: "checkmark.circle") }
+            else { Button(native.grant) { nativeAccess.request() } }
+            if nativeAccess.failed { Text(native.failed).foregroundStyle(.orange) }
+        } header: { Text(native.title) }
     }
 
     @ViewBuilder
@@ -178,7 +193,7 @@ struct MenuBarOrganizerSettings: View {
     private var behaviorSection: some View {
         Section {
             Text(text.alwaysHidden)
-            Toggle(text.showDividers, isOn: $showDividers)
+            if !MenuBarBackendPreferences.native { Toggle(text.showDividers, isOn: $showDividers) }
             Picker(text.presentationTitle, selection: $presentationMode) {
                 Text(text.presentationAutomatic)
                     .tag(MenuBarOrganizerPresentationMode.automatic.rawValue)
@@ -242,7 +257,8 @@ struct MenuBarOrganizerSettings: View {
                   ? "eye"
                   : (section == .hidden ? "eye.slash" : "lock"))
         }
-        .disabled(!item.isMovable || item.section == section)
+        .disabled(!item.isMovable || item.section == section
+                  || MenuBarBackendPreferences.native && section != .visible && item.bundleIdentifier.hasPrefix("com.apple."))
     }
 
     private func updateEditingSession() {
@@ -273,7 +289,7 @@ private struct MenuBarOrganizerEditorItem: View {
     var body: some View {
         HStack(spacing: 5) {
             MenuBarOrganizerItemIcon(item: item, size: 18)
-            Text(item.sourceName.isEmpty ? item.title : item.sourceName)
+            Text(item.shortDisplayName)
                 .font(.caption)
                 .lineLimit(1)
             if item.identityState == .provisional {

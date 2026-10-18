@@ -11,6 +11,7 @@ enum StorageInspectionTests {
         engineResults(suite)
         locales(suite)
         CleanupFixtureReceiptTests.run(suite)
+        ClamAVDefinitionUpdateTests.run(suite)
     }
 
     private static func fixtures(_ suite: TestSuite) throws {
@@ -193,8 +194,8 @@ enum StorageInspectionTests {
         try Data(eicar.utf8).write(to: chosen.appendingPathComponent("eicar.txt"))
         let files = StorageFolderScanner.scan(roots: [chosen], cancellation: .init()).files
         let backend = ClamAVBackend(tools: tools, root: backendRoot)
-        try backend.verify(.init())
         _ = try backend.update(.init())
+        try backend.verify(.init())
         suite.expect(ClamAVSupport.fresh(backend.definitionDate()), "real one-shot definition update preserves verified current definitions")
         let result = backend.scan(files, cancellation: .init(), processCancellation: .init())
         suite.expect(!result.failed && result.findings.count == 1 && result.findings[0].path.hasSuffix("eicar.txt"), "real optional ClamAV finds standardized EICAR and does not match the benign generated file")

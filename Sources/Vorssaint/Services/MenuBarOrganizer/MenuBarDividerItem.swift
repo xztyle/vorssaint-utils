@@ -27,6 +27,10 @@ final class MenuBarDividerItem: NSObject {
     }
 
     var frame: CGRect? { statusItem.button?.window?.frame }
+    private lazy var nativeRefresh = MenuBarNativeLayoutRefresh(
+        length: { [weak self] in self?.statusItem.length ?? 0 },
+        width: { [weak self] in self?.statusItem.button?.bounds.width ?? 0 },
+        setLength: { [weak self] in self?.statusItem.length = $0 })
     private var text: MenuBarOrganizerStrings { FeatureStrings.menuBarOrganizer(L10n.shared.language) }
 
     init(kind: Kind) {
@@ -76,6 +80,7 @@ final class MenuBarDividerItem: NSObject {
     }
 
     func removePreservingPosition() {
+        nativeRefresh.cancel()
         let key = "NSStatusItem Preferred Position \(kind.autosaveName)"
         let cached = UserDefaults.standard.object(forKey: key)
         statusItem.isVisible = false
@@ -84,6 +89,10 @@ final class MenuBarDividerItem: NSObject {
 
     func restore() {
         statusItem.isVisible = true
+    }
+
+    func requestNativeRefresh() {
+        nativeRefresh.request()
     }
 
     private func configureButton() {

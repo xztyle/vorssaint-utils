@@ -212,7 +212,7 @@ extension AppFeature {
     var isBeta: Bool { self == .fanControl || self == .killProcess || self == .menuBarOrganizer }
 
     static func isSupported(_ feature: AppFeature, onOperatingSystemMajorVersion major: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion) -> Bool {
-        feature != .menuBarOrganizer || (14...26).contains(major)
+        feature != .menuBarOrganizer || (14...27).contains(major)
     }
 
     var isSupportedOnCurrentSystem: Bool { Self.isSupported(self) }

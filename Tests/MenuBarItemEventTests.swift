@@ -18,6 +18,9 @@ enum MenuBarItemEventTests {
         releaseRecovery(suite)
         releaseOrdering(suite)
         hoverRouting(source, suite)
+        sessionProcessRouting(source, suite)
+        hostPressRouting(source, suite)
+        MenuBarDragReleaseTests.run(source, suite)
     }
 
     static func routing(_ type: CGEventType, source: CGEventSource, suite: TestSuite) {
@@ -32,12 +35,13 @@ enum MenuBarItemEventTests {
         for field: CGEventField in [.mouseEventWindowUnderMousePointer,
             .mouseEventWindowUnderMousePointerThatCanHandleThisEvent, MenuBarItemEventFactory.windowField] {
             suite.expect(event.getIntegerValueField(field) == 2611,
-                         "every move phase keeps the original window even when its point crosses other icons")
+                         "the event constructor retains the explicitly selected window for this phase")
         }
         suite.expect(event.flags == (type == .leftMouseUp ? [] : .maskCommand),
                      "press and drag hold Command; release clears synthetic modifiers")
-        suite.expect(event.getIntegerValueField(.mouseEventClickState) == (type == .leftMouseUp ? 0 : 1),
-                     "release cannot leave a synthetic click held")
+        let native = CGEvent(mouseEventSource: source, mouseType: type, mouseCursorPosition: destination, mouseButton: .left)
+        suite.expect(event.getIntegerValueField(.mouseEventClickState) == native?.getIntegerValueField(.mouseEventClickState),
+                     "reordering retains CoreGraphics' native drag click state")
     }
 
     static func click(_ source: CGEventSource, _ suite: TestSuite) {
@@ -151,5 +155,76 @@ enum MenuBarItemEventTests {
         changed.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: 494)
         suite.expect(!MenuBarItemEventFactory.routingMatches(changed, expected: click),
                      "ordinary activation does not inherit the held-drag hover exception")
+    }
+
+    static func sessionProcessRouting(_ source: CGEventSource, _ suite: TestSuite) {
+        for type: CGEventType in [.leftMouseDown, .leftMouseDragged, .leftMouseUp] {
+            guard let expected = MenuBarItemEventFactory.make(type, source: source,
+                point: CGPoint(x: 1727, y: 0), windowID: 5139, targetPID: 625, moving: true),
+                let received = expected.copy() else { suite.expect(false, "create recorded Siri routing fixture"); return }
+            received.setIntegerValueField(.eventTargetUnixProcessID, value: 20921)
+            suite.expect(MenuBarItemEventFactory.routingMatches(received, expected: expected, isSession: true),
+                         "recorded session delivery may name Setapp while all Siri window fields remain bound")
+            suite.expect(!MenuBarItemEventFactory.routingMatches(received, expected: expected),
+                         "foreground process substitution is still rejected by the target host tap")
+            received.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: 494)
+            suite.expect(MenuBarItemEventFactory.routingMatches(received, expected: expected, isSession: true) == (type != .leftMouseDown),
+                         "session process rewriting does not relax the press hit-test window check")
+            received.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: 5139)
+            received.setIntegerValueField(MenuBarItemEventFactory.windowField, value: 494)
+            suite.expect(!MenuBarItemEventFactory.routingMatches(received, expected: expected, isSession: true),
+                         "a rewritten session address cannot authorize a different explicit window")
+            received.setIntegerValueField(MenuBarItemEventFactory.windowField, value: 5139)
+            received.type = .rightMouseDown
+            suite.expect(!MenuBarItemEventFactory.routingMatches(received, expected: expected, isSession: true),
+                         "the session address exception never changes the authorized event type")
+        }
+        guard let click = MenuBarItemEventFactory.make(.leftMouseDown, source: source,
+            point: .zero, windowID: 5139, targetPID: 625, moving: false), let changed = click.copy() else { return }
+        changed.setIntegerValueField(.eventTargetUnixProcessID, value: 20921)
+        suite.expect(!MenuBarItemEventFactory.routingMatches(changed, expected: click, isSession: true),
+                     "activation without an explicit routing window keeps its strict host check")
+    }
+
+    static func hostPressRouting(_ source: CGEventSource, _ suite: TestSuite) {
+        guard let expected = MenuBarItemEventFactory.make(.leftMouseDown, source: source,
+            point: CGPoint(x: 1730, y: 0), windowID: 5139, targetPID: 625, moving: true),
+              let received = expected.copy() else { suite.expect(false, "create recorded host press fixture"); return }
+        received.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: 31849)
+        received.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: 31849)
+        for session in [false, true] {
+            for verified in [false, true] {
+                suite.expect(MenuBarItemEventFactory.routingMatches(received, expected: expected,
+                    isSession: session, verifiedSession: verified) == (!session && verified),
+                    "recorded Tahoe host rewrite requires a previously verified session press")
+            }
+        }
+        hostPressRejection(received, expected: expected, suite)
+        var delivery = MenuBarEventDeliveryState(entryToken: 1, mouseToken: 2, exitToken: 3)
+        _ = delivery.receive(token: 1, isSession: false, matchesWindow: false)
+        suite.expect(delivery.phase != .target, "entry acknowledgement does not authorize rewritten hit-test fields")
+        _ = delivery.receive(token: 2, isSession: true, matchesWindow: true)
+        suite.expect(delivery.phase == .target, "the verified session authorizes only its next host delivery")
+        _ = delivery.receive(token: 2, isSession: false, matchesWindow: true)
+        suite.expect(delivery.phase != .target, "host delivery consumes the session authorization")
+    }
+
+    static func hostPressRejection(_ received: CGEvent, expected: CGEvent, _ suite: TestSuite) {
+        let fields: [(CGEventField, Int64)] = [(MenuBarItemEventFactory.windowField, 494),
+                                             (.eventTargetUnixProcessID, 626)]
+        for (field, value) in fields {
+            guard let changed = received.copy() else { continue }
+            changed.setIntegerValueField(field, value: value)
+            suite.expect(!MenuBarItemEventFactory.routingMatches(changed, expected: expected, verifiedSession: true),
+                         "session verification cannot authorize a different explicit icon or host")
+        }
+        guard let changed = received.copy() else { return }
+        changed.flags = []
+        suite.expect(!MenuBarItemEventFactory.routingMatches(changed, expected: expected, verifiedSession: true),
+                     "a rewritten press without Command cannot activate a menu by accident")
+        changed.flags = expected.flags
+        changed.type = .rightMouseDown
+        suite.expect(!MenuBarItemEventFactory.routingMatches(changed, expected: expected, verifiedSession: true),
+                     "session verification cannot authorize another event type")
     }
 }

@@ -21,6 +21,7 @@ final class MenuBarOrganizerService: ObservableObject {
     @Published var automationPaused = false
     let provider = MenuBarWindowProvider()
     let mover = MenuBarItemMover()
+    let nativeBackend = MenuBarNativeBackend()
     let store = MenuBarLayoutStore(defaults: .standard)
     var controlItem: MenuBarDividerItem?
     var hiddenDivider: MenuBarDividerItem?
@@ -80,10 +81,11 @@ final class MenuBarOrganizerService: ObservableObject {
 
     func start() async {
         defer { if !stopping { operationTask = nil } }
+        defer { if !isRunning, controlItem != nil { finishTermination() } }
         do { try loadStoredState() }
         catch { libraryIsValid = false; operationMessage = extra.corruptStore; return }
-        let snapshot = await provider.snapshot(hiddenDividerMidX: nil,
-            alwaysHiddenDividerMidX: nil, excludedWindowIDs: [])
+        guard await prepareNativeBackend() else { return }
+        let snapshot = await inventorySnapshot()
         guard !Task.isCancelled, snapshot.enumerationSucceeded, !snapshot.items.isEmpty else {
             operationMessage = text.automaticMoveUnavailable; return
         }
@@ -93,7 +95,12 @@ final class MenuBarOrganizerService: ObservableObject {
         guard !Task.isCancelled, AppFeature.menuBarOrganizer.isAvailable,
               UserDefaults.standard.bool(forKey: DefaultsKey.menuBarOrganizerEnabled),
               AXIsProcessTrusted(), MenuBarManagerDetection.runningManagers().isEmpty else { return }
+        await finishStart(pendingRecovery: pendingRecovery)
+    }
+
+    private func finishStart(pendingRecovery: Bool) async {
         createControls()
+        if usesNativeBackend { nativeBackend.loadSavedMembership(desiredLayout, recovering: pendingRecovery) }
         isRunning = true
         recoveryNeeded = pendingRecovery
         automationPaused = pendingRecovery
@@ -107,30 +114,34 @@ final class MenuBarOrganizerService: ObservableObject {
 
     private func loadStoredState() throws {
         library = try store.library()
-        desiredLayout = try store.layout(for: DefaultsKey.menuBarOrganizerLayout) ?? MenuBarLayout()
-        baseline = try store.layout(for: DefaultsKey.menuBarOrganizerBaseline)
+        desiredLayout = try store.layout(for: layoutPreferenceKey) ?? MenuBarLayout()
+        baseline = try store.layout(for: baselinePreferenceKey)
         libraryIsValid = true
     }
 
     private func prepareBaseline(from items: [ManagedMenuBarItem]) throws -> Bool {
         if baseline == nil {
             let original = MenuBarLayout.capture(items, original: true)
-            try store.save(original, for: DefaultsKey.menuBarOrganizerBaseline)
+            try store.save(original, for: baselinePreferenceKey)
             baseline = original
         }
-        return baseline.map { !MenuBarLayoutPolicy.isSatisfied($0, items: items) } ?? false
+        return baseline.map { !MenuBarLayoutPolicy.isSatisfied($0, items: items)
+            || !MenuBarLayoutPolicy.allItemsAvailable($0, items: items) } ?? false
     }
 
     func createControls() {
+        guard controlItem == nil else { return }
         controlItem = MenuBarDividerItem(kind: .control)
-        hiddenDivider = MenuBarDividerItem(kind: .hidden)
-        alwaysHiddenDivider = MenuBarDividerItem(kind: .alwaysHidden)
+        if !usesNativeBackend {
+            hiddenDivider = MenuBarDividerItem(kind: .hidden)
+            alwaysHiddenDivider = MenuBarDividerItem(kind: .alwaysHidden)
+        }
         controlItem?.onLeftClick = { [weak self] in self?.toggleHiddenSection() }
         controlItem?.onRightClick = { [weak self] in self?.showContextMenu() }
         hiddenDivider?.onLeftClick = { [weak self] in self?.toggleHiddenSection() }
         alwaysHiddenDivider?.onLeftClick = { [weak self] in self?.toggleAlwaysHiddenSection() }
         secondaryPanel = MenuBarOrganizerPanelController(service: self)
-        let setup = UserDefaults.standard.bool(forKey: DefaultsKey.menuBarOrganizerSetupComplete)
+        let setup = UserDefaults.standard.bool(forKey: setupPreferenceKey)
         hiddenSectionShown = !setup
         alwaysHiddenSectionShown = !setup
         applyDividerState()
@@ -141,6 +152,7 @@ final class MenuBarOrganizerService: ObservableObject {
         automationPaused = false
         reconciliationFailures = 0
         needsReconciliation = true
+        if usesNativeBackend { nativeBackend.visibility.retry() }
         syncWithPreferences()
         refresh()
     }
@@ -159,10 +171,7 @@ final class MenuBarOrganizerService: ObservableObject {
     func refreshNow() async -> MenuBarItemSnapshot? {
         guard isRunning else { return nil }
         let generation = refreshGeneration
-        let excluded = Set([controlItem?.windowID, hiddenDivider?.windowID,
-                            alwaysHiddenDivider?.windowID].compactMap { $0 })
-        let snapshot = await provider.snapshot(hiddenDividerMidX: hiddenDivider?.frame?.midX,
-            alwaysHiddenDividerMidX: alwaysHiddenDivider?.frame?.midX, excludedWindowIDs: excluded)
+        let snapshot = await inventorySnapshot()
         guard !Task.isCancelled, generation == refreshGeneration, isRunning else { return nil }
         capabilities = snapshot.capabilities
         if snapshot.enumerationSucceeded {
@@ -194,7 +203,7 @@ final class MenuBarOrganizerService: ObservableObject {
 
     func completeSetup() {
         guard entryAllowed, capabilities.automaticEditorAvailable else { return }
-        UserDefaults.standard.set(true, forKey: DefaultsKey.menuBarOrganizerSetupComplete)
+        UserDefaults.standard.set(true, forKey: setupPreferenceKey)
         saveCurrentLayout()
         editingCount = 0
         preEditingState = nil
@@ -202,7 +211,8 @@ final class MenuBarOrganizerService: ObservableObject {
     }
 
     func applyDividerState() {
-        let setup = UserDefaults.standard.bool(forKey: DefaultsKey.menuBarOrganizerSetupComplete)
+        if usesNativeBackend { applyNativeVisibility(); return }
+        let setup = UserDefaults.standard.bool(forKey: setupPreferenceKey)
         let markers = editingCount > 0 || !setup
             || UserDefaults.standard.bool(forKey: DefaultsKey.menuBarOrganizerShowDividers)
         let length = MenuBarOrganizerSupport.collapsedLength(screenWidths: NSScreen.screens.map(\.frame.width))
@@ -248,13 +258,13 @@ final class MenuBarOrganizerService: ObservableObject {
 
     func showSecondaryBar(includeAlwaysHidden: Bool = false) {
         guard entryAllowed else { return }
-        secondaryPanel?.show(anchor: controlItem?.frame, search: false, includeAlwaysHidden: includeAlwaysHidden)
+        secondaryPanel?.show(anchor: organizerAnchor, search: false, includeAlwaysHidden: includeAlwaysHidden)
         refresh()
     }
 
     func showSearch() {
         guard entryAllowed else { return }
-        secondaryPanel?.show(anchor: controlItem?.frame, search: true, includeAlwaysHidden: true)
+        secondaryPanel?.show(anchor: organizerAnchor, search: true, includeAlwaysHidden: true)
         refresh()
     }
 

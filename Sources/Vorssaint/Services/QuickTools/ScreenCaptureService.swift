@@ -9,6 +9,7 @@ import Combine
 final class ScreenCaptureSelectionOptions: ObservableObject {
     let availableTools: [ScreenCaptureTool]
     let showsCaptureMenu: Bool
+    let clipboardOnly: Bool
     let controlsInNotch: Bool
     var hasFocusedControl = false
     var onPresentationReady: (() -> Void)?
@@ -19,12 +20,14 @@ final class ScreenCaptureSelectionOptions: ObservableObject {
     var onSelectionChange: (() -> Void)?
 
     init(availableTools: [ScreenCaptureTool], selectedTool: ScreenCaptureTool,
-         showsCaptureMenu: Bool, controlsInNotch: Bool = false) {
+         showsCaptureMenu: Bool, controlsInNotch: Bool = false,
+         clipboardOnly: Bool = false) {
         precondition(availableTools.contains(selectedTool))
         self.availableTools = availableTools
         self.selectedTool = selectedTool
         self.showsCaptureMenu = showsCaptureMenu
         self.controlsInNotch = controlsInNotch
+        self.clipboardOnly = clipboardOnly
     }
 
     func select(_ tool: ScreenCaptureTool) {
@@ -43,6 +46,8 @@ final class ScreenCaptureService: ObservableObject {
     /// The tools whose own shortcut could not be registered, so each tool's
     /// settings can say so.
     @Published private(set) var toolShortcutRegistrationFailures: Set<ScreenCaptureTool> = []
+    @Published private(set) var captureMenuShortcutRegistrationFailed = false
+    @Published private(set) var areaClipboardShortcutRegistrationFailed = false
 
     /// One hotkey per tool, built from the tool list so a new mode cannot be
     /// added without one. Ids continue past the hand-assigned quick tool
@@ -56,6 +61,8 @@ final class ScreenCaptureService: ObservableObject {
         }
         return hotkeys
     }()
+    private let captureMenuHotkey = QuickToolHotkey(id: 29)
+    private let areaClipboardHotkey = QuickToolHotkey(id: 31)
     private var selection: ScreenshotSelectionController?
     private var options: ScreenCaptureSelectionOptions?
     private var countdown: DispatchWorkItem?
@@ -70,13 +77,23 @@ final class ScreenCaptureService: ObservableObject {
         for (tool, hotkey) in toolHotkeys {
             hotkey.onPress = { [weak self] in self?.capture(initial: tool, fromShortcut: true) }
         }
+        captureMenuHotkey.onPress = { [weak self] in
+            self?.capture(initial: .screenshot, fromShortcut: false)
+        }
+        areaClipboardHotkey.onPress = { [weak self] in
+            self?.capture(initial: .screenshot, fromShortcut: true, clipboardOnly: true)
+        }
     }
 
     func syncWithPreferences() {
         let availableTools = ScreenCaptureTool.available()
         guard !availableTools.isEmpty else {
             toolShortcutRegistrationFailures = []
+            captureMenuShortcutRegistrationFailed = false
+            areaClipboardShortcutRegistrationFailed = false
             toolHotkeys.values.forEach { $0.unregister() }
+            captureMenuHotkey.unregister()
+            areaClipboardHotkey.unregister()
             cancelSelection()
             return
         }
@@ -86,6 +103,18 @@ final class ScreenCaptureService: ObservableObject {
             cancelSelection()
         }
         syncToolShortcuts(availableTools: availableTools, defaults: UserDefaults.standard)
+        let menuEnabled = availableTools.contains(.screenshot)
+            && UserDefaults.standard.bool(forKey: DefaultsKey.screenshotCaptureMenuShortcutEnabled)
+        captureMenuShortcutRegistrationFailed = !captureMenuHotkey.sync(
+            enabled: menuEnabled,
+            shortcut: GlobalShortcutRole.screenshotCaptureMenu.savedShortcut,
+            storageKey: DefaultsKey.screenshotCaptureMenuShortcut)
+        let clipboardEnabled = availableTools.contains(.screenshot)
+            && UserDefaults.standard.bool(forKey: DefaultsKey.screenshotAreaClipboardShortcutEnabled)
+        areaClipboardShortcutRegistrationFailed = !areaClipboardHotkey.sync(
+            enabled: clipboardEnabled,
+            shortcut: GlobalShortcutRole.screenshotAreaClipboard.savedShortcut,
+            storageKey: DefaultsKey.screenshotAreaClipboardShortcut)
     }
 
     /// A tool's own shortcut opens the same chooser already on that mode. A
@@ -107,13 +136,16 @@ final class ScreenCaptureService: ObservableObject {
 
     func suspend() {
         toolHotkeys.values.forEach { $0.unregister() }
+        captureMenuHotkey.unregister()
+        areaClipboardHotkey.unregister()
         cancelSelection()
     }
 
     /// Opens the same chooser from every feature surface. A feature-specific
     /// button merely picks the initial mode; the person can switch before
     /// selecting anything.
-    func capture(initial preferred: ScreenCaptureTool? = nil, fromShortcut: Bool = false) {
+    func capture(initial preferred: ScreenCaptureTool? = nil, fromShortcut: Bool = false,
+                 clipboardOnly: Bool = false) {
         let recorder = ScreenRecorderService.shared
         if preferred == .recording, AppFeature.screenRecorder.isAvailable,
            recorder.stopOrCancelActiveCapture() {
@@ -121,7 +153,9 @@ final class ScreenCaptureService: ObservableObject {
         }
         let duringRecording = recorder.hasActiveCapture
         if duringRecording {
-            guard let preferred, preferred.opensDuringRecording(fromShortcut: fromShortcut) else { return }
+            guard let preferred,
+                  clipboardOnly || preferred.opensDuringRecording(fromShortcut: fromShortcut)
+            else { return }
         }
         if countdown != nil {
             cancelSelection()
@@ -136,7 +170,7 @@ final class ScreenCaptureService: ObservableObject {
         if duringRecording, selected != preferred { return }
         // The digit keys switch tools even with the menu hidden, so a
         // selection that runs over a recording offers only its own tool.
-        let tools = duringRecording ? [selected] : available
+        let tools = duringRecording || clipboardOnly ? [selected] : available
 
         guard Permissions.shared.screenRecording else {
             // Color sampling itself needs no capture permission, so its
@@ -153,45 +187,50 @@ final class ScreenCaptureService: ObservableObject {
             return
         }
 
-        let showsCaptureMenu = selected.showsCaptureMenu(fromShortcut: fromShortcut)
+        let showsCaptureMenu = !clipboardOnly && selected.showsCaptureMenu(fromShortcut: fromShortcut)
         let delay = selected == .screenshot
             ? ScreenshotSupport.sanitizedDelay(
                 UserDefaults.standard.integer(forKey: DefaultsKey.screenshotDelay))
             : 0
         guard delay > 0 else {
-            beginSelection(tools: tools, selected: selected, showsCaptureMenu: showsCaptureMenu)
+            beginSelection(tools: tools, selected: selected,
+                           showsCaptureMenu: showsCaptureMenu, clipboardOnly: clipboardOnly)
             return
         }
         countdownRemaining = delay
         countdownTools = tools
-        tickCountdown(tools: tools, selected: selected, showsCaptureMenu: showsCaptureMenu)
+        tickCountdown(tools: tools, selected: selected,
+                      showsCaptureMenu: showsCaptureMenu, clipboardOnly: clipboardOnly)
     }
 
     private func tickCountdown(tools: [ScreenCaptureTool], selected: ScreenCaptureTool,
-                               showsCaptureMenu: Bool) {
+                               showsCaptureMenu: Bool, clipboardOnly: Bool) {
         guard countdownRemaining > 0 else {
             countdown = nil
             countdownTools = nil
-            beginSelection(tools: tools, selected: selected, showsCaptureMenu: showsCaptureMenu)
+            beginSelection(tools: tools, selected: selected,
+                           showsCaptureMenu: showsCaptureMenu, clipboardOnly: clipboardOnly)
             return
         }
         QuickToolHUD.showCountdown(countdownRemaining)
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.countdownRemaining -= 1
-            self.tickCountdown(tools: tools, selected: selected, showsCaptureMenu: showsCaptureMenu)
+            self.tickCountdown(tools: tools, selected: selected,
+                               showsCaptureMenu: showsCaptureMenu, clipboardOnly: clipboardOnly)
         }
         countdown = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: work)
     }
 
     private func beginSelection(tools: [ScreenCaptureTool], selected: ScreenCaptureTool,
-                               showsCaptureMenu: Bool) {
+                               showsCaptureMenu: Bool, clipboardOnly: Bool) {
         guard selection == nil, !ScreenshotSelectionController.isSessionOnScreen else { return }
         let options = ScreenCaptureSelectionOptions(availableTools: tools,
                                                     selectedTool: selected,
                                                     showsCaptureMenu: showsCaptureMenu,
-                                                    controlsInNotch: NotchSupport.routesCaptureControls() && NotchService.shared.acceptsSystemFeedback)
+                                                    controlsInNotch: NotchSupport.routesCaptureControls() && NotchService.shared.acceptsSystemFeedback,
+                                                    clipboardOnly: clipboardOnly)
         self.options = options
         startSelection(options: options)
     }
@@ -245,19 +284,21 @@ final class ScreenCaptureService: ObservableObject {
             self.selection = nil
             self.options = nil
             self.route(outcome, selected: options.selectedTool,
-                       recorderAudio: options.recorderAudio)
+                       recorderAudio: options.recorderAudio,
+                       clipboardOnly: options.clipboardOnly)
         }
     }
 
     private func route(_ outcome: ScreenshotSelectionController.Outcome,
                        selected: ScreenCaptureTool,
-                       recorderAudio: RecorderSelectionAudioOptions) {
+                       recorderAudio: RecorderSelectionAudioOptions,
+                       clipboardOnly: Bool) {
         guard ScreenshotSupport.captureRouteIsAuthorized(selected: selected) else { return }
         switch outcome {
         case .captured(let capture):
             switch selected {
             case .screenshot:
-                ScreenshotService.shared.receiveUnifiedCapture(capture)
+                ScreenshotService.shared.receiveUnifiedCapture(capture, clipboardOnly: clipboardOnly)
             case .text:
                 ScreenTextService.shared.receiveUnifiedCapture(capture)
             case .recording, .color:

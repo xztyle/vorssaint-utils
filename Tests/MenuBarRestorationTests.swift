@@ -4,9 +4,11 @@ import Foundation
 
 enum MenuBarRestorationTests {
     static func run(_ suite: TestSuite) {
+        MenuBarBestEffortRestorationTests.run(suite)
         actualUndo(suite)
         currentMacRecovery(suite)
         geometry(suite)
+        protectedAnchors(suite)
         permutations(suite)
     }
 
@@ -54,8 +56,15 @@ enum MenuBarRestorationTests {
                      "stable x coordinates below the menu do not authorize pointer restoration")
         suite.expect(!MenuBarMoveGeometry.hasSettled(row, previous: dragging, rowY: 0), "a single returned frame is not settled")
         suite.expect(MenuBarMoveGeometry.hasSettled(row, previous: row, rowY: 0), "two equal frames on the original row confirm settlement")
-        suite.expect(MenuBarMoveGeometry.point(in: row, after: false) == CGPoint(x: 1631, y: 0),
-                     "native drags stay on the menu row's top edge rather than pulling the item downward")
+        let before = MenuBarMoveGeometry.point(in: row, after: false)
+        let after = MenuBarMoveGeometry.point(in: row, after: true)
+        suite.expect(row.contains(before) && row.contains(after) && before.x < row.midX && after.x > row.midX,
+                     "native drop points hit the requested side inside the anchor, away from shared window edges")
+        let press = MenuBarMoveGeometry.pressPoint(in: row)
+        suite.expect(row.contains(press) && press.y > row.minY && press.y < row.maxY,
+                     "the physical press lands inside the status item's clickable height")
+        suite.expect(MenuBarMoveGeometry.point(in: row, after: true).y == press.y,
+                     "horizontal reordering keeps the entire gesture inside the same row")
     }
 
     static func currentMacRecovery(_ suite: TestSuite) {
@@ -77,6 +86,26 @@ enum MenuBarRestorationTests {
                      "recovery never drags protected Control Center or Clock")
         suite.expect(MenuBarLayoutPolicy.isSatisfied(desired, items: apply(plan, to: items)),
                      "planned moves restore the recorded order without moving the new Aster icon")
+    }
+
+    static func protectedAnchors(_ suite: TestSuite) {
+        let siri = MenuBarOrganizerTests.item("Siri", x: 150, window: 1)
+        let control = MenuBarOrganizerTests.item("Control", x: 180, movable: false, window: 2)
+        let clock = MenuBarOrganizerTests.item("Clock", x: 210, movable: false, window: 3)
+        let items = [siri, control, clock]
+        let destination = MenuBarMoveGeometry.destination(before: clock, excluding: siri.id, items: items)
+        suite.expect(destination.windowID == control.windowID && destination.after,
+                     "restoring between protected neighbors places after Control Center instead of dropping inside Clock")
+        let beforeControl = MenuBarMoveGeometry.destination(before: control, excluding: siri.id, items: items)
+        suite.expect(beforeControl.windowID == control.windowID && !beforeControl.after,
+                     "an icon before Control Center still targets Control Center's leading side")
+        let neighbor = MenuBarOrganizerTests.item("Other", x: 205, window: 4)
+        let separated = MenuBarMoveGeometry.destination(before: clock, excluding: siri.id, items: items + [neighbor])
+        suite.expect(separated.windowID == clock.windowID && !separated.after,
+                     "an intervening movable item cannot be skipped to reach a protected anchor")
+        let single = MenuBarMoveGeometry.destination(before: clock, excluding: siri.id, items: [clock])
+        suite.expect(single.windowID == clock.windowID && !single.after,
+                     "missing neighbors never create a guessed destination")
     }
 
     static func permutations(_ suite: TestSuite) {

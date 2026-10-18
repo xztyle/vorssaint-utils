@@ -144,7 +144,8 @@ enum MenuBarOrganizerTests {
             ownerBundleIdentifier: "com.apple.controlcenter", title: "Item-1", frame: .zero, layer: 25, alpha: 1, isOnScreen: true)
         suite.expect(MenuBarOrganizerSupport.identities(for: [hosted], sources: [:])[3]?.state == .provisional,
                      "generic hosted window does not become a stable Control Center item")
-        suite.expect(!AppFeature.isSupported(.menuBarOrganizer, onOperatingSystemMajorVersion: 27), "27 fails closed")
+        suite.expect(AppFeature.isSupported(.menuBarOrganizer, onOperatingSystemMajorVersion: 27), "27 selects the independent native backend")
+        suite.expect(!AppFeature.isSupported(.menuBarOrganizer, onOperatingSystemMajorVersion: 28), "unknown future systems fail closed")
         suite.expect(AppFeature.isSupported(.menuBarOrganizer, onOperatingSystemMajorVersion: 26), "26 uses reviewed provider")
     }
 

@@ -147,7 +147,10 @@ bind_battery_spawn_constraint() {
     /usr/bin/plutil -remove SpawnConstraint "$plist" >/dev/null 2>&1 || true
     /usr/bin/plutil -insert SpawnConstraint -dictionary "$plist"
     /usr/bin/plutil -insert SpawnConstraint.cdhash -data "$encoded" "$plist"
-    version="$(helper_version "$battery" "$plist")"
+    # CMS signing bytes can change on every build while the executable code and
+    # launchd constraint stay identical. Track the stable code hash instead.
+    version="$(printf '%s\n%s\n' "$cdhash" "$(/usr/bin/shasum -a 256 "$plist" | /usr/bin/awk '{print $1}')" \
+        | /usr/bin/shasum -a 256 | /usr/bin/awk '{print $1}')"
     /usr/libexec/PlistBuddy -c "Set :AsterBatteryCareHelperVersion $version" "$bundle/Contents/Info.plist"
 }
 
@@ -299,6 +302,7 @@ if (( TEST )); then
         Sources/Vorssaint/Core/QuitProtectionSupport.swift
         Sources/Vorssaint/Core/QuitProtectionStrings.swift
         Sources/Vorssaint/Core/Defaults.swift
+        Sources/Vorssaint/Core/ScreenshotShortcutDefaults.swift
         Sources/Vorssaint/Core/DefaultsRegistration.swift
         Sources/Vorssaint/Core/NotchStrings.swift
         Sources/Vorssaint/Core/NotchTourStrings.swift
@@ -385,11 +389,27 @@ if (( TEST )); then
         Sources/Vorssaint/Core/BatteryCarePreferences.swift
         Sources/Vorssaint/Services/BatteryCare/BatteryReplyGate.swift
         Sources/Vorssaint/Services/BatteryCare/BatteryCareModels.swift
+        Sources/Vorssaint/Services/BatteryCare/BatteryNativePolicyArchive.swift
+        Sources/Vorssaint/Services/BatteryCare/BatteryNativeLease.swift
+        Sources/Vorssaint/Services/BatteryCare/BatteryNativeHardware.swift
+        Sources/Vorssaint/Services/BatteryCare/BatteryNativePolicyIO.swift
+        Sources/BatteryCareHelper/BatteryNativeIntegration.swift
         Sources/Vorssaint/Services/BatteryCare/BatteryPolicy.swift
         Sources/Vorssaint/Services/BatteryCare/BatterySchedule.swift
         Sources/Vorssaint/Services/BatteryCare/BatteryHardware.swift
         Sources/Vorssaint/Services/BatteryCare/BatteryRegistrationRepair.swift
         Sources/Vorssaint/Services/BatteryCare/BatterySensor.swift
+        Sources/Vorssaint/Services/BatteryCare/BatteryPowerSampler.swift
+        Sources/Vorssaint/Services/BatteryCare/BatteryPowerTelemetry.swift
+        Sources/Vorssaint/Services/BatteryCare/BatteryControlCompatibility.swift
+        Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarNativeLayoutDocument.swift
+        Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarBookmarkAccess.swift
+        Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarNativeLayoutRefresh.swift
+        Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarNativeVisibilityExpectation.swift
+        Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarNativePreferenceStore.swift
+        Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarNativeKeyPolicy.swift
+        Sources/Vorssaint/Core/MenuBarNativeStrings.swift
+        Sources/Vorssaint/Services/Metrics/BatteryTemperatureSampler.swift
         Sources/Vorssaint/Services/BatteryCare/BatteryCareXPC.swift
         Sources/Vorssaint/Services/SystemMonitor/SMCClient.swift
         Sources/Vorssaint/Core/FanControlStrings.swift
@@ -436,6 +456,8 @@ if (( TEST )); then
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarEventDeliveryState.swift
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarPressReleaseGuard.swift
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarMoveGeometry.swift
+        Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarVisibleDragTransport.swift
+        Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarItemMoveError.swift
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarAXDiagnosticTrace.swift
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarSourceMatchPolicy.swift
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarLayoutModels.swift
@@ -473,6 +495,8 @@ if (( TEST )); then
         Sources/Vorssaint/Services/DiskImageInstaller/DiskImageInstallerSupport.swift
         Sources/Vorssaint/UI/NonModalAlert.swift
         Sources/Vorssaint/Services/Clipboard/ClipboardHistorySupport.swift
+        Sources/Vorssaint/Services/Clipboard/ClipboardLibraryWindowScope.swift
+        Sources/Vorssaint/UI/PlainTextEditor.swift
         Sources/Vorssaint/Services/Clipboard/ClipboardFileDragPayload.swift
         Sources/Vorssaint/Services/Clipboard/ClipboardLibraryStore.swift
         Sources/Vorssaint/Services/Clipboard/ClipboardLibraryArchive.swift
@@ -565,8 +589,12 @@ if (( TEST )); then
         Sources/Vorssaint/Services/Switcher/SpaceHopSupport.swift
         Sources/Vorssaint/Services/Switcher/WindowUseOrder.swift
         Sources/Vorssaint/Services/Metrics/MetricFormat.swift
+        Sources/Vorssaint/Services/Metrics/PowerFlowModel.swift
+        Sources/Vorssaint/Services/Metrics/ChipPowerModel.swift
+        Sources/Vorssaint/Core/PowerFlowStrings.swift
         Sources/Vorssaint/Services/Metrics/VMStatisticsDecoder.swift
         Sources/Vorssaint/Services/KeepAwakeAutomationSupport.swift
+        Sources/Vorssaint/Services/KeepAwakeAssertions.swift
         Sources/Vorssaint/Services/SudoersSupport.swift
         Sources/Vorssaint/Services/Metrics/BatteryTimeSupport.swift
         Sources/Vorssaint/Services/BoundedProcessRunner.swift
@@ -599,12 +627,15 @@ if (( TEST )); then
         Sources/Vorssaint/Core/StorageInspectionStrings.swift
         Sources/Vorssaint/Core/StorageInspectionPreferences.swift
         Sources/Vorssaint/Services/StorageInspection/StorageInspectionModels.swift
+        Sources/Vorssaint/Services/StorageInspection/StorageMapSupport.swift
+        Sources/Vorssaint/Core/StorageMapStrings.swift
         Sources/Vorssaint/Services/StorageInspection/StorageLocalAccess.swift
         Sources/Vorssaint/Services/StorageInspection/StorageFolderScanner.swift
         Sources/Vorssaint/Services/StorageInspection/StorageDuplicateFinder.swift
         Sources/Vorssaint/Services/StorageInspection/StorageTrashService.swift
         Sources/Vorssaint/Services/StorageInspection/ClamAVSupport.swift
         Sources/Vorssaint/Services/StorageInspection/ClamAVBackend.swift
+        Sources/Vorssaint/Services/StorageInspection/ClamAVDefinitionUpdate.swift
         Sources/Vorssaint/Services/StorageInspection/ClamAVSnapshots.swift
         Sources/Vorssaint/Services/StorageInspection/SecurityInspector.swift
         Sources/Vorssaint/Services/Cleaner/CleanerSupport.swift
@@ -627,6 +658,7 @@ if (( TEST )); then
     ./build/metrics-tests "${TEST_ARGS[@]}" || test_status=$?
     if (( ${#TEST_ARGS} == 0 )); then
         ./Tests/PreferenceCleanupTests.sh || test_status=1
+        python3 Tests/InstallBundleTests.py || test_status=1
     fi
     discard_test_preferences || test_status=1
     exit $test_status
@@ -645,6 +677,8 @@ APP_OBJECT_DIR="build/objects/$EXECUTABLE"
 mkdir -p build "$APP_OBJECT_DIR"
 APP_OUTPUT_FILE_MAP="$APP_OBJECT_DIR/output-file-map.json"
 write_swift_output_file_map "$APP_OUTPUT_FILE_MAP" "$APP_OBJECT_DIR" "${APP_SOURCES[@]}"
+clang -fobjc-arc -fblocks -target "$TARGET" -isysroot "$SDK" \
+    -c Sources/MenuBarNativeShim/AsterMenuVisibility.m -o "$APP_OBJECT_DIR/menu-visibility.o"
 # Without -j the driver compiles one file at a time, and without batch mode
 # each file's compiler parses the whole module again: a clean release took a
 # quarter of an hour. Batches share that work and run on every core, and the
@@ -653,7 +687,8 @@ swiftc "${APP_OPTIMIZATION_FLAGS[@]}" -incremental -enable-batch-mode -j "$BUILD
     -output-file-map "$APP_OUTPUT_FILE_MAP" \
     -target "$TARGET" -sdk "$SDK" "${SDK_COMPAT_FLAGS[@]}" "${VM_STATISTICS_COMPAT_FLAGS[@]}" "${HID_EVENT_SYSTEM_FLAGS[@]}" \
     "${BUILD_VARIANT_FLAGS[@]}" \
-    "${APP_SOURCES[@]}" -o "build/$EXECUTABLE"
+    -import-objc-header Sources/MenuBarNativeShim/AsterMenuVisibility.h \
+    "${APP_SOURCES[@]}" "$APP_OBJECT_DIR/menu-visibility.o" -o "build/$EXECUTABLE"
 
 echo "▸ Compiling protected fan helper…"
 swiftc -O -target "$TARGET" -sdk "$SDK" "${SDK_COMPAT_FLAGS[@]}" "${BUILD_VARIANT_FLAGS[@]}" \
@@ -674,7 +709,15 @@ swiftc -O -target "$TARGET" -sdk "$SDK" "${SDK_COMPAT_FLAGS[@]}" "${BUILD_VARIAN
     Sources/Vorssaint/Services/BatteryCare/BatteryPolicy.swift \
     Sources/Vorssaint/Services/BatteryCare/BatterySchedule.swift \
     Sources/Vorssaint/Services/BatteryCare/BatteryHardware.swift \
+    Sources/Vorssaint/Services/BatteryCare/BatteryNativePolicyArchive.swift \
+    Sources/Vorssaint/Services/BatteryCare/BatteryNativeLease.swift \
+    Sources/Vorssaint/Services/BatteryCare/BatteryNativeHardware.swift \
+    Sources/Vorssaint/Services/BatteryCare/BatteryNativePolicyIO.swift \
+    Sources/Vorssaint/Services/BoundedProcessRunner.swift \
+    Sources/Vorssaint/Services/Metrics/BatteryTemperatureSampler.swift \
     Sources/Vorssaint/Services/BatteryCare/BatterySensor.swift \
+    Sources/Vorssaint/Services/BatteryCare/BatteryPowerSampler.swift \
+    Sources/Vorssaint/Services/BatteryCare/BatteryPowerTelemetry.swift \
     Sources/Vorssaint/Services/BatteryCare/BatteryCareXPC.swift \
     Sources/Vorssaint/Services/SystemMonitor/SMCClient.swift \
     Sources/Vorssaint/Services/FanControl/FanControlSupport.swift \
@@ -746,6 +789,7 @@ cp Resources/com.vorssaint.utils.fan-control.plist \
     "$STAGE/Contents/Library/LaunchDaemons/$FAN_HELPER_ID.plist"
 cp Resources/Info.plist "$STAGE/Contents/Info.plist"
 cp CHANGELOG.md "$STAGE/Contents/Resources/CHANGELOG.md"
+cp Resources/ThirdPartyNotices.txt "$STAGE/Contents/Resources/ThirdPartyNotices.txt"
 for lproj in Resources/*.lproj(N); do
     cp -R "$lproj" "$STAGE/Contents/Resources/"
 done
@@ -929,23 +973,7 @@ stop_process() {
     return 1
 }
 
-wait_for_install_metadata() {
-    local bundle="$1"
-    local missing
-    for _ in {1..50}; do
-        missing=0
-        while IFS= read -r file; do
-            if ! xattr -p com.apple.provenance "$file" >/dev/null 2>&1; then
-                missing=1
-                break
-            fi
-        done < <(find "$bundle/Contents" -type f ! -path "*/_CodeSignature/*")
-        if (( missing == 0 )); then
-            return 0
-        fi
-        sleep 0.1
-    done
-}
+source Tools/install-bundle.zsh
 
 # Installed development builds only need the copy in /Applications. Retaining
 # another app in each checkout pollutes application search with stale builds.
@@ -991,8 +1019,8 @@ if (( INSTALL )); then
         fi
     done
     INSTALL_DEST="/Applications/$APP_NAME.app"
-    rm -rf "$INSTALL_DEST"
-    ditto --noextattr --noqtn "$STAGE" "$INSTALL_DEST"
-    sign_installed_bundle "$INSTALL_DEST"
+    INSTALL_IDENTITY="$(developer_id_identity)"
+    [[ -n "$INSTALL_IDENTITY" ]] || INSTALL_IDENTITY="$LEGACY_IDENTITY"
+    python3 Tools/install-bundle.py "$STAGE" "$INSTALL_DEST" "$INSTALL_IDENTITY"
     echo "✓ Installed: $INSTALL_DEST"
 fi

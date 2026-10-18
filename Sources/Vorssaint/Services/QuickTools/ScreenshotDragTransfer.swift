@@ -283,11 +283,14 @@ struct ScreenshotPreviewDragSurface: NSViewRepresentable {
                              sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation { .copy }
         func draggingSession(_ session: NSDraggingSession, endedAt point: NSPoint,
                              operation: NSDragOperation) {
+            let transferred = started && !cancelled && !operation.isEmpty
+                && !NSEvent.modifierFlags.contains(.option)
             down = nil
             started = false
             if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
             escapeMonitor = nil
             dragging?(false)
+            if transferred { dismiss?() }
         }
     }
 }

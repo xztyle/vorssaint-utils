@@ -49,6 +49,8 @@ struct PlainTextEditor: NSViewRepresentable {
     /// Turns on AppKit's own find bar: the real Command-F, with its counter,
     /// its highlighting and Command-G, none of which is worth rewriting.
     var usesFindBar = false
+    /// Optional native cancellation for callers that edit a temporary draft.
+    var onCancel: (() -> Void)?
     /// Handed the text view once, for callers that need to reach it later.
     var onCreate: ((NSTextView) -> Void)?
 
@@ -58,6 +60,7 @@ struct PlainTextEditor: NSViewRepresentable {
          textColor: NSColor? = nil,
          textContainerInset: NSSize? = nil,
          usesFindBar: Bool = false,
+         onCancel: (() -> Void)? = nil,
          onCreate: ((NSTextView) -> Void)? = nil) {
         self._text = text
         self.fontSize = fontSize
@@ -65,6 +68,7 @@ struct PlainTextEditor: NSViewRepresentable {
         self.textColor = textColor
         self.textContainerInset = textContainerInset
         self.usesFindBar = usesFindBar
+        self.onCancel = onCancel
         self.onCreate = onCreate
     }
 
@@ -74,6 +78,16 @@ struct PlainTextEditor: NSViewRepresentable {
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
         guard let textView = scroll.documentView as? NSTextView else { return scroll }
+        configure(textView)
+        textView.string = text
+        // Delegate last: assigning .string posts a selection notification
+        // synchronously, and makeNSView runs inside SwiftUI's update pass.
+        textView.delegate = context.coordinator
+        onCreate?(textView)
+        return scroll
+    }
+
+    private func configure(_ textView: NSTextView) {
         textView.drawsBackground = false
         textView.font = .systemFont(ofSize: fontSize)
         textView.textContainer?.lineFragmentPadding = Self.lineFragmentPadding
@@ -92,22 +106,12 @@ struct PlainTextEditor: NSViewRepresentable {
             textView.usesFindBar = true
             textView.isIncrementalSearchingEnabled = true
         }
-        if let textColor {
-            textView.textColor = textColor
-        }
-        if let textContainerInset {
-            textView.textContainerInset = textContainerInset
-        }
-        textView.string = text
-        // Delegate last: assigning .string posts a selection notification
-        // synchronously, and makeNSView runs inside SwiftUI's update pass,
-        // where writing state is undefined behavior.
-        textView.delegate = context.coordinator
-        onCreate?(textView)
-        return scroll
+        if let textColor { textView.textColor = textColor }
+        if let textContainerInset { textView.textContainerInset = textContainerInset }
     }
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
+        context.coordinator.onCancel = onCancel
         guard let textView = nsView.documentView as? NSTextView else { return }
         // Size is a preference and can change under a view that is already up,
         // so it is applied before the text guard below rather than after it.
@@ -127,17 +131,26 @@ struct PlainTextEditor: NSViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text, selectedRange: selectedRange)
+        Coordinator(text: $text, selectedRange: selectedRange, onCancel: onCancel)
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         private let text: Binding<String>
         private let selectedRange: Binding<Range<Int>?>?
         var isApplyingExternalText = false
+        var onCancel: (() -> Void)?
 
-        init(text: Binding<String>, selectedRange: Binding<Range<Int>?>?) {
+        init(text: Binding<String>, selectedRange: Binding<Range<Int>?>?, onCancel: (() -> Void)? = nil) {
             self.text = text
+            self.onCancel = onCancel
             self.selectedRange = selectedRange
+        }
+
+        func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            guard commandSelector == #selector(NSResponder.cancelOperation(_:)),
+                  !textView.hasMarkedText(), let onCancel else { return false }
+            onCancel()
+            return true
         }
 
         func textDidChange(_ notification: Notification) {

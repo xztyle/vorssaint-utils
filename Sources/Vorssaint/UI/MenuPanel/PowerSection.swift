@@ -3,6 +3,14 @@
 
 import SwiftUI
 
+enum PowerFlowPresentation {
+    static func caption(_ flow: Double, l10n: L10n) -> String {
+        if flow > 0.5 { return l10n.s.powerCharging }
+        if flow < -0.5 { return l10n.s.powerOnBattery }
+        return FeatureStrings.batteryCare(l10n.language)[.holding]
+    }
+}
+
 /// The "Power" card: how much the Mac is drawing overall, from the adapter, and
 /// to/from the battery. Rows that the hardware cannot report are simply hidden;
 /// a Mac that reports nothing shows a short note instead.
@@ -30,6 +38,10 @@ struct PowerSection: View {
                      supportsEditing: true,
                      resetAction: resetPanelDefaults) { editing in
             VStack(alignment: .leading, spacing: 10) {
+                if pwrSystem || pwrAdapter || pwrBattery {
+                    PowerFlowView(reading: monitor.snapshot.power)
+                    Divider()
+                }
                 if blocks(editing: editing).isEmpty {
                     Text(l10n.s.powerUnavailable)
                         .font(.system(size: 10.5))
@@ -177,11 +189,11 @@ struct PowerSection: View {
             }
         case .battery:
             if pwrBattery, power?.hasBattery == true, let flow = power?.batteryWatts {
-                row(icon: flow >= 0 ? "battery.100.bolt" : "battery.50",
-                    color: flow >= 0 ? PanelMetricColor.green(for: colorScheme) : .secondary,
+                row(icon: flow > 0.5 ? "battery.100.bolt" : "battery.50",
+                    color: flow > 0.5 ? PanelMetricColor.green(for: colorScheme) : .secondary,
                     label: l10n.s.powerBattery,
                     value: MetricFormat.watts(abs(flow)),
-                    caption: flow >= 0 ? l10n.s.powerCharging : l10n.s.powerOnBattery,
+                    caption: PowerFlowPresentation.caption(flow, l10n: l10n),
                     visible: $pwrBattery, editing: editing)
             } else if editing && !pwrBattery {
                 PanelHiddenItemRow(title: l10n.s.powerBattery,
@@ -347,83 +359,6 @@ struct PowerSection: View {
                 .frame(minWidth: 44, alignment: .trailing)
             if editing {
                 PanelInlineHideButton(isVisible: visible)
-            }
-        }
-    }
-}
-
-private struct EnergyAppsBreakdown: View {
-    @ObservedObject private var l10n = L10n.shared
-    @ObservedObject private var monitor = SystemMonitor.shared
-    @AppStorage(DefaultsKey.monitorInterval) private var monitorInterval = 2
-    @State private var expanded = false
-    @State private var rows: [ProcessUsage] = []
-    @State private var loading = false
-    @State private var lastRefresh = Date.distantPast
-    @State private var requestID = UUID()
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Button {
-                expanded.toggle()
-                requestID = UUID()
-                if expanded {
-                    rows = ProcessUsageService.shared.cachedTop(.energy, limit: 15) ?? []
-                    refresh()
-                } else {
-                    rows = []
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 8, weight: .semibold))
-                        .rotationEffect(.degrees(expanded ? 90 : 0))
-                    Text(l10n.s.energyAppsTitle)
-                    Spacer()
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            if expanded {
-                if rows.isEmpty {
-                    Text(loading ? l10n.s.breakdownMeasuring : l10n.s.energyAppsIdle)
-                        .foregroundStyle(.tertiary)
-                } else {
-                    ForEach(rows) { row in
-                        ProcessUsageRow(row: row,
-                                        value: String(format: "%.1f%%", locale: MetricFormat.locale, row.value),
-                                        iconSize: 14, leadingPadding: 16)
-                    }
-                }
-            }
-        }
-        .font(.system(size: 10.5))
-        .foregroundStyle(.secondary)
-        .onReceive(monitor.$snapshot) { _ in
-            guard expanded, !loading,
-                  Date().timeIntervalSince(lastRefresh) >= Double(Defaults.sanitizedMonitorInterval(monitorInterval))
-            else { return }
-            refresh()
-        }
-        .onDisappear {
-            expanded = false
-            requestID = UUID()
-            rows = []
-            loading = false
-        }
-    }
-
-    private func refresh() {
-        lastRefresh = Date()
-        loading = true
-        let currentRequest = requestID
-        let interval = Double(Defaults.sanitizedMonitorInterval(monitorInterval))
-        DispatchQueue.global(qos: .utility).async {
-            let result = ProcessUsageService.shared.top(.energy, limit: 15, sampleInterval: interval)
-            DispatchQueue.main.async {
-                guard expanded, requestID == currentRequest else { return }
-                loading = false
-                if !result.isEmpty || rows.isEmpty { rows = result }
             }
         }
     }

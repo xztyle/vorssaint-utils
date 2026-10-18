@@ -156,6 +156,26 @@ struct MenuBarMovePlanStep: Equatable {
 }
 
 enum MenuBarLayoutPolicy {
+    static func unchangedTopology(before: [ManagedMenuBarItem], after: [ManagedMenuBarItem]) -> Bool {
+        topologyDifference(before: before, after: after) == nil
+    }
+
+    static func topologyDifference(before: [ManagedMenuBarItem], after: [ManagedMenuBarItem]) -> String? {
+        guard !before.isEmpty, before.count == after.count else { return "item count" }
+        let old = before.sorted { $0.frame.minX < $1.frame.minX }
+        let new = after.sorted { $0.frame.minX < $1.frame.minX }
+        for (original, current) in zip(old, new) {
+            if original.id != current.id { return "identity or ordering at window \(original.windowID)/\(current.windowID)" }
+            if original.windowID != current.windowID { return "replacement window" }
+            if original.section != current.section { return "section at window \(original.windowID): \(original.section.rawValue)/\(current.section.rawValue)" }
+            if original.identityState != current.identityState { return "identity confidence" }
+            if original.ownerPID != current.ownerPID || original.sourcePID != current.sourcePID { return "source process" }
+            if original.isMovable != current.isMovable || original.isProtected != current.isProtected { return "protection" }
+            if abs(original.frame.minY - current.frame.minY) > 1 { return "menu row" }
+        }
+        return nil
+    }
+
     static func preservesUnmovedItems(_ identity: MenuBarItemIdentity,
                                       before: [ManagedMenuBarItem], after: [ManagedMenuBarItem]) -> Bool {
         let original = MenuBarLayout.capture(before).entries.filter { $0.identity != identity }

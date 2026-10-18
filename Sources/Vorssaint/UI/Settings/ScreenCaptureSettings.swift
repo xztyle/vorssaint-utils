@@ -37,6 +37,10 @@ struct ScreenCaptureSettings: View {
                     }
                     ToolShortcutRows(tool: currentTool, keys: currentTool.dedicatedShortcut)
                         .id(currentTool)
+                    if currentTool == .screenshot {
+                        AreaClipboardShortcutRows()
+                        CaptureMenuShortcutRows()
+                    }
                     if AppFeature.screenshot.isAvailable || AppFeature.screenRecorder.isAvailable {
                         RecentCapturesShortcutRows()
                     }
@@ -97,6 +101,44 @@ struct ScreenCaptureSettings: View {
         }
         if !availableTools.contains(selectedTool), let first = availableTools.first {
             selectedTool = first
+        }
+    }
+}
+
+private struct AreaClipboardShortcutRows: View {
+    @ObservedObject private var l10n = L10n.shared
+    @ObservedObject private var service = ScreenCaptureService.shared
+    @AppStorage(DefaultsKey.screenshotAreaClipboardShortcutEnabled) private var enabled = false
+
+    var body: some View {
+        Toggle(ScreenshotShortcutLabels.areaToClipboard(l10n.language), isOn: $enabled)
+            .onChange(of: enabled) { _, _ in service.syncWithPreferences() }
+        ShortcutPreferenceRow(role: .screenshotAreaClipboard, isEnabled: enabled) {
+            service.syncWithPreferences()
+        }
+        if enabled, service.areaClipboardShortcutRegistrationFailed {
+            Text(l10n.s.shortcutUnavailable)
+                .font(.caption)
+                .foregroundStyle(.orange)
+        }
+    }
+}
+
+private struct CaptureMenuShortcutRows: View {
+    @ObservedObject private var l10n = L10n.shared
+    @ObservedObject private var service = ScreenCaptureService.shared
+    @AppStorage(DefaultsKey.screenshotCaptureMenuShortcutEnabled) private var enabled = false
+
+    var body: some View {
+        Toggle(FeatureStrings.screenshot(l10n.language).screenCaptureTitle, isOn: $enabled)
+            .onChange(of: enabled) { _, _ in service.syncWithPreferences() }
+        ShortcutPreferenceRow(role: .screenshotCaptureMenu, isEnabled: enabled) {
+            service.syncWithPreferences()
+        }
+        if enabled, service.captureMenuShortcutRegistrationFailed {
+            Text(l10n.s.shortcutUnavailable)
+                .font(.caption)
+                .foregroundStyle(.orange)
         }
     }
 }

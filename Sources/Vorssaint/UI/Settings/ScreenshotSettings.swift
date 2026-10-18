@@ -11,12 +11,14 @@ struct ScreenshotCaptureSettings: View {
     @ObservedObject private var sharing = ScreenshotShareService.shared
     @AppStorage(DefaultsKey.screenshotFullScreenShortcutEnabled)
     private var fullScreenShortcutEnabled = false
+    @AppStorage(DefaultsKey.screenshotFullScreenClipboardShortcutEnabled)
+    private var fullScreenClipboardShortcutEnabled = false
     @AppStorage(DefaultsKey.screenshotLastCaptureShortcutEnabled)
     private var lastCaptureShortcutEnabled = false
     @AppStorage(DefaultsKey.screenshotClipboardShortcutEnabled)
     private var clipboardShortcutEnabled = false
     @AppStorage(DefaultsKey.screenshotFreeze) private var freeze = true
-    @AppStorage(DefaultsKey.screenshotHideVorssaintWindows) private var hideVorssaintWindows = true
+    @AppStorage(DefaultsKey.screenshotHideVorssaintWindows) private var hideVorssaintWindows = false
     @AppStorage(DefaultsKey.screenshotSaveFolder) private var saveFolder = ""
     @AppStorage(DefaultsKey.screenshotSaveSubfolder) private var saveSubfolder = ""
     @AppStorage(DefaultsKey.screenshotFileNamePattern) private var fileNamePattern = ""
@@ -78,6 +80,21 @@ struct ScreenshotCaptureSettings: View {
                     ScreenshotService.shared.syncWithPreferences()
                 }
                 if fullScreenShortcutEnabled, service.fullScreenShortcutRegistrationFailed {
+                    Text(l10n.s.shortcutUnavailable)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+                Toggle(ScreenshotShortcutLabels.fullScreenToClipboard(l10n.language),
+                       isOn: $fullScreenClipboardShortcutEnabled)
+                    .onChange(of: fullScreenClipboardShortcutEnabled) { _, _ in
+                        ScreenshotService.shared.syncWithPreferences()
+                    }
+                ShortcutPreferenceRow(role: .screenshotFullScreenClipboard,
+                                      isEnabled: fullScreenClipboardShortcutEnabled) {
+                    ScreenshotService.shared.syncWithPreferences()
+                }
+                if fullScreenClipboardShortcutEnabled,
+                   service.fullScreenClipboardShortcutRegistrationFailed {
                     Text(l10n.s.shortcutUnavailable)
                         .font(.caption)
                         .foregroundStyle(.orange)

@@ -70,10 +70,7 @@ final class KeepAwakeManager: ObservableObject {
 
     var onSessionEnded: ((EndReason) -> Void)?
 
-    private var systemAssertion = IOPMAssertionID(0)
-    private var displayAssertion = IOPMAssertionID(0)
-    private var hasSystemAssertion = false
-    private var hasDisplayAssertion = false
+    private let powerAssertions = KeepAwakeAssertions()
     private var endTimer: Timer?
     private var batteryTimer: Timer?
     private var mouseJiggleTimer: Timer?
@@ -673,46 +670,10 @@ final class KeepAwakeManager: ObservableObject {
     // MARK: - IOKit assertions
 
     private func applyAssertions() {
-        if !hasSystemAssertion {
-            var id = IOPMAssertionID(0)
-            let ok = IOPMAssertionCreateWithName("PreventUserIdleSystemSleep" as CFString,
-                                                 IOPMAssertionLevel(kIOPMAssertionLevelOn),
-                                                 "Aster: keep the Mac awake" as CFString,
-                                                 &id)
-            if ok == kIOReturnSuccess {
-                systemAssertion = id
-                hasSystemAssertion = true
-            }
-        }
-        let allowDisplaySleep = UserDefaults.standard.bool(
-            forKey: DefaultsKey.keepAwakeAllowDisplaySleep
-        )
-        if allowDisplaySleep, hasDisplayAssertion {
-            IOPMAssertionRelease(displayAssertion)
-            hasDisplayAssertion = false
-        } else if !allowDisplaySleep, !hasDisplayAssertion {
-            var id = IOPMAssertionID(0)
-            let ok = IOPMAssertionCreateWithName("PreventUserIdleDisplaySleep" as CFString,
-                                                 IOPMAssertionLevel(kIOPMAssertionLevelOn),
-                                                 "Aster: keep the display on" as CFString,
-                                                 &id)
-            if ok == kIOReturnSuccess {
-                displayAssertion = id
-                hasDisplayAssertion = true
-            }
-        }
+        powerAssertions.apply(allowDisplaySleep: UserDefaults.standard.bool(forKey: DefaultsKey.keepAwakeAllowDisplaySleep))
     }
 
-    private func releaseAssertions() {
-        if hasSystemAssertion {
-            IOPMAssertionRelease(systemAssertion)
-            hasSystemAssertion = false
-        }
-        if hasDisplayAssertion {
-            IOPMAssertionRelease(displayAssertion)
-            hasDisplayAssertion = false
-        }
-    }
+    private func releaseAssertions() { powerAssertions.clear() }
 
     // MARK: - Closed lid (pmset disablesleep)
 
@@ -1130,6 +1091,7 @@ final class KeepAwakeManager: ObservableObject {
     }
 
     private func checkBattery() {
+        if isActive, !sessionPausedForScreenLock { applyAssertions() }
         guard isActive, batteryProtectionPercent() != nil else { return }
         deactivate(reason: .battery)
     }

@@ -12,10 +12,9 @@ struct ClipboardQuickPanelView: View {
     @FocusState private var collectionsFocused: Bool
     @State private var editingCollection: ClipboardCollection?
     @State private var showsCollectionEditor = false
-    @State private var fullPreviewEntry: ClipboardHistoryEntry?
     @State private var renameEntry: ClipboardHistoryEntry?
     @State private var renameDraft = ""
-    @State private var previewIsEditing = false
+    @State private var previewEditingEntryID: UUID?
     @State private var showsClearConfirmation = false
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var colorContrast
@@ -24,21 +23,9 @@ struct ClipboardQuickPanelView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(spacing: 0) {
-                toolbar
-                collections
-            }
-            .background(HUDBackdrop())
+            toolbar.background(HUDBackdrop())
             Divider()
-            HStack(spacing: 0) {
-                timeline
-                if history.quickPreviewPresented {
-                    Divider()
-                    ClipboardEntryPreviewSidebar(text: text, entry: history.selectedQuickEntry,
-                        isEditing: $previewIsEditing, onClose: { history.setQuickPreviewPresented(false) })
-                        .frame(width: 320)
-                }
-            }
+            timeline
             Divider()
             footer.background(HUDBackdrop())
         }
@@ -59,11 +46,15 @@ struct ClipboardQuickPanelView: View {
         .onChange(of: history.searchFocusRequest) { _, _ in searchFocused = true }
         .onChange(of: history.quickSelectionIsVisible) { _, selected in if selected { searchFocused = false } }
         .onChange(of: history.quickWindowPresentationID) { _, _ in searchFocused = true }
-        .onChange(of: history.editRequest) { _, _ in history.setQuickPreviewPresented(true); previewIsEditing = true }
+        .onChange(of: history.editRequest) { _, _ in
+            previewEditingEntryID = history.selectedQuickEntryID
+            history.setQuickPreviewPresented(true)
+        }
+        .onChange(of: history.quickPreviewPresented) { _, presented in
+            if !presented { previewEditingEntryID = nil }
+        }
         .onChange(of: history.renameRequest) { _, _ in beginRename(history.selectedQuickEntry) }
         .sheet(isPresented: $showsCollectionEditor) { collectionEditor }
-        .sheet(item: $fullPreviewEntry) { ClipboardLargePreview(entry: $0) }
-        .onChange(of: history.fullPreviewRequest) { _, _ in fullPreviewEntry = history.selectedQuickEntry }
         .sheet(item: $renameEntry) { entry in renameEditor(entry) }
         .confirmationDialog(text.clearRecent, isPresented: $showsClearConfirmation) {
             Button(text.clearRecent, role: .destructive) { history.clearRecent() }
@@ -71,45 +62,65 @@ struct ClipboardQuickPanelView: View {
     }
 
     private var toolbar: some View {
-        HStack(spacing: 12) {
-            Label(text.title, systemImage: "doc.on.clipboard.fill")
-                .font(.system(size: 15, weight: .semibold))
+        GeometryReader { geometry in
+            let sideWidth = min(240.0, geometry.size.width * 0.23)
+            HStack(spacing: 20) {
+                search.frame(width: sideWidth)
+                Spacer(minLength: 0)
+                collections.frame(maxWidth: 640)
+                Spacer(minLength: 0)
+                toolbarActions.frame(width: sideWidth, alignment: .trailing)
+            }.padding(.horizontal, 20).padding(.top, 14).padding(.bottom, 10)
+        }.frame(height: 56)
+    }
+
+    private var search: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
             TextField(text.search, text: $history.quickQuery)
-                .textFieldStyle(.roundedBorder).focused($searchFocused)
-                .frame(minWidth: 160, maxWidth: 360)
+                .textFieldStyle(.plain).focused($searchFocused)
                 .help("type:image  app:Safari  after:2026-01-01  before:2026-12-31")
-            Spacer(minLength: 0)
-            Button(history.pauseIsActive ? libraryText.resume : libraryText.pause) {
+        }.font(.system(size: 12)).padding(.horizontal, 12).frame(height: 32)
+            .background(Color.primary.opacity(0.06), in: Capsule())
+    }
+
+    private var toolbarActions: some View {
+        HStack(spacing: 16) {
+            Button {
                 history.pause(for: history.pauseIsActive ? nil : .infinity)
-            }.controlSize(.small)
+            } label: { Image(systemName: history.pauseIsActive ? "play.fill" : "pause.fill") }
+                .help(history.pauseIsActive ? libraryText.resume : libraryText.pause)
+                .accessibilityLabel(history.pauseIsActive ? libraryText.resume : libraryText.pause)
             Button { history.toggleQuickPreview() } label: {
-                Image(systemName: history.quickPreviewPresented ? "sidebar.right" : "eye")
+                Image(systemName: history.quickPreviewPresented ? "eye.slash" : "eye")
             }.help(text.previewLabel).accessibilityLabel(text.previewLabel)
+                .disabled(history.selectedQuickEntry == nil)
             Button { history.hideHistoryWindow() } label: { Image(systemName: "xmark") }
                 .help(l10n.s.menuClose).accessibilityLabel(l10n.s.menuClose)
         }
-        .buttonStyle(.borderless)
-        .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 12)
+        .buttonStyle(.borderless).foregroundStyle(.secondary)
     }
 
     private var collections: some View {
         HStack(spacing: 10) {
             collectionTab(text.recent, id: nil, color: .accentColor).focused($collectionsFocused)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(history.collections) { collection in
-                        collectionTab(collection.name, id: collection.id, color: ClipboardCardPalette.color(collection.color))
-                            .contextMenu { collectionActions(collection) }
-                            .onDrop(of: [ClipboardCardPalette.dragType], isTargeted: nil) { providers in
-                                receiveCollectionDrop(providers, collection: collection)
-                            }
+            if !history.collections.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(history.collections) { collection in
+                            collectionTab(collection.name, id: collection.id, color: ClipboardCardPalette.color(collection.color))
+                                .contextMenu { collectionActions(collection) }
+                                .onDrop(of: [ClipboardCardPalette.dragType], isTargeted: nil) { providers in
+                                    receiveCollectionDrop(providers, collection: collection)
+                                }
+                        }
                     }
                 }
             }
             Button { editingCollection = nil; showsCollectionEditor = true } label: {
-                Image(systemName: "plus.circle")
+                Image(systemName: "plus")
             }.buttonStyle(.borderless).help(libraryText.newCollection).accessibilityLabel(libraryText.newCollection)
-        }.padding(.horizontal, 20).padding(.bottom, 12)
+        }
     }
 
     private func collectionTab(_ title: String, id: UUID?, color: Color) -> some View {
@@ -141,6 +152,9 @@ struct ClipboardQuickPanelView: View {
                                     compact: geometry.size.height < 220,
                                     onSelect: { select(entry) }, onRename: { beginRename(entry) })
                                     .frame(width: geometry.size.height < 220 ? 210 : 246)
+                                    .background(ClipboardEntryPreviewPopover(entry: entry,
+                                        isPresented: history.quickPreviewPresented && history.selectedQuickEntryID == entry.id,
+                                        isEditing: previewEditing(entry.id)))
                                     .id(entry.id)
                                     .background(GeometryReader { card in
                                         Color.clear.preference(key: ClipboardCardFrames.self,
@@ -162,13 +176,21 @@ struct ClipboardQuickPanelView: View {
         }
     }
 
+    private func previewEditing(_ id: UUID) -> Binding<Bool> {
+        Binding(get: { previewEditingEntryID == id }, set: { editing in
+            if editing { previewEditingEntryID = id }
+            else if previewEditingEntryID == id { previewEditingEntryID = nil }
+        })
+    }
+
     private var footer: some View {
         HStack(spacing: 12) {
             if let error = history.storageError {
                 Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange).lineLimit(2)
             } else {
-                Label(history.isSaving ? libraryText.saving : libraryText.saved,
-                      systemImage: history.isSaving ? "arrow.triangle.2.circlepath" : "checkmark.shield")
+                Image(systemName: history.isSaving ? "arrow.triangle.2.circlepath" : "checkmark.shield")
+                    .help(history.isSaving ? libraryText.saving : libraryText.saved)
+                    .accessibilityLabel(history.isSaving ? libraryText.saving : libraryText.saved)
             }
             Text("\(history.quickResults.count)").monospacedDigit()
             Spacer(minLength: 4)
@@ -181,7 +203,7 @@ struct ClipboardQuickPanelView: View {
             Button { showsClearConfirmation = true } label: { Image(systemName: "trash") }
                 .help(text.clearRecent).accessibilityLabel(text.clearRecent)
         }.font(.system(size: 10.5)).foregroundStyle(.secondary)
-            .buttonStyle(.borderless).padding(.horizontal, 20).padding(.vertical, 10)
+            .buttonStyle(.borderless).padding(.horizontal, 20).padding(.vertical, 6)
     }
 
     private func select(_ entry: ClipboardHistoryEntry) {

@@ -469,7 +469,7 @@ final class ScreenshotQuickPreviewController {
 
     private func scheduleAutoDismiss() {
         guard !closed, !pointerInside, !systemSharing, !model.sharing, !model.deletingShare,
-              !dragging, !editing, autoDismissDuration > 0 else { return }
+              !dragging, !swiping, !editing, autoDismissDuration > 0 else { return }
         dismissWork?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.close() }
         dismissWork = work
@@ -478,59 +478,54 @@ final class ScreenshotQuickPreviewController {
 
     private func installKeyMonitor(for panel: NSPanel) {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak panel] event in
-            guard let self, !self.closed, let panel, panel.isVisible, event.window === panel,
-                  !self.shownInNotch || NotchService.shared.isCaptureVisible(id: self.presentationID),
-                  panel.attachedSheet == nil, !(panel.firstResponder is NSText),
-                  !ShortcutCapture.isCapturing else { return event }
-            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-            let key = Int(event.keyCode)
-            if flags.intersection([.command, .option, .shift, .control]) == .command {
-                let text = event.charactersIgnoringModifiers?.folding(
-                    options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
-                let letter = text?.count == 1 ? text?.first : nil
-                let isLatinLetter = letter.map { $0.isASCII && $0.isLetter } ?? false
-                if isLatinLetter ? letter == "w" : key == kVK_ANSI_W {
-                    self.close()
-                    return nil
-                }
-            }
-            if flags.contains(.command) {
-                switch key {
-                case kVK_ANSI_E:
-                    self.perform(.edit)
-                    return nil
-                case kVK_ANSI_C:
-                    self.perform(.copy)
-                    return nil
-                case kVK_ANSI_S:
-                    self.perform(.save)
-                    return nil
-                case kVK_Delete, kVK_ForwardDelete:
-                    self.perform(.discard)
-                    return nil
-                default:
-                    return event
-                }
-            }
-            guard flags.isDisjoint(with: [.command, .control, .option]) else { return event }
-            switch key {
-            case kVK_Return, kVK_ANSI_KeypadEnter, kVK_ANSI_E:
-                self.perform(.edit)
-                return nil
-            case kVK_Delete, kVK_ForwardDelete:
-                self.perform(.discard)
-                return nil
-            case kVK_Escape:
-                // Escape only dismisses. Before the after-capture actions it
-                // was equivalent to discard; now a discard can delete a file
-                // the HUD just announced as saved, and "make this popup go
-                // away" must never do that. Deleting stays on Trash and ⌫.
-                self.close()
-                return nil
-            default:
-                return event
-            }
+            guard let self, let panel, self.ownsPreviewKey(event, panel: panel) else { return event }
+            return self.handlePreviewKey(event) ? nil : event
         }
+    }
+
+    private func ownsPreviewKey(_ event: NSEvent, panel: NSPanel) -> Bool {
+        // Escape belongs to AppKit's drag cancellation or the swipe handler
+        // while a gesture is active. It must not also dismiss the source card.
+        !closed && !dragging && !swiping && panel.isVisible && event.window === panel
+            && (!shownInNotch || NotchService.shared.isCaptureVisible(id: presentationID))
+            && panel.attachedSheet == nil && !(panel.firstResponder is NSText)
+            && !ShortcutCapture.isCapturing
+    }
+
+    private func handlePreviewKey(_ event: NSEvent) -> Bool {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let key = Int(event.keyCode)
+        if isCloseCommand(event, flags: flags) { close(); return true }
+        if flags.contains(.command) { return handlePreviewCommand(key) }
+        guard flags.isDisjoint(with: [.command, .control, .option]) else { return false }
+        switch key {
+        case kVK_Return, kVK_ANSI_KeypadEnter, kVK_ANSI_E: perform(.edit)
+        case kVK_Delete, kVK_ForwardDelete: perform(.discard)
+        // Closing a preview does not delete a file saved by an earlier action.
+        case kVK_Escape: close()
+        default: return false
+        }
+        return true
+    }
+
+    private func handlePreviewCommand(_ key: Int) -> Bool {
+        switch key {
+        case kVK_ANSI_E: perform(.edit)
+        case kVK_ANSI_C: perform(.copy)
+        case kVK_ANSI_S: perform(.save)
+        case kVK_Delete, kVK_ForwardDelete: perform(.discard)
+        default: return false
+        }
+        return true
+    }
+
+    private func isCloseCommand(_ event: NSEvent, flags: NSEvent.ModifierFlags) -> Bool {
+        guard flags.intersection([.command, .option, .shift, .control]) == .command else { return false }
+        let text = event.charactersIgnoringModifiers?.folding(
+            options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
+        let letter = text?.count == 1 ? text?.first : nil
+        let isLatinLetter = letter.map { $0.isASCII && $0.isLetter } ?? false
+        return isLatinLetter ? letter == "w" : Int(event.keyCode) == kVK_ANSI_W
     }
 }
 private final class ScreenshotQuickPreviewPanel: OverlayPanel {

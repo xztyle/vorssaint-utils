@@ -13,9 +13,25 @@ extension SMCClient: BatteryKeyTransport {}
 
 enum BatteryHardwareError: Error { case unavailable, shape, mismatch, conflict }
 
+protocol BatteryChargeHardware {
+    var expected: BatteryCommand? { get }
+    var backendName: String { get }
+    func prepare(upper: Int, target: Int)
+    func needsApply(_ command: BatteryCommand) -> Bool
+    func readState() throws -> BatteryCommand
+    func verifyOwnership() throws
+    func apply(_ command: BatteryCommand) throws
+}
+
+extension BatteryChargeHardware {
+    var backendName: String { "legacy-smc" }
+    func prepare(upper: Int, target: Int) {}
+    func needsApply(_ command: BatteryCommand) -> Bool { false }
+}
+
 /// Only these two documented-by-observation shapes are eligible on this backend.
 /// Eligibility is not power-flow qualification; that runs explicitly in the daemon.
-final class BatteryHardware {
+final class BatteryHardware: BatteryChargeHardware {
     private let transport: BatteryKeyTransport
     private let charging: SMCClient.Key
     private let adapter: SMCClient.Key
@@ -40,7 +56,7 @@ final class BatteryHardware {
         let charge = try transport.checkedRead(charging)
         let ac = try transport.checkedRead(adapter)
         guard [Self.chargeBytes(false), Self.chargeBytes(true)].contains(charge),
-              ac == [0] || ac == [8], !(ac == [8] && charge == Self.chargeBytes(true)) else {
+              ac == [0] || ac == [8], !(ac == [8] && charge == Self.chargeBytes(false)) else {
             throw BatteryHardwareError.conflict
         }
         if ac == [8] { return .discharge }
@@ -56,10 +72,10 @@ final class BatteryHardware {
     }
 
     func apply(_ command: BatteryCommand) throws {
-        // Never cut AC and inhibit charging together. Restore AC before charge
-        // changes, and clear inhibit before adapter cut. Verify every step.
+        // Inhibit charging before cutting AC so forced discharge cannot start
+        // with a charging path open. Reconnect AC before changing the limit.
         if command == .discharge {
-            try write(Self.chargeBytes(false), key: charging)
+            try write(Self.chargeBytes(true), key: charging)
             try write([8], key: adapter)
         } else {
             try write([0], key: adapter)

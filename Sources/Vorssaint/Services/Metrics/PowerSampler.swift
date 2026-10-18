@@ -21,6 +21,8 @@ struct PowerReading {
     var isCharging = false
     var externalConnected = false
     var hasBattery = false
+    var components: [PowerComponentReading] = []
+    var chip = ChipPowerReading()
 
     var isEmpty: Bool {
         systemWatts == nil && adapterWatts == nil && adapterMaxWatts == nil
@@ -29,8 +31,8 @@ struct PowerReading {
 }
 
 /// Reads power without any special permission. Total system power and adapter
-/// input come from the SMC (the same sensors Activity Monitor's energy tab is
-/// built on); battery flow and the charger's rating come from AppleSmartBattery.
+/// input and live battery flow come from the SMC. AppleSmartBattery supplies
+/// the rating and a battery-flow fallback. Chip counters measure interval energy.
 /// Anything the hardware does not expose stays nil.
 final class PowerSampler {
     /// Internal-battery presence is immutable for the lifetime of a Mac boot.
@@ -44,9 +46,13 @@ final class PowerSampler {
     }()
 
     private let smc: SMCClient?
+    private let batteryPower: BatteryPowerSampler
+    private let batteryTemperature: BatteryTemperatureSampler
+    private let chip = ChipPowerSampler()
     private var systemKey: SMCClient.Key?
     private var adapterKey: SMCClient.Key?
     private var resolvedKeys = false
+    private var componentKeys: [PowerComponent: SMCClient.Key] = [:]
     private var batteryService: io_service_t = 0
 
     /// `PSTR` = System Total Power. `PDTR` = DC-In (adapter) Total Power.
@@ -56,6 +62,8 @@ final class PowerSampler {
 
     init(smc: SMCClient?) {
         self.smc = smc
+        batteryPower = BatteryPowerSampler(smc: smc)
+        batteryTemperature = BatteryTemperatureSampler(smc: smc)
     }
 
     deinit {
@@ -66,72 +74,79 @@ final class PowerSampler {
 
     func sample() -> PowerReading {
         var reading = PowerReading()
-
-        if let smc {
-            if !resolvedKeys {
-                resolvedKeys = true
-                systemKey = smc.key(named: Self.systemPowerKey)
-                adapterKey = smc.key(named: Self.adapterPowerKey)
-            }
-            reading.systemWatts = plausibleWatts(systemKey)
-            reading.adapterWatts = plausibleWatts(adapterKey)
-        }
-
+        reading.chip = chip.sample()
+        samplePowerSensors(into: &reading)
         if let props = batteryProperties() {
-            let battery = BatterySensor.decode(props, at: reading.sampledAt)
-            reading.batteryTemperature = battery.temperature
-            reading.hasBattery = true
-            reading.externalConnected = (props["ExternalConnected"] as? Bool) ?? false
-            reading.isCharging = (props["IsCharging"] as? Bool) ?? false
-            reading.timeRemainingSeconds = BatteryTimeSupport.remainingSeconds(
-                timeToEmptyMinutes: timeToEmptyMinutes(),
-                externalConnected: reading.externalConnected,
-                isCharging: reading.isCharging)
-
-            reading.batteryWatts = battery.watts
-
-            if let adapter = props["AdapterDetails"] as? [String: Any],
-               let rated = adapter["Watts"] as? Int, rated > 0 {
-                reading.adapterMaxWatts = Double(rated)
-            }
-
-            if let capacity = props["CurrentCapacity"] as? Int,
-               let maxCapacity = props["MaxCapacity"] as? Int, maxCapacity > 0 {
-                reading.chargePercent = Int((Double(capacity) / Double(maxCapacity) * 100).rounded())
-            }
-            if let cycles = props["CycleCount"] as? Int { reading.cycleCount = cycles }
-            if let design = batteryInt("DesignCapacity", in: props), design > 0 {
-                // Fallback estimate from IORegistry: a full-charge capacity over
-                // design. NominalChargeCapacity is the smoothed value (closest of
-                // the raw fields); fall back to AppleRawMaxCapacity when absent.
-                let fullCharge = batteryInt("NominalChargeCapacity", in: props)
-                    ?? batteryInt("FullChargeCapacity", in: props)
-                    ?? batteryInt("AppleRawMaxCapacity", in: props)
-                if let fullCharge, fullCharge > 0 {
-                    reading.healthPercent = min(100, Double(fullCharge) / Double(design) * 100)
-                }
-            }
-            // Prefer the exact "Maximum Capacity" macOS shows in System Information
-            // (a smoothed value no raw ratio reproduces). Cached + off the hot path;
-            // the ratio above stands in until the first reading lands or when macOS
-            // doesn't expose the field.
-            MaxCapacityProbe.shared.refreshIfStale()
-            if let exact = MaxCapacityProbe.shared.percent {
-                reading.healthPercent = Double(exact)
-            }
+            sampleBattery(props, into: &reading)
         }
-
         reading.systemWatts = MetricFormat.systemPowerWatts(
             measured: reading.systemWatts,
             batteryWatts: reading.batteryWatts,
             externalConnected: reading.externalConnected)
-
         return reading
+    }
+
+    private func samplePowerSensors(into reading: inout PowerReading) {
+        guard let smc else { return }
+        if !resolvedKeys {
+            resolvedKeys = true
+            systemKey = smc.key(named: Self.systemPowerKey)
+            adapterKey = smc.key(named: Self.adapterPowerKey)
+            for component in PowerComponent.allCases {
+                componentKeys[component] = component.keys.lazy.compactMap { smc.key(named: $0) }.first
+            }
+        }
+        reading.systemWatts = plausibleWatts(systemKey)
+        reading.adapterWatts = plausibleWatts(adapterKey)
+        reading.components = sampleComponents(smc)
+    }
+
+    private func sampleBattery(_ props: [String: Any], into reading: inout PowerReading) {
+        let battery = BatterySensor.decode(props, at: reading.sampledAt, liveWatts: batteryPower.sample())
+        reading.batteryTemperature = battery.temperature ?? batteryTemperature.sample()
+        reading.hasBattery = true
+        reading.externalConnected = (props["ExternalConnected"] as? Bool) ?? false
+        reading.isCharging = battery.charging ?? false
+        reading.timeRemainingSeconds = BatteryTimeSupport.remainingSeconds(
+            timeToEmptyMinutes: timeToEmptyMinutes(),
+            externalConnected: reading.externalConnected,
+            isCharging: reading.isCharging)
+        reading.batteryWatts = battery.watts
+        if let adapter = props["AdapterDetails"] as? [String: Any],
+           let rated = adapter["Watts"] as? Int, rated > 0 {
+            reading.adapterMaxWatts = Double(rated)
+        }
+        if let capacity = props["CurrentCapacity"] as? Int,
+           let maxCapacity = props["MaxCapacity"] as? Int, maxCapacity > 0 {
+            reading.chargePercent = Int((Double(capacity) / Double(maxCapacity) * 100).rounded())
+        }
+        reading.cycleCount = props["CycleCount"] as? Int
+        reading.healthPercent = batteryHealth(props)
+    }
+
+    private func batteryHealth(_ props: [String: Any]) -> Double? {
+        // The cached system value matches macOS's Maximum Capacity display.
+        MaxCapacityProbe.shared.refreshIfStale()
+        if let exact = MaxCapacityProbe.shared.percent { return Double(exact) }
+        guard let design = batteryInt("DesignCapacity", in: props), design > 0 else { return nil }
+        let fullCharge = batteryInt("NominalChargeCapacity", in: props)
+            ?? batteryInt("FullChargeCapacity", in: props)
+            ?? batteryInt("AppleRawMaxCapacity", in: props)
+        guard let fullCharge, fullCharge > 0 else { return nil }
+        return min(100, Double(fullCharge) / Double(design) * 100)
     }
 
     private func plausibleWatts(_ key: SMCClient.Key?) -> Double? {
         guard let key, let smc, let watts = smc.readValue(key), watts > 0, watts < 1000 else { return nil }
         return watts
+    }
+
+    private func sampleComponents(_ smc: SMCClient) -> [PowerComponentReading] {
+        PowerComponent.allCases.compactMap { component in
+            guard let key = componentKeys[component], let value = smc.readValue(key),
+                  value.isFinite, value >= 0, value < 1000 else { return nil }
+            return PowerComponentReading(component: component, watts: value)
+        }
     }
 
     private func batteryProperties() -> [String: Any]? {

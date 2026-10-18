@@ -8,7 +8,8 @@ import ServiceManagement
 /// bundle. Run from the installed bundle so SMAppService sees the correct app.
 enum Uninstaller {
     static func runAndExit() -> Never {
-        if let baseline = UserDefaults.standard.data(forKey: "menuBarOrganizerBaseline"), !baseline.isEmpty {
+        let layoutKeys = [DefaultsKey.menuBarOrganizerBaseline, DefaultsKey.menuBarNativeBaseline, DefaultsKey.menuBarNativeTransaction]
+        if layoutKeys.contains(where: { UserDefaults.standard.data(forKey: $0)?.isEmpty == false }) {
             print("UNINSTALL: restore the original menu layout in Aster before removal")
             exit(EXIT_FAILURE)
         }

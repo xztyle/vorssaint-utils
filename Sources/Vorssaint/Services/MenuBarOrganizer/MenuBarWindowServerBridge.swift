@@ -86,7 +86,8 @@ final class MenuBarWindowServerBridge: @unchecked Sendable {
 
 
     func menuBarWindowIDs() -> [CGWindowID]? {
-        guard AppFeature.menuBarOrganizer.isSupportedOnCurrentSystem else { return nil }
+        guard AppFeature.menuBarOrganizer.isSupportedOnCurrentSystem,
+              ProcessInfo.processInfo.operatingSystemVersion.majorVersion < 27 else { return nil }
         return Self.menuBarWindowIDs()
     }
     func frame(for id: CGWindowID) -> CGRect? { Self.frame(of: id) }

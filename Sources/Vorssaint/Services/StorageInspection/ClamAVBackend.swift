@@ -42,6 +42,20 @@ final class ClamAVBackend {
 
     func update(_ cancellation: BoundedProcessCancellation) throws -> String {
         try prepareDirectory()
+        let stagingRoot = root.appendingPathComponent("Update-" + UUID().uuidString, isDirectory: true)
+        guard PrivateFileStore.createDirectory(at: stagingRoot, container: root) else { throw StorageInspectionFailure.failed }
+        defer { try? FileManager.default.removeItem(at: stagingRoot) }
+        let staging = ClamAVBackend(tools: tools, root: stagingRoot, run: run)
+        try staging.prepareDirectory()
+        try staging.seedVerifiedDefinitions(from: database, cancellation: cancellation)
+        let detail = try staging.download(cancellation)
+        try staging.verify(cancellation)
+        if cancellation.isCancelled { throw StorageInspectionFailure.cancelled }
+        try publishDefinitions(from: staging.database)
+        return detail
+    }
+
+    private func download(_ cancellation: BoundedProcessCancellation) throws -> String {
         guard !database.path.contains("\n"), !database.path.contains("\"") else { throw StorageInspectionFailure.excluded }
         let config = root.appendingPathComponent("freshclam.conf")
         let text = "DatabaseDirectory \"\(database.path)\"\nDatabaseMirror database.clamav.net\nTestDatabases yes\nScriptedUpdates no\n"
@@ -49,7 +63,6 @@ final class ClamAVBackend {
         let result = run(tools.updater, ["--config-file=" + config.path, "--cvdcertsdir=" + tools.certificates], 600, cancellation)
         let detail = String(decoding: result.output, as: UTF8.self)
         guard result.status == 0, !result.timedOut, !cancellation.isCancelled else { throw ClamAVBackendError.update(detail) }
-        try verify(cancellation)
         return detail
     }
 

@@ -49,11 +49,11 @@ struct NotchScratchpadView: View {
                         PlainTextEditor(text: $pad.text, fontSize: textSize,
                                         textColor: .white,
                                         textContainerInset: Self.editorInset,
-                                        usesFindBar: true) { view in
+                                        usesFindBar: true, onCreate: { view in
                             view.insertionPointColor = .white
                             editor.view = view
                             DispatchQueue.main.async { focusEditor() }
-                        }
+                        })
                         .opacity(pad.isPreviewing ? 0 : 1)
                         .allowsHitTesting(!pad.isPreviewing)
                         .accessibilityHidden(pad.isPreviewing)
