@@ -6,6 +6,27 @@ file and visibility backend; it never calls the legacy WindowServer move APIs.
 macOS 28 and later remain unsupported. Live ordering, hiding and restoration
 on the owner's Mac16,5 running macOS 27.0.1 are not yet accepted.
 
+## macOS 27 findings (2026-10-18, Mac16,5, macOS 27.0.1)
+
+Checked live on the owner's Mac:
+
+- **Reorder works only by a visible Command-drag.** MenuBarAgent keeps the
+  order in memory and ignores edits to `com.apple.MenuBar.plist`. Aster now
+  drags from fresh Accessibility frames, verifies by icon order, and retries
+  up to three times. `Aster --menu-bar-move SOURCE TARGET` exercises it.
+- **Siri stays between Control Center and the clock.** macOS rejects dragging
+  it further left.
+- **A wide divider item does nothing.** A 10,000-point status item placed
+  mid-bar left every icon visible, so Bartender's divider hiding is unavailable.
+- **`MBAssessmentModeAssertion` hides by bundle, with side effects.** Even with
+  every running app allowed, it also hides iStat Menus, Setapp, Now Playing and
+  the system overflow chevron. Settings warn about this.
+- **Accessibility keeps listing hidden icons at stale frames.** Hiding is
+  verified by the icons that must stay visible, never by the hidden ones
+  disappearing.
+- **The SMC limiter keys `bfF0`, `bfD0`, `bfE0` need private Apple
+  entitlements.** Even root reads fail with `kIOReturnNotPrivileged`.
+
 ## Behavior
 
 - Visible, hidden and always-hidden sections, with drag arrangement and undo.
