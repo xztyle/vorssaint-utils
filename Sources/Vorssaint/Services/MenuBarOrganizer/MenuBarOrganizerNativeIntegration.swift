@@ -46,7 +46,7 @@ extension MenuBarOrganizerService {
 
     func applyNativeVisibility() {
         nativeBackend.applyVisibility(hiddenShown: hiddenSectionShown, alwaysShown: alwaysHiddenSectionShown,
-            editing: editingCount > 0, items: items) { [weak self] in
+            items: items) { [weak self] in
                 guard let self else { return }
                 hiddenSectionShown = true; alwaysHiddenSectionShown = true
                 automationPaused = true; operationMessage = text.errorVerification

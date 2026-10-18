@@ -66,9 +66,8 @@ final class MenuBarNativeBackend {
         assignments[identity] = section
     }
 
-    func applyVisibility(hiddenShown: Bool, alwaysShown: Bool, editing: Bool,
+    func applyVisibility(hiddenShown: Bool, alwaysShown: Bool,
                          items: [ManagedMenuBarItem], failure: @escaping () -> Void) {
-        guard !editing else { visibility.reset(); return }
         let hidden = Set(items.filter {
             $0.section == .hidden && !hiddenShown || $0.section == .alwaysHidden && !alwaysShown
         }.map(\.id))

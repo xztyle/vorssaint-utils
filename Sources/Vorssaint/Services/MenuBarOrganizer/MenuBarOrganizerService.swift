@@ -199,7 +199,11 @@ final class MenuBarOrganizerService: ObservableObject {
         return snapshot
     }
 
+    /// Editing reveals every icon so dividers can be dragged. macOS 27 has no
+    /// dividers, its lists already show every icon, and a move lifts hiding
+    /// itself, so editing there is a no-op and can never leave the bar stuck.
     func beginEditing() {
+        guard !usesNativeBackend else { return }
         editingCount += 1
         guard editingCount == 1, entryAllowed else { return }
         preEditingState = (hiddenSectionShown, alwaysHiddenSectionShown)
@@ -207,6 +211,7 @@ final class MenuBarOrganizerService: ObservableObject {
     }
 
     func endEditing() {
+        guard !usesNativeBackend else { return }
         editingCount = max(0, editingCount - 1)
         guard editingCount == 0 else { return }
         if let previous = preEditingState {
