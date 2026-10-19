@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Vorssaint
 
-import Foundation
+import AppKit
 
 /// How tightly the menu bar metric blocks pack together. The standard reserve
 /// keeps every number rock-steady by sizing blocks for their largest possible
@@ -199,6 +199,14 @@ enum MenuBarSpacingSupport {
     }
 
     /// The glue string drawn between two metric blocks.
+    /// Width of a separate stat item: its drawing plus a 3-point margin per
+    /// side, rounded up to a 4-point step so small value changes do not
+    /// reflow the whole bar. An empty drawing keeps macOS's automatic length.
+    static func metricItemLength(titleWidth: CGFloat) -> CGFloat {
+        guard titleWidth > 0, titleWidth.isFinite else { return NSStatusItem.variableLength }
+        return ceil((titleWidth + 6) / 4) * 4
+    }
+
     static func blockGlue(readableStyle: Bool, spacing: MenuBarMetricSpacing) -> String {
         switch spacing {
         case .standard: return readableStyle ? "  " : " "

@@ -1910,6 +1910,12 @@ enum SwitcherModelFeatureTests {
         suite.expectClose(customBarRGB.blue, 32.0 / 255.0, "menu bar color parses blue")
         suite.expect(MenuBarUsageBarSupport.hex(red: 1, green: 0.5, blue: 0) == "#FF8000",
                "menu bar color picker writes stable hex values")
+        suite.expect(MenuBarSpacingSupport.metricItemLength(titleWidth: 19.2) == 28,
+                     "a separate stat item hugs its drawing with a 3-point margin per side")
+        suite.expect(MenuBarSpacingSupport.metricItemLength(titleWidth: 20.5) == 28,
+                     "small value changes keep the same 4-point width step")
+        suite.expect(MenuBarSpacingSupport.metricItemLength(titleWidth: 0) == NSStatusItem.variableLength,
+                     "an empty stat drawing keeps macOS's automatic length")
         suite.expect(MenuBarSpacingSupport.digitMatchedReserve(for: "14%") == "88%",
                "compact spacing reserves the current digit count for percentages")
         suite.expect(MenuBarSpacingSupport.digitMatchedReserve(for: "999°") == "888°",

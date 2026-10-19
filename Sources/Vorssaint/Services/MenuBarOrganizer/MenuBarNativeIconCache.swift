@@ -15,9 +15,11 @@ final class MenuBarNativeIconCache: ObservableObject {
     static let shared = MenuBarNativeIconCache()
     @Published private(set) var images: [MenuBarItemIdentity: NSImage] = [:]
     private var saved: [MenuBarItemIdentity: NSImage] = [:] // read during view updates; not published
-    private var persisted: Set<MenuBarItemIdentity> = []
+    private var persisted: [MenuBarItemIdentity: Date] = [:]
     private var lastCapture = Date.distantPast
     private var capturing = false
+    /// Frames from the previous capture call; only settled icons are cut.
+    private var lastFrames: [MenuBarItemIdentity: CGRect] = [:]
     private var liveTimer: Timer?
     private var liveItems: () -> (items: [ManagedMenuBarItem], hidden: Set<String>) = { ([], []) }
 
@@ -38,7 +40,10 @@ final class MenuBarNativeIconCache: ObservableObject {
     /// Before the first hiding pass every icon is drawn, including apps that
     /// any pass hides as a side effect (iStat Menus, Setapp); picture them now.
     func captureBeforeHiding(_ items: [ManagedMenuBarItem]) async {
-        await snapshot(items, hidden: [])
+        lastFrames = Dictionary(items.map { ($0.id, $0.frame) }, uniquingKeysWith: { first, _ in first })
+        try? await Task.sleep(for: .seconds(1)) // let launch-time reflow settle
+        let fresh = await MenuBarNativeAXProvider.snapshot()
+        await snapshot(fresh.enumerationSucceeded ? fresh.items : items, hidden: [])
     }
 
     /// Live pictures while the editor is on screen, like Bartender's
@@ -61,7 +66,11 @@ final class MenuBarNativeIconCache: ObservableObject {
     func stopLive() { liveTimer?.invalidate(); liveTimer = nil }
 
     private func snapshot(_ items: [ManagedMenuBarItem], hidden: Set<String>) async {
-        let usable = Self.capturable(items, hidden: hidden)
+        // Reported frames lag a reflow (Aster's own stats resizing, apps
+        // launching); an icon must report the same frame twice in a row.
+        let settled = items.filter { lastFrames[$0.id] == $0.frame }
+        lastFrames = Dictionary(items.map { ($0.id, $0.frame) }, uniquingKeysWith: { first, _ in first })
+        let usable = Self.capturable(settled, hidden: hidden)
         guard !capturing, !usable.isEmpty else { return }
         capturing = true
         lastCapture = Date()
@@ -73,8 +82,9 @@ final class MenuBarNativeIconCache: ObservableObject {
     private func store(_ image: CGImage?, for identity: MenuBarItemIdentity) {
         guard let image, !Self.isEmpty(image) else { return }
         images[identity] = NSImage(cgImage: image, size: .zero)
-        guard !persisted.contains(identity) else { return }
-        persisted.insert(identity)
+        // Re-save at most once a minute, so a later good picture replaces a bad one.
+        guard Date().timeIntervalSince(persisted[identity] ?? .distantPast) > 60 else { return }
+        persisted[identity] = Date()
         let url = file(for: identity)
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])?.write(to: url)
@@ -91,10 +101,22 @@ final class MenuBarNativeIconCache: ObservableObject {
     /// `hidden` names what is undrawn: bundle IDs, publisher names or item
     /// titles. Any icon overlapping another one is stacked in the overflow.
     static func capturable(_ items: [ManagedMenuBarItem], hidden: Set<String>) -> [ManagedMenuBarItem] {
-        items.filter { item in
-            item.identityState == .stable && item.frame.width > 0
+        let own = ownStatusFrames()
+        return items.filter { item in
+            let inner = item.frame.insetBy(dx: 3, dy: 0)
+            return item.identityState == .stable && item.frame.width > 0
                 && hidden.isDisjoint(with: [item.bundleIdentifier, item.sourceName, item.id.title])
-                && !items.contains { $0.id != item.id && $0.frame.intersects(item.frame.insetBy(dx: 3, dy: 0)) }
+                && !items.contains { $0.id != item.id && $0.frame.intersects(inner) }
+                && !own.contains { $0.intersects(inner) }
+        }
+    }
+
+    /// Aster's own status items, top-left screen coordinates. Inventories
+    /// leave them out, yet a neighbour's stale frame can lie over them.
+    static func ownStatusFrames() -> [CGRect] {
+        let top = NSScreen.screens.first { $0.frame.origin == .zero }?.frame.maxY ?? 0
+        return NSApp.windows.filter { $0.className.contains("StatusBarWindow") && $0.isVisible }.map {
+            CGRect(x: $0.frame.minX, y: top - $0.frame.maxY, width: $0.frame.width, height: $0.frame.height)
         }
     }
 

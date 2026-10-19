@@ -595,9 +595,6 @@ final class StatusItemController {
 
             metricStatusItemFocus[group.id] = group.focusMetric
             let item = metricStatusItems[group.id] ?? installMetricStatusItem(for: group)
-            if item.length != NSStatusItem.variableLength {
-                item.length = NSStatusItem.variableLength
-            }
             guard let button = item.button else { continue }
 
             let full = NSMutableAttributedString(attributedString: title)
@@ -605,6 +602,10 @@ final class StatusItemController {
             full.addAttribute(.font,
                               value: font,
                               range: NSRange(location: 0, length: full.length))
+            // An exact width, as iStat uses: macOS's automatic length pads each
+            // side generously, which doubled narrow gauges near the notch.
+            let length = MenuBarSpacingSupport.metricItemLength(titleWidth: full.size().width)
+            if item.length != length { item.length = length }
             if button.font?.isEqual(font) != true {
                 button.font = font
             }
