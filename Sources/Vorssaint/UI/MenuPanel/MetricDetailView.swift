@@ -163,7 +163,18 @@ struct MetricDetailView: View {
         VStack(alignment: .leading, spacing: 10) {
             summaryCard
             detailCard
+            if kind == .cpu {
+                CPUCoresCard()
+                SensorsCard()
+            }
+            if kind == .memory {
+                MemoryRingCard()
+            }
+            if kind == .disk {
+                DiskRingCard()
+            }
             if kind == .network {
+                NetworkAddressCard()
                 speedTestCard
             }
             if kind.processKind != nil {
