@@ -88,7 +88,7 @@ struct CPUCoresCard: View {
         HStack {
             Text(text.loadAverage).font(.system(size: 11)).foregroundStyle(.secondary)
             Spacer()
-            Text(reading.load.map { String(format: "%.2f", $0) }.joined(separator: "  "))
+            Text(reading.load.map { String(format: "%.2f", locale: .current, $0) }.joined(separator: "  "))
                 .font(.system(size: 11, weight: .semibold).monospacedDigit())
         }
     }
