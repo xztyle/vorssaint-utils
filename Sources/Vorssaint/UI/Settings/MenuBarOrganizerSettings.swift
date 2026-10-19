@@ -54,7 +54,9 @@ struct MenuBarOrganizerSettings: View {
                         setupSection
                     }
                     editorSection
-                    behaviorSection
+                    // macOS 27 reveals hidden icons in the bar itself; there is
+                    // no divider or secondary bar left to choose between.
+                    if !MenuBarBackendPreferences.native { behaviorSection }
                     MenuBarOrganizerProfiles(service: service)
                     Section {
                         Button(MenuBarProductStrings.localized(l10n.language).search) { service.showSearch() }
