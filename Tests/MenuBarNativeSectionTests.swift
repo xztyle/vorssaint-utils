@@ -22,17 +22,40 @@ enum MenuBarNativeSectionTests {
         var mover: Layout { layout }
         var catalog: [MenuBarItemIdentity: ManagedMenuBarItem] = [:]
         var assignments: [MenuBarItemIdentity: MenuBarOrganizerSection] = [:]
+        private(set) var switchedOn: [MenuBarItemIdentity] = []
+        /// Aster's own stats are switched back on and drawn before a drag.
+        func switchOnAndWait(_ identity: MenuBarItemIdentity) async { switchedOn.append(identity) }
     }
 
     static func run(_ suite: TestSuite) {
         var finished = false
         Task { @MainActor in
-            await membership(suite); await ordering(suite); await rejection(suite); startup(suite)
+            await membership(suite); await ordering(suite); await rejection(suite); startup(suite); ownStats(suite)
             finished = true
         }
         let deadline = Date().addingTimeInterval(2)
         while !finished, Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.002)) }
         suite.expect(finished, "native section checks complete with inert movement endpoints")
+    }
+
+    /// Always Hidden switches Aster's own stat off in its settings, and only
+    /// the switches the organizer turned off come back on.
+    @MainActor private static func ownStats(_ suite: TestSuite) {
+        let domain = "com.vorssaint.tests.aster-own-stats.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: domain)!
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let stats = MenuBarOwnStatVisibility(defaults: defaults), cpu = "AsterMetric.cpu"
+        defaults.set(true, forKey: "menuBarCPU"); defaults.set(false, forKey: "menuBarCPUTemperature")
+        stats.statSwitches[cpu] = ["menuBarCPU", "menuBarCPUTemperature"]
+        stats.switchOff(cpu)
+        suite.expect(!defaults.bool(forKey: "menuBarCPU") && stats.switchedOff[cpu] == ["menuBarCPU"],
+            "Always Hidden switches the stat off in Aster's settings and records it")
+        stats.switchOn(cpu)
+        suite.expect(defaults.bool(forKey: "menuBarCPU") && !defaults.bool(forKey: "menuBarCPUTemperature")
+            && stats.switchedOff.isEmpty, "leaving Always Hidden restores exactly the switched-off stat")
+        stats.switchOff(cpu); defaults.set(true, forKey: "menuBarCPU")
+        suite.expect(stats.forgetIfSwitchedBackOn(cpu) && stats.switchedOff.isEmpty,
+            "a stat switched on again in Aster's settings leaves Always Hidden")
     }
 
     private static func startup(_ suite: TestSuite) {

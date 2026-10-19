@@ -107,7 +107,7 @@ final class MenuBarNativeIconCache: ObservableObject {
             return item.identityState == .stable && item.frame.width > 0
                 && hidden.isDisjoint(with: [item.bundleIdentifier, item.sourceName, item.id.title])
                 && !items.contains { $0.id != item.id && $0.frame.intersects(inner) }
-                && !own.contains { $0.intersects(inner) }
+                && (MenuBarOwnStatVisibility.isOwnStat(item) || !own.contains { $0.intersects(inner) })
         }
     }
 

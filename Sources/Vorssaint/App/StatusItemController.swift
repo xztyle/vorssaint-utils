@@ -25,6 +25,7 @@ final class StatusItemController {
     private var cancellables = Set<AnyCancellable>()
     private var titleTimer: Timer?
     private var defaultsObserver: NSObjectProtocol?
+    private var ownStatVisibilityObserver: NSObjectProtocol?
     /// Last combination applied by updateIconAppearance, so refresh ticks
     /// don't re-render an unchanged icon every 2 seconds.
     private var lastIconStateKey = ""
@@ -57,7 +58,7 @@ final class StatusItemController {
     /// rather than for every launch regardless of whether anyone uses it.
     private var clipboardBindingsInstalled = false
     private static let mainAutosaveName = "AsterMenuBarItem"
-    private static let metricAutosavePrefix = "AsterMetric"
+    private static let metricAutosavePrefix = MenuBarOwnStatVisibility.metricAutosavePrefix
     private static let clipboardPreviewAutosaveName = "AsterClipboardPreview"
     private static let maxPlacementGeneration = 10_000
     private static let emptyStatusImage = NSImage()
@@ -214,6 +215,11 @@ final class StatusItemController {
 
         bindClipboardPreviewIfAvailable()
 
+        // Hiding or revealing one of Aster's own stats from the organizer.
+        ownStatVisibilityObserver = NotificationCenter.default.addObserver(
+            forName: MenuBarOwnStatVisibility.didChange, object: nil, queue: .main) { [weak self] _ in
+            self?.refresh()
+        }
         defaultsObserver = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification,
                                                                   object: nil,
                                                                   queue: .main) { [weak self] _ in
@@ -267,6 +273,7 @@ final class StatusItemController {
         // a block observer that outlives this instance.
         titleTimer?.invalidate()
         if let defaultsObserver { NotificationCenter.default.removeObserver(defaultsObserver) }
+        if let ownStatVisibilityObserver { NotificationCenter.default.removeObserver(ownStatVisibilityObserver) }
         for item in metricStatusItems.values {
             NSStatusBar.system.removeStatusItem(item)
         }
@@ -572,6 +579,12 @@ final class StatusItemController {
                                           snapshot: SystemSnapshot,
                                           strings: Strings) {
         let groups = Self.metricStatusGroups(for: metrics, strings: strings)
+        let switches = groups.map { ("\(Self.metricAutosavePrefix).\($0.id)", $0.metrics.map(\.defaultsKey)) }
+        let hiddenStats = MainActor.assumeIsolated {
+            let ownStats = MenuBarOwnStatVisibility.shared
+            for (identifier, keys) in switches { ownStats.statSwitches[identifier] = keys }
+            return ownStats.hidden
+        }
         let wanted = Set(groups.map(\.id))
         removeMetricStatusItems(except: wanted)
         var rendered = 0
@@ -595,6 +608,9 @@ final class StatusItemController {
 
             metricStatusItemFocus[group.id] = group.focusMetric
             let item = metricStatusItems[group.id] ?? installMetricStatusItem(for: group)
+            // The organizer hides Aster's own stats itself (macOS 27 hides per app).
+            let shown = !hiddenStats.contains("\(Self.metricAutosavePrefix).\(group.id)")
+            if item.isVisible != shown { item.isVisible = shown }
             guard let button = item.button else { continue }
 
             let full = NSMutableAttributedString(attributedString: title)
@@ -695,6 +711,9 @@ final class StatusItemController {
         // whoever answers that announcement.
         metricStatusItems[group.id] = item
         metricStatusItemFocus[group.id] = group.focusMetric
+        // Named before it is shown: macOS 27 takes the accessibility name
+        // when the item first appears, and the organizer lists it by name.
+        item.button?.setAccessibilityIdentifier("\(Self.metricAutosavePrefix).\(group.id)")
         item.isVisible = true
         if let button = item.button {
             button.font = MenuBarRenderer.statusFont(stacked: false)

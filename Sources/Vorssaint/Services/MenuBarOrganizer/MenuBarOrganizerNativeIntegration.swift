@@ -91,13 +91,14 @@ extension MenuBarOrganizerService {
     /// Now Playing is a system module.
     var nativeUndrawn: Set<String> {
         let visibility = nativeBackend.visibility
-        guard visibility.isActive else { return visibility.concealed }
+        let ownHidden = MenuBarOwnStatVisibility.shared.hidden
+        guard visibility.isActive else { return visibility.concealed.union(ownHidden) }
         let keys = (try? MenuBarNativeLayoutAccess.shared.read().positions.keys).map(Array.init) ?? []
         let byName = keys.compactMap { key -> String? in
             guard key.hasPrefix("status:"), let name = key.dropFirst(7).components(separatedBy: "::").first,
                   !name.contains(".") else { return nil }
             return name
         }
-        return visibility.concealed.union(byName).union(["com.apple.menuextra.now-playing"])
+        return visibility.concealed.union(byName).union(ownHidden).union(["com.apple.menuextra.now-playing"])
     }
 }

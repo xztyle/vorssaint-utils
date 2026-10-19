@@ -461,6 +461,7 @@ if (( TEST )); then
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarPressReleaseGuard.swift
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarMoveGeometry.swift
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarVisibleDragTransport.swift
+        Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarOwnStatVisibility.swift
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarItemMoveError.swift
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarAXDiagnosticTrace.swift
         Sources/Vorssaint/Services/MenuBarOrganizer/MenuBarSourceMatchPolicy.swift

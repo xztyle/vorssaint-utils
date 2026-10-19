@@ -24,6 +24,12 @@ Checked live on the owner's Mac:
 - **Accessibility keeps listing hidden icons at stale frames.** Hiding is
   verified by the icons that must stay visible, never by the hidden ones
   disappearing.
+- **Aster hides its own stat icons itself.** The system pass must always allow
+  Aster, so a Hidden stat is switched off in the bar until `‹` reveals it, and
+  an Always Hidden stat is switched off in Aster's own stat settings. Dragging
+  it out switches it back on; switching it on in settings moves it to Visible.
+  Each stat item is named `AsterMetric.<id>` before it is shown, because
+  macOS 27 reads the accessibility name when the item first appears.
 - **The SMC limiter keys `bfF0`, `bfD0`, `bfE0` need private Apple
   entitlements.** Even root reads fail with `kIOReturnNotPrivileged`.
 
