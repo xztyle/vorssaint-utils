@@ -9,6 +9,8 @@ final class BatteryController {
     var makeHardware: () throws -> any BatteryChargeHardware = { try BatteryHardware() }
     let readSample: () -> BatterySample?
     let readCompetitors: () -> [String]
+    /// Unattended hardware tests never run in a bag: each one restarts powerd.
+    var lidRequiresSleep: () -> Bool = BatteryNativePolicyIO.lidRequiresSleep
     var state: BatteryCareState
     var hardware: (any BatteryChargeHardware)?
     var snapshot = BatteryCareSnapshot()
@@ -364,7 +366,7 @@ final class BatteryController {
             snapshot.reason = .unplugged
             return
         }
-        guard !sleeping, (state.qualificationFailures ?? 0) < 3 else {
+        guard !sleeping, !lidRequiresSleep(), (state.qualificationFailures ?? 0) < 3 else {
             snapshot.reason = .unavailable
             return
         }

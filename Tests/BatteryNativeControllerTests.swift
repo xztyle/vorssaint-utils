@@ -10,6 +10,7 @@ enum BatteryNativeControllerTests {
             try savedPolicy(suite)
             try qualification(suite)
             try restart(suite)
+            try closedLid(suite)
         } catch { suite.expect(false, "native controller checks failed: \(error)") }
     }
 
@@ -91,6 +92,19 @@ enum BatteryNativeControllerTests {
         replacement.tick()
         suite.expect(replacement.state.nativeLease?.token == token && replacement.state.nativeLease?.owner == 3456,
                      "first replacement tick reclaims the saved rule without removing protection first")
+    }
+
+    private static func closedLid(_ suite: TestSuite) throws {
+        let fixture = NativeControllerFixture()
+        fixture.store.state.policy.enabled = true
+        let controller = fixture.controller()
+        controller.lidRequiresSleep = { true }
+        controller.probe(); controller.tick()
+        suite.expect(controller.qualification == nil && fixture.io.reloads == 0,
+                     "a closed lid never starts an unattended test that restarts powerd")
+        controller.lidRequiresSleep = { false }
+        controller.tick()
+        suite.expect(controller.qualification != nil, "the test starts once the lid is open")
     }
 
     private static func advance(_ controller: BatteryController) {

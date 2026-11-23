@@ -18,7 +18,9 @@ final class KeepAwakeManager: ObservableObject {
     enum EndReason { case manual, timer, battery, quit }
     enum SessionTrigger { case manual, automation }
 
-    @Published private(set) var isActive = false
+    @Published private(set) var isActive = false {
+        didSet { if isActive != oldValue { syncLidDimmingObserver() } }
+    }
     @Published private(set) var endDate: Date? // nil = indefinite
     @Published private(set) var sessionTrigger: SessionTrigger?
     /// The preset a manual session started from; nil for an end time or automation.
@@ -670,10 +672,20 @@ final class KeepAwakeManager: ObservableObject {
     // MARK: - IOKit assertions
 
     private func applyAssertions() {
+        // Without closed-lid mode a shut lid must sleep. A restarted powerd
+        // no longer acts on the lid, so an idle assertion would keep the Mac
+        // awake in a bag until the battery is empty.
+        guard !lidRequiresSleep else { releaseAssertions(); sleepIfLidAlreadyClosed(); return }
         powerAssertions.apply(allowDisplaySleep: UserDefaults.standard.bool(forKey: DefaultsKey.keepAwakeAllowDisplaySleep))
     }
 
     private func releaseAssertions() { powerAssertions.clear() }
+
+    /// macOS's own lid policy decides: an external display keeps a closed Mac
+    /// awake as usual, while a closed lid in a bag must sleep.
+    private var lidRequiresSleep: Bool {
+        !clamshellActive && BrightnessService.lidClosed() == true && Self.lidSleepIsAllowed()
+    }
 
     // MARK: - Closed lid (pmset disablesleep)
 
@@ -854,7 +866,7 @@ final class KeepAwakeManager: ObservableObject {
         let generation = generation ?? lidSleepGeneration
         guard generation == lidSleepGeneration else { return }
         lidSleepAttemptsRemaining = 0
-        guard !isActive || sessionPausedForScreenLock, !clamshellActive else { return }
+        guard !isActive || sessionPausedForScreenLock || lidRequiresSleep, !clamshellActive else { return }
         guard BrightnessService.lidClosed() == true, Self.lidSleepIsAllowed() else { return }
         let rootDomain = IOPMFindPowerManagement(kIOMainPortDefault)
         guard rootDomain != 0 else { return }
@@ -981,7 +993,7 @@ final class KeepAwakeManager: ObservableObject {
     private func syncLidDimmingObserver() {
         let armed = clamshellActive && dimScreenOnLidClose
         if !armed { applyDimmingAction(LidDimmingSupport.restoring(saved: savedDisplayBrightness)) }
-        guard armed || savedDisplayBrightness != nil else {
+        guard armed || isActive || savedDisplayBrightness != nil else {
             if lidDimmingNotification != 0 { IOObjectRelease(lidDimmingNotification) }
             lidDimmingNotification = 0
             if let lidDimmingNotificationPort { IONotificationPortDestroy(lidDimmingNotificationPort) }
@@ -989,11 +1001,20 @@ final class KeepAwakeManager: ObservableObject {
             lidClosedForDimming = nil
             return
         }
-        guard lidDimmingNotificationPort == nil else { return }
+        if lidDimmingNotificationPort == nil, !registerLidObserver() { return }
+        // The option can be enabled from an external display while the lid is
+        // already shut. No transition follows in that case.
+        if armed, BrightnessService.lidClosed() == true, savedDisplayBrightness == nil {
+            applyDimmingAction(LidDimmingSupport.lidClosed(
+                currentBrightness: LidDisplayDimmer.currentBrightness()))
+        }
+    }
+
+    private func registerLidObserver() -> Bool {
         let root = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPMrootDomain"))
-        guard root != 0 else { return }
+        guard root != 0 else { return false }
         defer { IOObjectRelease(root) }
-        guard let port = IONotificationPortCreate(kIOMainPortDefault) else { return }
+        guard let port = IONotificationPortCreate(kIOMainPortDefault) else { return false }
         let result = IOServiceAddInterestNotification(
             port, root, kIOGeneralInterest, { context, _, _, _ in
                 guard let context else { return }
@@ -1002,17 +1023,12 @@ final class KeepAwakeManager: ObservableObject {
             }, Unmanaged.passUnretained(self).toOpaque(), &lidDimmingNotification)
         guard result == KERN_SUCCESS else {
             IONotificationPortDestroy(port)
-            return
+            return false
         }
         lidDimmingNotificationPort = port
         IONotificationPortSetDispatchQueue(port, DispatchQueue.main)
         lidClosedForDimming = BrightnessService.lidClosed()
-        // The option can be enabled from an external display while the lid is
-        // already shut. No transition follows registration in that case.
-        if armed, lidClosedForDimming == true, savedDisplayBrightness == nil {
-            applyDimmingAction(LidDimmingSupport.lidClosed(
-                currentBrightness: LidDisplayDimmer.currentBrightness()))
-        }
+        return true
     }
 
     /// General interest fires on far more than lid transitions, so the
@@ -1021,16 +1037,30 @@ final class KeepAwakeManager: ObservableObject {
     /// callback already queued when the feature was torn down: it lands here
     /// as a no-op instead of acting on a mode that already ended.
     private func lidStateMayHaveChangedForDimming() {
-        guard (clamshellActive && dimScreenOnLidClose) || savedDisplayBrightness != nil else { return }
         let closed = BrightnessService.lidClosed() ?? false
         guard closed != lidClosedForDimming else { return }
         lidClosedForDimming = closed
+        lidStateChangedForSession(closed: closed)
+        guard (clamshellActive && dimScreenOnLidClose) || savedDisplayBrightness != nil else { return }
         if closed {
             if clamshellActive, dimScreenOnLidClose {
                 applyDimmingAction(LidDimmingSupport.lidClosed(currentBrightness: LidDisplayDimmer.currentBrightness()))
             }
         } else {
             applyDimmingAction(LidDimmingSupport.restoring(saved: savedDisplayBrightness))
+        }
+    }
+
+    /// A session without closed-lid mode lets go when the lid shuts and asks
+    /// for the sleep the lid would have caused; it holds again on opening.
+    private func lidStateChangedForSession(closed: Bool) {
+        guard isActive, !sessionPausedForScreenLock, !clamshellActive else { return }
+        if closed {
+            releaseAssertions()
+            Self.log.log("lid closed without closed-lid mode: released the keep-awake hold")
+            sleepIfLidAlreadyClosed()
+        } else {
+            applyAssertions()
         }
     }
 

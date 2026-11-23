@@ -133,6 +133,8 @@ enum KeepAwakeDimmingTests {
                && C.DimmingObserver.destroyedPorts == 0,
                "exhausting the retries after the option is switched off still owes the restore and keeps watching the lid")
         C.LidDisplayDimmer.writeSucceeds = true
+        // A running session keeps watching the lid for its own sleep rule.
+        exhausted.isActive = false
         C.BrightnessService.lid = false
         C.DimmingObserver.callback?()
         C.drain()

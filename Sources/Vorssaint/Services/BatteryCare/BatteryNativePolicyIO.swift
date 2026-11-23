@@ -3,6 +3,7 @@
 
 import Foundation
 import Darwin
+import IOKit.pwr_mgt
 
 struct BatteryNativePolicySnapshot {
     let boot: String?
@@ -74,9 +75,41 @@ final class BatteryNativePolicyIO: BatteryNativePolicyTransport {
         let deadline = Date().addingTimeInterval(6)
         repeat {
             usleep(100_000)
-            if let fresh = try? powerdPID(), fresh != previous { return }
+            if let fresh = try? powerdPID(), fresh != previous {
+                Self.sleepIfLidClosed()
+                return
+            }
         } while Date() < deadline
         throw BatteryHardwareError.mismatch
+    }
+
+    /// A restarted powerd no longer acts on a lid that was already shut, so a
+    /// Mac in a bag would stay awake until its battery is empty. Request the
+    /// sleep the lid asked for when the kernel says a closed lid means sleep
+    /// (false with an external display or closed-lid mode). The fresh powerd
+    /// can refuse briefly while it starts, so a refusal is retried.
+    static func sleepIfLidClosed(attempts: Int = 10) {
+        for attempt in 1...attempts {
+            guard lidRequiresSleep() else { return }
+            let port = IOPMFindPowerManagement(kIOMainPortDefault)
+            guard port != 0 else { return }
+            let result = IOPMSleepSystem(port)
+            IOServiceClose(port)
+            if result == kIOReturnSuccess || attempt == attempts { return }
+            usleep(500_000)
+        }
+    }
+
+    /// True when the lid is shut and the kernel says that means sleep.
+    static func lidRequiresSleep() -> Bool {
+        let root = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPMrootDomain"))
+        guard root != 0 else { return false }
+        defer { IOObjectRelease(root) }
+        func flag(_ key: String) -> Bool {
+            IORegistryEntryCreateCFProperty(root, key as CFString, kCFAllocatorDefault, 0)?
+                .takeRetainedValue() as? Bool == true
+        }
+        return flag(kAppleClamshellStateKey) && flag(kAppleClamshellCausesSleepKey)
     }
 
     private func powerdPID() throws -> pid_t {

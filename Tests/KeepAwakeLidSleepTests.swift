@@ -188,7 +188,7 @@ enum KeepAwakeLidSleepTests {
             let service = C.reset(); C.results = [1]
             service.sleepIfLidAlreadyClosed()
             switch change {
-            case 0: service.isActive = true
+            case 0: service.isActive = true; C.policy = false
             case 1: C.BrightnessService.lid = false
             case 2: C.policy = false
             case 3: service.clamshellActive = true
@@ -203,6 +203,21 @@ enum KeepAwakeLidSleepTests {
             C.DispatchQueue.main.advance()
             expect(C.calls == 1, "a canceled retry cannot resume after a later context change")
         }
+        let session = C.reset(); session.isActive = true
+        session.sleepIfLidAlreadyClosed()
+        expect(C.calls == 1, "an active session without closed-lid mode still sleeps when the lid shuts")
+        let desk = C.reset(); desk.isActive = true; C.policy = false
+        desk.sleepIfLidAlreadyClosed()
+        expect(C.calls == 0, "an external display's no-sleep lid policy keeps an active session awake")
+        let held = C.reset(); held.isActive = true; held.assertionsHeld = true
+        held.lidStateChangedForSession(closed: true)
+        expect(!held.assertionsHeld && C.calls == 1, "closing the lid releases the hold and requests sleep")
+        held.lidStateChangedForSession(closed: false)
+        expect(held.assertionsHeld, "opening the lid holds the Mac awake again")
+        let clamshell = C.reset(); clamshell.isActive = true; clamshell.clamshellActive = true
+        clamshell.assertionsHeld = true
+        clamshell.lidStateChangedForSession(closed: true)
+        expect(clamshell.assertionsHeld && C.calls == 0, "closed-lid mode keeps the Mac awake with the lid shut")
         let paused = C.reset(); paused.isActive = true; paused.sessionPausedForScreenLock = true
         paused.sleepIfLidAlreadyClosed()
         expect(C.calls == 1, "a session paused for screen lock no longer asks to stay awake")
